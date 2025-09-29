@@ -45,7 +45,7 @@
       position:absolute;
       bottom:80px;
       left:20px;
-      width:740px;
+      width:1110px;
       height:320px;
       background:white;
       border-radius:6px;
@@ -82,6 +82,7 @@
 
   <!-- Logout button -->
   <div id="topBar">
+    Hi, {{ user }} |
     <a href="{{ url_for('dashboard') }}">🏠 Dashboard</a> |
     <a href="{{ url_for('logout') }}">🚪 Logout</a>
   </div>
@@ -100,6 +101,7 @@
 
   <!-- Charts Panel -->
   <div id="chartsPanel">
+    <div class="chartBox"><canvas id="dirChart"></canvas></div>
     <div class="chartBox"><canvas id="windChart"></canvas></div>
     <div class="chartBox"><canvas id="thermoChart"></canvas></div>
   </div>
@@ -152,6 +154,23 @@
         }
       }
     });
+
+    // --- Wind Direction Chart ---
+    const dirChartData = { datasets: [
+      { label: 'Wind Dir (°)', data: [], borderColor: 'green', showLine:true }
+    ]};
+    const dirChart = new Chart(document.getElementById('dirChart'), {
+      type: 'scatter', data: dirChartData,
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          x: { title: { display: true, text: 'Direction (°)' }, min:0, max:360 },
+          y: { title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 25000 }
+        }
+      }
+    });
+    
 
     const thermoChartData = { datasets: [
       { label: 'Temp (°C)', data: [], borderColor: 'orange', showLine:true },
@@ -307,18 +326,24 @@
       windChartData.datasets[1].data = subset.map(l => ({ x: l.wind_speed_mps ?? null, y: l.height_m }));
       thermoChartData.datasets[0].data = subset.map(l => ({ x: l.temp_C ?? null, y: l.height_m }));
       thermoChartData.datasets[1].data = subset.map(l => ({ x: l.dewpoint_C ?? null, y: l.height_m }));
-
+      dirChartData.datasets[0].data = subset.map(l => ({ x: l.wind_dir_deg ?? null, y: l.height_m }));
+      
       // Auto-scale >25 km
       const h = data.height_m;
       if (isFiniteNumber(h) && h > 25000) {
         windChart.options.scales.y.suggestedMax = null;
         thermoChart.options.scales.y.suggestedMax = null;
+        dirChart.options.scales.y.suggestedMax = null;
       } else {
         windChart.options.scales.y.suggestedMax = 25000;
         thermoChart.options.scales.y.suggestedMax = 25000;
+        dirChart.options.scales.y.suggestedMax = 25000;
       }
+      
       windChart.update();
       thermoChart.update();
+      dirChart.update();
+      
 
       // Balloon path up to current frame
       const trackCoords = subset
