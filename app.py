@@ -691,19 +691,24 @@ def raob_analysis(site, filename):
         except Exception:
             pass
 
-        # --- Tropopause (WMO: lapse rate < 2°C/km) ---
+        # --- Tropopause (WMO: lapse rate ≤ 2 °C/km) ---
         tropopause_level = "-"
         try:
             if "height_m" in thermo:
-                lapse_rate = mpcalc.lapse_rate(
-                    thermo["temp_C"].values * units.degC,
-                    thermo["height_m"].values * units.meter
-                ).to("degC/km")
-                bad = np.where(lapse_rate > -2 * units("degC/km"))[0]
-                if bad.size > 0:
-                    tropopause_level = f"{thermo.iloc[bad[0]]['pressure_hPa']:.0f} hPa"
-        except Exception:
-            pass
+                T_vals = thermo["temp_C"].values
+                Z_vals = thermo["height_m"].values
+        
+                # Simple finite-difference lapse rate (°C/km)
+                lapse_rate = np.gradient(T_vals, Z_vals) * 1000.0  
+        
+                # Find first level where lapse rate ≥ -2 °C/km
+                mask = lapse_rate >= -2.0
+                if np.any(mask):
+                    idx = np.where(mask)[0][0]
+                    tropopause_level = f"{thermo.iloc[idx]['pressure_hPa']:.0f} hPa"
+        except Exception as e:
+            print("Tropopause calc failed:", e)
+
 
         # --- Skew-T plot ---
         fig1 = plt.figure(figsize=(6, 6))

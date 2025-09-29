@@ -3,62 +3,66 @@
 <head>
   <meta charset="utf-8">
   <title>RAOB Analysis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       background: #f8fafc;
       color: #222;
     }
     header {
       background: #0d6efd;
       color: white;
-      padding: 20px;
+      padding: 15px;
       text-align: center;
     }
-    header h1 { margin: 0; font-size: 28px; }
     main {
       max-width: 1200px;
       margin: 20px auto;
       padding: 0 20px;
     }
-    h2 {
-      margin-top: 30px;
-      text-align: center;
-      color: #0d6efd;
-      border-bottom: 2px solid #0d6efd33;
-      padding-bottom: 5px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 15px 0;
-      background: white;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 10px 14px;
-      text-align: left;
-    }
-    th {
-      background: #f1f5f9;
-      color: #333;
-      font-weight: 600;
-    }
-    td.val {
-      font-weight: bold;
-      text-align: right;
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
     }
     .card {
       background: white;
       border-radius: 8px;
-      padding: 20px;
-      margin: 20px 0;
+      padding: 15px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
     }
+    .headline {
+      font-size: 15px;
+      margin-bottom: 10px;
+      background: #f0f2f5;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .plots img {
+      width: 100%;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .indices-table, .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    .indices-table th, .indices-table td,
+    .meta-table th, .meta-table td {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+    }
+    .indices-table th, .meta-table th {
+      background: #f0f2f5;
+      text-align: left;
+    }
+    .val { font-weight: bold; }
     .legend {
       display: flex;
       justify-content: space-around;
@@ -76,140 +80,143 @@
       width: 16px; height: 16px;
       border-radius: 3px;
     }
-    .plots {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-    .plots img {
-      max-width: 100%;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    .plots div {
-      flex: 1 1 45%;
-      text-align: center;
-    }
     .btn {
       display: inline-block;
       background: #0d6efd;
       color: white;
-      padding: 8px 14px;
+      padding: 6px 12px;
       border-radius: 6px;
       text-decoration: none;
-      margin-top: 10px;
       font-size: 14px;
-      transition: background 0.2s;
-      cursor: pointer;
+      margin-top: 6px;
     }
     .btn:hover { background: #0b5ed7; }
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-
   <header>
-    <h1>RAOB Analysis</h1>
+    <h1>RAOB Analysis – {{ meta.get("launch_time", "-") }}</h1>
   </header>
 
   <main>
-
-    <!-- Metadata -->
-    <div class="card">
-      <h2>Metadata</h2>
-      <table>
-        <tbody>
-          {% for k, v in meta.items() %}
-            <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Indices -->
-    <div class="card">
-      <h2>Indices</h2>
-      <table id="indicesTable">
-        <tbody>
-          {% for k, v in indices.items() %}
-            <tr>
-              <th>{{ k }}</th>
-              <td class="val">{{ v }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-
-      <!-- Download button -->
-      <div style="text-align:center;">
-        <a href="#" class="btn" onclick="downloadCSV()">⬇ Download CSV</a>
-      </div>
-
-      <!-- Legend -->
-      <div class="legend">
-        <div class="legend-item"><span style="background:red;"></span> Severe / Extreme</div>
-        <div class="legend-item"><span style="background:orange;"></span> Strong / Significant</div>
-        <div class="legend-item"><span style="background:green;"></span> Moderate</div>
-        <div class="legend-item"><span style="background:black;"></span> Weak / Neutral</div>
-      </div>
-    </div>
-
-    <!-- Plots -->
-    <div class="card">
-      <h2>Plots</h2>
-      <div class="plots">
-        <div>
-          <h3>Skew-T</h3>
+    <div class="grid">
+      <!-- Left column: Skew-T + Metadata -->
+      <div>
+        <div class="card">
+          <h2>Skew-T Log-P</h2>
+          <div class="headline">
+            CAPE: <span id="capeVal">{{ indices["CAPE (J/kg)"] }}</span> J/kg &nbsp; | 
+            CIN: <span id="cinVal">{{ indices["CIN (J/kg)"] }}</span> J/kg &nbsp; | 
+            LI: <span id="liVal">{{ indices["Lifted Index (°C)"] }}</span> &nbsp; | 
+            KI: <span id="kiVal">{{ indices["K Index (°C)"] }}</span>
+          </div>
           <img id="skewtImg" src="data:image/png;base64,{{ skewt_img }}" alt="Skew-T">
-          <br>
-          <a class="btn" onclick="downloadPlot('skewtImg','skewt.png')">⬇ Download PNG</a>
+          <div style="text-align:center;">
+            <a class="btn" onclick="downloadPlot('skewtImg','skewt.png')">⬇ Download PNG</a>
+          </div>
         </div>
-        {% if hodo_img %}
-        <div>
-          <h3>Hodograph</h3>
-          <img id="hodoImg" src="data:image/png;base64,{{ hodo_img }}" alt="Hodograph">
-          <br>
-          <a class="btn" onclick="downloadPlot('hodoImg','hodograph.png')">⬇ Download PNG</a>
+
+        <div class="card">
+          <h2>Metadata</h2>
+          <table class="meta-table">
+            <tbody>
+              {% for k, v in meta.items() %}
+                <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-        {% endif %}
+      </div>
+
+      <!-- Right column: Hodograph + Indices -->
+      <div>
+        <div class="card">
+          <h2>Hodograph</h2>
+          <div class="headline">
+            Shear 0–1 km: <span id="shear1">{{ indices["0–1 km Bulk Shear (kt)"] }}</span> kt &nbsp; | 
+            Shear 0–6 km: <span id="shear6">{{ indices["0–6 km Bulk Shear (kt)"] }}</span> kt <br>
+            SRH 0–1 km: <span id="srh1">{{ indices["SRH 0–1 km (m²/s²)"] }}</span> &nbsp; | 
+            SRH 0–3 km: <span id="srh3">{{ indices["SRH 0–3 km (m²/s²)"] }}</span>
+          </div>
+          {% if hodo_img %}
+            <img id="hodoImg" src="data:image/png;base64,{{ hodo_img }}" alt="Hodograph">
+            <div style="text-align:center;">
+              <a class="btn" onclick="downloadPlot('hodoImg','hodograph.png')">⬇ Download PNG</a>
+            </div>
+          {% else %}
+            <p style="color:gray;">No wind data available</p>
+          {% endif %}
+        </div>
+
+        <div class="card">
+          <h2>Indices Table</h2>
+          <table id="indicesTable" class="indices-table">
+            <tbody>
+              {% for k, v in indices.items() %}
+                <tr>
+                  <th>{{ k }}</th>
+                  <td class="val">{{ v }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div style="text-align:center;">
+            <a href="#" class="btn" onclick="downloadCSV()">⬇ Download CSV</a>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span style="background:red;"></span> Severe</div>
+            <div class="legend-item"><span style="background:orange;"></span> Strong</div>
+            <div class="legend-item"><span style="background:green;"></span> Moderate</div>
+            <div class="legend-item"><span style="background:black;"></span> Neutral</div>
+          </div>
+        </div>
       </div>
     </div>
-
   </main>
 
-  <!-- Script for coloring + CSV + PNG -->
   <script>
+    function colorCell(cell, label, val) {
+      if (label.includes("CAPE") && !isNaN(val)) {
+        if (val > 2000) cell.style.color = "red";
+        else if (val > 1000) cell.style.color = "orange";
+        else if (val > 500) cell.style.color = "green";
+      }
+      if (label.includes("SRH") && !isNaN(val)) {
+        if (val > 300) cell.style.color = "red";
+        else if (val > 150) cell.style.color = "orange";
+        else if (val > 100) cell.style.color = "green";
+      }
+      if (label.includes("Shear") && !isNaN(val)) {
+        if (val > 40) cell.style.color = "red";
+        else if (val > 20) cell.style.color = "orange";
+      }
+      if (label.includes("Lifted Index") && !isNaN(val)) {
+        if (val < -6) cell.style.color = "red";
+        else if (val < -3) cell.style.color = "orange";
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
-      const rows = document.querySelectorAll("#indicesTable tr");
-      rows.forEach(row => {
+      // Table coloring
+      document.querySelectorAll("#indicesTable tr").forEach(row => {
         const label = row.querySelector("th")?.innerText || "";
-        const valCell = row.querySelector("td.val");
-        if (!valCell) return;
-        const val = parseFloat(valCell.innerText);
+        const cell = row.querySelector("td.val");
+        if (!cell) return;
+        const val = parseFloat(cell.innerText);
+        colorCell(cell, label, val);
+      });
 
-        if (label.includes("CAPE") && !isNaN(val)) {
-          if (val > 2000) valCell.style.color = "red";
-          else if (val > 1000) valCell.style.color = "orange";
-          else if (val > 500) valCell.style.color = "green";
-        }
-
-        if (label.includes("SRH") && !isNaN(val)) {
-          if (val > 300) valCell.style.color = "red";
-          else if (val > 150) valCell.style.color = "orange";
-          else if (val > 100) valCell.style.color = "green";
-        }
-
-        if (label.includes("Shear") && !isNaN(val)) {
-          if (val > 40) valCell.style.color = "red";
-          else if (val > 20) valCell.style.color = "orange";
-        }
-
-        if (label.includes("Lifted Index") && !isNaN(val)) {
-          if (val < -6) valCell.style.color = "red";
-          else if (val < -3) valCell.style.color = "orange";
-        }
+      // Headline coloring (Skew-T and Hodograph)
+      [["capeVal","CAPE"], ["cinVal","CIN"], ["liVal","Lifted Index"], ["kiVal","K Index"],
+       ["shear1","0–1 km Bulk Shear"], ["shear6","0–6 km Bulk Shear"],
+       ["srh1","SRH"], ["srh3","SRH"]].forEach(([id,label]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const val = parseFloat(el.innerText);
+        colorCell(el, label, val);
       });
     });
 
@@ -223,8 +230,8 @@
       });
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "raob_indices.csv");
+      link.href = encodedUri;
+      link.download = "raob_indices.csv";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -240,6 +247,5 @@
       document.body.removeChild(a);
     }
   </script>
-
 </body>
 </html>
