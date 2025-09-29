@@ -190,7 +190,7 @@ def parse_bufr(decoded_text):
 def fetch_all_sites():
     result = {}
     cfg = CONFIG["ftp"]
-    exts = cfg.get("file_ext", [".bufr"])   # list of allowed extensions
+    exts = cfg.get("file_ext", [".bufr",".bfh",".bfr"])   # list of allowed extensions
 
     try:
         with ftplib.FTP() as ftp:
