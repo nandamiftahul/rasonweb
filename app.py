@@ -1,6 +1,5 @@
 #! /usr/bin/python3
 import os
-from dotenv import load_dotenv
 import json
 import ftplib
 import subprocess
@@ -11,6 +10,8 @@ from flask import (
     url_for, jsonify, session
 )
 from functools import wraps
+
+from dotenv import load_dotenv
 
 # Load local .env file (ignored in production)
 load_dotenv()
@@ -28,7 +29,6 @@ CONFIG = {
         "limit": int(os.getenv("FTP_LIMIT", "10"))
     }
 }
-
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -37,7 +37,12 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 
 # --- Authentication ---
-VALID_USERS = {"admin": "meteomodem"}
+VALID_USERS = {
+    "admin": "meteomodem",
+    "trial1": "trialpass",
+    "trial2": "12345",
+    "guest": "guest123"
+}
 
 def login_required(f):
     @wraps(f)
@@ -124,23 +129,23 @@ def parse_bufr(decoded_text):
 
         # --- Per-level data ---
         elif "PRESSURE" in line and "007004" in line:
-            current["pressure_hPa"] = float(line.split()[-1]) / 100.0
+            current["pressure_hPa"] = safe_float(line.split()[-1]) / 100.0
         elif "GEOPOTENTIAL HEIGHT" in line and "010009" in line:
-            current["height_m"] = float(line.split()[-1])
+            current["height_m"] = safe_float(line.split()[-1])
         elif "TEMPERATURE/AIR TEMPERATURE" in line:
-            current["temp_C"] = float(line.split()[-1]) - 273.15
+            current["temp_C"] = safe_float(line.split()[-1]) - 273.15
         elif "DEW-POINT TEMPERATURE" in line:
-            current["dewpoint_C"] = float(line.split()[-1]) - 273.15
+            current["dewpoint_C"] = safe_float(line.split()[-1]) - 273.15
         elif "WIND DIRECTION" in line and "011001" in line:
-            current["wind_dir_deg"] = float(line.split()[-1])
+            current["wind_dir_deg"] = safe_float(line.split()[-1])
         elif "WIND SPEED" in line and "011002" in line:
-            current["wind_speed_mps"] = float(line.split()[-1])
+            current["wind_speed_mps"] = safe_float(line.split()[-1])
         elif "LATITUDE DISPLACEMENT" in line and "005015" in line:
-            current["lat_disp"] = float(line.split()[-1])
+            current["lat_disp"] = safe_float(line.split()[-1])
         elif "LONGITUDE DISPLACEMENT" in line and "006015" in line:
-            current["lon_disp"] = float(line.split()[-1])
+            current["lon_disp"] = safe_float(line.split()[-1])
         elif "LONG TIME PERIOD OR DISPLACEMENT" in line and "004086" in line:
-            current["time_s"] = float(line.split()[-1])
+            current["time_s"] = safe_float(line.split()[-1])
         elif "EXTENDED VERTICAL SOUNDING SIGNIFICANCE" in line and "008042" in line:
             current["status_flag"] = line.split()[-1]
         elif "TRACKING TECHNIQUE/STATUS OF SYSTEM USED" in line and "002014" in line:
@@ -229,7 +234,14 @@ def download_and_process(site, filename):
     except Exception as e:
         print(f"FTP download error: {e}")
         metadata, rason_levels = {}, []
-        
+
+def safe_float(val):
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return np.nan
+
+
 # --- Routes ---
 @app.route("/dashboard")
 @login_required
@@ -258,9 +270,11 @@ def index():
         df_meta, df_levels = parse_bufr(decoded)
         metadata = df_meta.to_dict("records")[0] if not df_meta.empty else {}
         rason_levels = df_levels.to_dict("records") if not df_levels.empty else []
+
         return redirect(url_for("index"))
 
-    return render_template("map.html", total=len(rason_levels))
+    # 👉 Pass user to template
+    return render_template("map.html", total=len(rason_levels), user=session.get("user"))
 
 @app.route("/value")
 @login_required
@@ -281,6 +295,7 @@ def rason_metadata():
 @login_required
 def all_levels_route():
     return jsonify(rason_levels)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
