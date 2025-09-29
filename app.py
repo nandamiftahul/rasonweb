@@ -669,18 +669,30 @@ def raob_analysis(site, filename):
         srh_0_1km = srh_0_3km = np.nan * units("m^2/s^2")
         if (u is not None) and (v is not None) and (hgt is not None):
             try:
-                rmotion, lmotion, mean_wind = mpcalc.bunkers_storm_motion(p_w, u, v, hgt)
+                # Ensure sorted by height
+                sort_idx = np.argsort(hgt)
+                hgt_sorted = hgt[sort_idx]
+                u_sorted = u[sort_idx]
+                v_sorted = v[sort_idx]
+        
+                # Storm motion (Bunkers right mover)
+                rmotion, lmotion, mean_wind = mpcalc.bunkers_storm_motion(p_w, u_sorted, v_sorted, hgt_sorted)
                 storm_u, storm_v = rmotion
+        
+                # SRH integrations
                 srh_0_1km, _, _ = mpcalc.storm_relative_helicity(
-                    hgt, u, v, depth=1000*units.m,
+                    hgt_sorted, u_sorted, v_sorted,
+                    depth=1000*units.m, bottom=0*units.m,
                     storm_u=storm_u, storm_v=storm_v
                 )
                 srh_0_3km, _, _ = mpcalc.storm_relative_helicity(
-                    hgt, u, v, depth=3000*units.m,
+                    hgt_sorted, u_sorted, v_sorted,
+                    depth=3000*units.m, bottom=0*units.m,
                     storm_u=storm_u, storm_v=storm_v
                 )
             except Exception as e:
                 print("SRH calculation failed:", e)
+        
 
         # --- Freezing Level ---
         freezing_level = "-"
@@ -695,19 +707,25 @@ def raob_analysis(site, filename):
         tropopause_level = "-"
         try:
             if "height_m" in thermo:
-                T_vals = thermo["temp_C"].values
-                Z_vals = thermo["height_m"].values
+                T_vals = thermo["temp_C"].values * units.degC
+                Z_vals = thermo["height_m"].values * units.meter
         
-                # Simple finite-difference lapse rate (°C/km)
-                lapse_rate = np.gradient(T_vals, Z_vals) * 1000.0  
+                # Compute lapse rate profile
+                lapse = mpcalc.lapse_rate(T_vals, Z_vals).to("degC/km")
         
-                # Find first level where lapse rate ≥ -2 °C/km
-                mask = lapse_rate >= -2.0
-                if np.any(mask):
-                    idx = np.where(mask)[0][0]
-                    tropopause_level = f"{thermo.iloc[idx]['pressure_hPa']:.0f} hPa"
+                for i in range(len(Z_vals)):
+                    if lapse[i] >= -2.0 * units("degC/km"):
+                        # Check mean lapse over next 2 km
+                        z_top = Z_vals[i] + 2000 * units.m
+                        mask = (Z_vals >= Z_vals[i]) & (Z_vals <= z_top)
+                        if mask.sum() > 1:
+                            mean_lapse = np.mean(lapse[mask])
+                            if mean_lapse >= -2.0 * units("degC/km"):
+                                tropopause_level = f"{thermo.iloc[i]['pressure_hPa']:.0f} hPa"
+                                break
         except Exception as e:
             print("Tropopause calc failed:", e)
+
 
 
         # --- Skew-T plot ---
