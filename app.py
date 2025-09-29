@@ -10,7 +10,7 @@ from flask import (
     url_for, jsonify, session, send_file, Response
 )
 from functools import wraps
-
+from collections import defaultdict
 from dotenv import load_dotenv
 from datetime import datetime
 import matplotlib
@@ -48,6 +48,20 @@ app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 
+# In-memory per-user store (username -> {"metadata": {...}, "levels": [...]})
+USER_STATE = defaultdict(lambda: {"metadata": {}, "levels": []})
+
+def get_user_store():
+    """Return the current user's store dict."""
+    user = session.get("user")
+    return USER_STATE[user]
+
+def clear_user_store():
+    """Wipe current user's store on logout."""
+    user = session.get("user")
+    if user in USER_STATE:
+        del USER_STATE[user]
+
 # --- Authentication ---
 VALID_USERS = {
     "admin": "meteomodem",
@@ -82,12 +96,9 @@ def login():
 
 @app.route("/logout")
 def logout():
+    clear_user_store()
     session.pop("user", None)
     return redirect(url_for("login"))
-
-# --- Global store ---
-rason_levels = []   # list of dicts (per level)
-metadata = {}       # dict for station metadata
 
 # --- BUFR decode ---
 def decode_bufr(filepath):
@@ -281,8 +292,7 @@ def api_sites_with_meta():
     return jsonify(sites)
 
 def download_and_process(site, filename):
-    """Fetch BUFR file from FTP and process into rason_levels + metadata."""
-    global rason_levels, metadata
+    """Fetch BUFR from FTP and save into THIS user's store."""
     cfg = CONFIG["ftp"]
     local_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
 
@@ -292,19 +302,21 @@ def download_and_process(site, filename):
             ftp.login(cfg["user"], cfg["password"])
             ftp.cwd(f"{cfg['base_path']}/{site}")
             with open(local_path, "wb") as f:
-                ftp.retrbinary(f"RETR {filename}", f.write)
+                ftp.retrbinary(f"RETR " + filename, f.write)
 
         decoded = decode_bufr(local_path)
         df_meta, df_levels = parse_bufr(decoded)
-        
-        issues = analyze_flight(df_meta, df_levels)   # ⬅️ add here
-        metadata = df_meta.to_dict("records")[0] if not df_meta.empty else {}
-        metadata["flight_issues"] = issues            # ⬅️ save into metadata
-        rason_levels = df_levels.to_dict("records") if not df_levels.empty else []
-        
+        issues = analyze_flight(df_meta, df_levels)
+
+        store = get_user_store()
+        store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        store["metadata"]["flight_issues"] = issues
+        store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
+
     except Exception as e:
         print(f"FTP download error: {e}")
-        metadata, rason_levels = {}, []
+        store = get_user_store()
+        store["metadata"], store["levels"] = {}, []
 
 def safe_float(val):
     try:
@@ -474,11 +486,16 @@ def download_file(site, filename):
 def dashboard():
     # Default to ".bfr" if ext is missing or empty
     selected_ext = request.args.get("ext")
-    if not selected_ext:
-        selected_ext = ".bfr"
-
-    limit = request.args.get("limit", type=int, default=2)
-
+    limit = request.args.get("limit", type=int)
+    
+    if selected_ext is not None:
+        session["dash_ext"] = selected_ext
+    if limit is not None:
+        session["dash_limit"] = limit
+    
+    selected_ext = session.get("dash_ext", ".bfr")
+    limit = session.get("dash_limit", 2)
+    
     sites = fetch_all_sites(ext_filter=selected_ext, limit=limit)
     return render_template(
         "dashboard.html",
@@ -520,38 +537,41 @@ def index():
 
         decoded = decode_bufr(filepath)
         df_meta, df_levels = parse_bufr(decoded)
-        
-        issues = analyze_flight(df_meta, df_levels)   # ⬅️ add here
-        metadata = df_meta.to_dict("records")[0] if not df_meta.empty else {}
-        metadata["flight_issues"] = issues            # ⬅️ save into metadata
-        rason_levels = df_levels.to_dict("records") if not df_levels.empty else []
 
+        issues = analyze_flight(df_meta, df_levels)
+        store = get_user_store()
+        store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        store["metadata"]["flight_issues"] = issues
+        store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
 
         return redirect(url_for("index"))
 
-    # 👉 Pass user to template
-    return render_template("map.html", total=len(rason_levels), user=session.get("user"))
+    store = get_user_store()
+    return render_template("map.html", total=len(store["levels"]), user=session.get("user"))
 
 @app.route("/value")
 @login_required
 def rason_value():
-    if not rason_levels:
+    store = get_user_store()
+    levels = store["levels"]
+    if not levels:
         return jsonify({"error": "No radiosonde"}), 404
-    idx = int(request.args.get("frame", 0)) % len(rason_levels)
-    return jsonify(rason_levels[idx])
+    idx = int(request.args.get("frame", 0)) % len(levels)
+    return jsonify(levels[idx])
 
 @app.route("/metadata")
 @login_required
 def rason_metadata():
-    if not metadata:
+    store = get_user_store()
+    if not store["metadata"]:
         return jsonify({"error": "No metadata"}), 404
-    return jsonify(metadata)
+    return jsonify(store["metadata"])
 
 @app.route("/all_levels")
 @login_required
 def all_levels_route():
-    return jsonify(rason_levels)
-
+    store = get_user_store()
+    return jsonify(store["levels"])
 
 @app.route("/download_wmo/<site>/<filename>")
 @login_required
