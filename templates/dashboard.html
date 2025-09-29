@@ -116,6 +116,7 @@
         ${withMeta ? "<th>Launch Time</th><th>Status</th>" : ""}
         <th>.bfr</th>
         <th>WMO</th>
+        <th>RAOB</th>
       </tr></thead><tbody>`;
     
       for (const [site, files] of Object.entries(sites)) {
@@ -134,9 +135,10 @@
             html += `<td>${f.launch_time || "-"}</td><td class="${statusClass}">${issues}</td>`;
           }
     
-          // ✅ Separate columns for .bfr and WMO downloads
+          // ✅ Separate download and RAOB columns
           html += `<td><a href="/download/${site}/${f.name}" target="_blank">⬇</a></td>`;
           html += `<td><a href="/download_wmo/${site}/${f.name}" target="_blank">⬇</a></td>`;
+          html += `<td><a href="/raob/${site}/${f.name}" target="_blank">📊</a></td>`;
     
           html += `</tr>`;
         });
@@ -148,8 +150,6 @@
       // ✅ Activate DataTables
       new DataTable('#dataTable');
     }
-
-    
 
 
     async function showMetadata() {

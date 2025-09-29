@@ -13,6 +13,17 @@ from functools import wraps
 
 from dotenv import load_dotenv
 from datetime import datetime
+import matplotlib
+matplotlib.use("Agg")  # safe for server
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+
+import metpy.calc as mpcalc
+from metpy.units import units
+from metpy.plots import SkewT, Hodograph
+from scipy.signal import medfilt
+
 
 # Load local .env file (ignored in production)
 load_dotenv()
@@ -560,6 +571,186 @@ def download_wmo(site, filename):
         return f"Error generating WMO: {e}", 500
 
 
+@app.route("/raob/<site>/<filename>")
+@login_required
+def raob_analysis(site, filename):
+    try:
+        # --- Fetch & decode BUFR ---
+        local_path = download_from_ftp(site, filename)
+        decoded = decode_bufr(local_path)
+        df_meta, df_levels = parse_bufr(decoded)
+
+        if df_levels.empty:
+            return "No levels found", 500
+
+        # --- Clean profile ---
+        df = df_levels.dropna(subset=["pressure_hPa"]).copy()
+        df = df.sort_values("pressure_hPa", ascending=False)
+        df["pressure_hPa"] = medfilt(df["pressure_hPa"].values, kernel_size=3)
+
+        if "temp_C" in df:
+            df["temp_C"] = pd.Series(df["temp_C"]).interpolate(limit_direction="both")
+            df["temp_C"] = medfilt(df["temp_C"].values, kernel_size=3)
+
+        if "dewpoint_C" in df:
+            df["dewpoint_C"] = pd.Series(df["dewpoint_C"]).interpolate(limit_direction="both")
+            df["dewpoint_C"] = medfilt(df["dewpoint_C"].values, kernel_size=3)
+
+        df = df.drop_duplicates(subset=["pressure_hPa"])
+        df = df.sort_values("pressure_hPa", ascending=False).reset_index(drop=True)
+
+        # --- Thermo profile ---
+        thermo = df.dropna(subset=["pressure_hPa", "temp_C", "dewpoint_C"]).copy()
+        if thermo.empty:
+            return "Insufficient thermo data", 500
+
+        p = thermo["pressure_hPa"].values * units.hPa
+        T = thermo["temp_C"].values * units.degC
+        Td = thermo["dewpoint_C"].values * units.degC
+
+        # --- Wind profile ---
+        wind = df.dropna(subset=["pressure_hPa", "wind_dir_deg", "wind_speed_mps"]).copy()
+        if wind.empty:
+            u = v = p_w = hgt = None
+        else:
+            p_w = wind["pressure_hPa"].values * units.hPa
+            ws = wind["wind_speed_mps"].values * (units.meter/units.second)
+            wdir = wind["wind_dir_deg"].values * units.degree
+            u, v = mpcalc.wind_components(ws, wdir)
+
+            # Heights: use BUFR height if present, otherwise estimate
+            if "height_m" in wind:
+                hgt = wind["height_m"].values * units.meter
+            elif "height_m" in df:
+                hgt = df["height_m"].interpolate(limit_direction="both").values * units.meter
+            else:
+                hgt = mpcalc.pressure_to_height_std(p_w)
+
+        # --- Thermodynamic indices ---
+        lcl_pressure, lcl_temp = mpcalc.lcl(p[0], T[0], Td[0])
+        parcel_prof = mpcalc.parcel_profile(p, T[0], Td[0]).to("degC")
+        cape, cin = mpcalc.cape_cin(p, T, Td, parcel_prof)
+        li = mpcalc.lifted_index(p, T, parcel_prof)
+        ki = mpcalc.k_index(p, T, Td)
+
+        # --- Wind shear ---
+        shear_0_1km_mag = np.nan * units("knot")
+        shear_0_6km_mag = np.nan * units("knot")
+        if (u is not None) and (v is not None):
+            try:
+                sh_u_1km, sh_v_1km = mpcalc.bulk_shear(p_w, u, v, depth=1000 * units.meter)
+                sh_u_6km, sh_v_6km = mpcalc.bulk_shear(p_w, u, v, depth=6000 * units.meter)
+                shear_0_1km_mag = mpcalc.wind_speed(sh_u_1km, sh_v_1km).to("knot")
+                shear_0_6km_mag = mpcalc.wind_speed(sh_u_6km, sh_v_6km).to("knot")
+            except Exception:
+                pass
+
+        # --- SRH ---
+        srh_0_1km = srh_0_3km = np.nan * units("m^2/s^2")
+        if (u is not None) and (v is not None) and (hgt is not None):
+            try:
+                rmotion, lmotion, mean_wind = mpcalc.bunkers_storm_motion(p_w, u, v, hgt)
+                storm_u, storm_v = rmotion
+                srh_0_1km, _, _ = mpcalc.storm_relative_helicity(
+                    hgt, u, v, depth=1000*units.m,
+                    storm_u=storm_u, storm_v=storm_v
+                )
+                srh_0_3km, _, _ = mpcalc.storm_relative_helicity(
+                    hgt, u, v, depth=3000*units.m,
+                    storm_u=storm_u, storm_v=storm_v
+                )
+            except Exception as e:
+                print("SRH calculation failed:", e)
+
+        # --- Freezing Level ---
+        freezing_level = "-"
+        try:
+            idx = np.where(np.diff(np.sign(T.m)))[0]
+            if idx.size > 0:
+                freezing_level = f"{thermo.iloc[idx[0]]['pressure_hPa']:.0f} hPa"
+        except Exception:
+            pass
+
+        # --- Tropopause (WMO: lapse rate < 2°C/km) ---
+        tropopause_level = "-"
+        try:
+            if "height_m" in thermo:
+                lapse_rate = mpcalc.lapse_rate(
+                    thermo["temp_C"].values * units.degC,
+                    thermo["height_m"].values * units.meter
+                ).to("degC/km")
+                bad = np.where(lapse_rate > -2 * units("degC/km"))[0]
+                if bad.size > 0:
+                    tropopause_level = f"{thermo.iloc[bad[0]]['pressure_hPa']:.0f} hPa"
+        except Exception:
+            pass
+
+        # --- Skew-T plot ---
+        fig1 = plt.figure(figsize=(6, 6))
+        skew = SkewT(fig1, rotation=45)
+        skew.plot(p, T, "r")
+        skew.plot(p, Td, "g")
+        if (u is not None) and (v is not None):
+            skew.plot_barbs(p_w, u.to("m/s"), v.to("m/s"))
+        skew.plot(p, parcel_prof, "k")
+        skew.ax.set_ylim(1050, 100)
+        skew.ax.set_xlim(-40, 40)
+        skew.ax.set_title(f"Skew-T  {df_meta.iloc[0].get('launch_time', '')}")
+        buf1 = BytesIO()
+        plt.savefig(buf1, format="png", bbox_inches="tight")
+        buf1.seek(0)
+        skewt_img = base64.b64encode(buf1.read()).decode("utf-8")
+        plt.close(fig1)
+
+        # --- Hodograph ---
+        if (u is not None) and (v is not None):
+            fig2 = plt.figure(figsize=(6, 6))
+            ax = fig2.add_subplot(1, 1, 1)
+            hodo = Hodograph(ax, component_range=60.0)
+            hodo.add_grid(increment=20)
+            hodo.plot(u.to("m/s"), v.to("m/s"), color="b")
+            ax.set_title("Hodograph")
+            buf2 = BytesIO()
+            plt.savefig(buf2, format="png", bbox_inches="tight")
+            buf2.seek(0)
+            hodo_img = base64.b64encode(buf2.read()).decode("utf-8")
+            plt.close(fig2)
+        else:
+            hodo_img = None
+
+        # --- Helper for clean indices ---
+        def scalar_str(x, fmt=".1f"):
+            try:
+                val = np.atleast_1d(x.m)[0]
+                return format(val, fmt) if np.isfinite(val) else "-"
+            except Exception:
+                return "-"
+
+        # --- Indices table ---
+        indices = {
+            "LCL Pressure (hPa)": scalar_str(lcl_pressure),
+            "CAPE (J/kg)": scalar_str(cape),
+            "CIN (J/kg)": scalar_str(cin),
+            "Lifted Index (°C)": scalar_str(li),
+            "K Index (°C)": scalar_str(ki),
+            "0–1 km Bulk Shear (kt)": scalar_str(shear_0_1km_mag),
+            "0–6 km Bulk Shear (kt)": scalar_str(shear_0_6km_mag),
+            "SRH 0–1 km (m²/s²)": scalar_str(srh_0_1km),
+            "SRH 0–3 km (m²/s²)": scalar_str(srh_0_3km),
+            "Freezing Level": freezing_level,
+            "Tropopause": tropopause_level,
+        }
+
+        return render_template(
+            "raob.html",
+            meta=df_meta.to_dict("records")[0],
+            indices=indices,
+            skewt_img=skewt_img,
+            hodo_img=hodo_img
+        )
+
+    except Exception as e:
+        return f"RAOB error: {e}", 500
 
 if __name__ == "__main__":
     app.run(debug=True)

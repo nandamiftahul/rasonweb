@@ -4,3 +4,4 @@ numpy
 pybufrkit
 gunicorn
 python-dotenv
+metpy

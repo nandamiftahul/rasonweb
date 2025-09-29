@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RAOB Analysis</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f8fafc;
+      color: #222;
+    }
+    header {
+      background: #0d6efd;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    header h1 { margin: 0; font-size: 28px; }
+    main {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+    h2 {
+      margin-top: 30px;
+      text-align: center;
+      color: #0d6efd;
+      border-bottom: 2px solid #0d6efd33;
+      padding-bottom: 5px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 15px 0;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+      color: #333;
+      font-weight: 600;
+    }
+    td.val {
+      font-weight: bold;
+      text-align: right;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .legend {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 10px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend span {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border-radius: 3px;
+    }
+    .plots {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    .plots img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .plots div {
+      flex: 1 1 45%;
+      text-align: center;
+    }
+    .btn {
+      display: inline-block;
+      background: #0d6efd;
+      color: white;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      margin-top: 10px;
+      font-size: 14px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .btn:hover { background: #0b5ed7; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>RAOB Analysis</h1>
+  </header>
+
+  <main>
+
+    <!-- Metadata -->
+    <div class="card">
+      <h2>Metadata</h2>
+      <table>
+        <tbody>
+          {% for k, v in meta.items() %}
+            <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Indices -->
+    <div class="card">
+      <h2>Indices</h2>
+      <table id="indicesTable">
+        <tbody>
+          {% for k, v in indices.items() %}
+            <tr>
+              <th>{{ k }}</th>
+              <td class="val">{{ v }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Download button -->
+      <div style="text-align:center;">
+        <a href="#" class="btn" onclick="downloadCSV()">⬇ Download CSV</a>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-item"><span style="background:red;"></span> Severe / Extreme</div>
+        <div class="legend-item"><span style="background:orange;"></span> Strong / Significant</div>
+        <div class="legend-item"><span style="background:green;"></span> Moderate</div>
+        <div class="legend-item"><span style="background:black;"></span> Weak / Neutral</div>
+      </div>
+    </div>
+
+    <!-- Plots -->
+    <div class="card">
+      <h2>Plots</h2>
+      <div class="plots">
+        <div>
+          <h3>Skew-T</h3>
+          <img id="skewtImg" src="data:image/png;base64,{{ skewt_img }}" alt="Skew-T">
+          <br>
+          <a class="btn" onclick="downloadPlot('skewtImg','skewt.png')">⬇ Download PNG</a>
+        </div>
+        {% if hodo_img %}
+        <div>
+          <h3>Hodograph</h3>
+          <img id="hodoImg" src="data:image/png;base64,{{ hodo_img }}" alt="Hodograph">
+          <br>
+          <a class="btn" onclick="downloadPlot('hodoImg','hodograph.png')">⬇ Download PNG</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Script for coloring + CSV + PNG -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const rows = document.querySelectorAll("#indicesTable tr");
+      rows.forEach(row => {
+        const label = row.querySelector("th")?.innerText || "";
+        const valCell = row.querySelector("td.val");
+        if (!valCell) return;
+        const val = parseFloat(valCell.innerText);
+
+        if (label.includes("CAPE") && !isNaN(val)) {
+          if (val > 2000) valCell.style.color = "red";
+          else if (val > 1000) valCell.style.color = "orange";
+          else if (val > 500) valCell.style.color = "green";
+        }
+
+        if (label.includes("SRH") && !isNaN(val)) {
+          if (val > 300) valCell.style.color = "red";
+          else if (val > 150) valCell.style.color = "orange";
+          else if (val > 100) valCell.style.color = "green";
+        }
+
+        if (label.includes("Shear") && !isNaN(val)) {
+          if (val > 40) valCell.style.color = "red";
+          else if (val > 20) valCell.style.color = "orange";
+        }
+
+        if (label.includes("Lifted Index") && !isNaN(val)) {
+          if (val < -6) valCell.style.color = "red";
+          else if (val < -3) valCell.style.color = "orange";
+        }
+      });
+    });
+
+    function downloadCSV() {
+      const rows = document.querySelectorAll("#indicesTable tr");
+      let csvContent = "data:text/csv;charset=utf-8,Parameter,Value\n";
+      rows.forEach(row => {
+        const cols = row.querySelectorAll("th, td");
+        const line = Array.from(cols).map(col => col.innerText).join(",");
+        csvContent += line + "\n";
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "raob_indices.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function downloadPlot(imgId, filename) {
+      const img = document.getElementById(imgId);
+      const a = document.createElement("a");
+      a.href = img.src;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  </script>
+
+</body>
+</html>
