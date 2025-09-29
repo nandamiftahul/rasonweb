@@ -6,20 +6,6 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { text-align: center; }
-    table {
-      border-collapse: collapse;
-      margin: 20px auto;
-      width: 90%;
-      table-layout: fixed; /* 🔑 enforce fixed layout */
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 6px 10px;
-      text-align: left;
-      word-wrap: break-word;  /* allow long text to wrap */
-    }
-    th { background-color: #f0f0f0; }
-    .site-block { margin-bottom: 40px; }
     .logout {
       position: absolute; top: 10px; right: 10px;
       background: #eee; padding: 6px 12px; border-radius: 4px;
@@ -63,6 +49,11 @@
     .status-warn { color: orange; font-weight: bold; }
     .status-issues { color: red; font-weight: bold; }
   </style>
+
+  <!-- ✅ DataTables CSS/JS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 </head>
 <body>
   <div class="logout"><a href="{{ url_for('logout') }}">🚪 Logout</a></div>
@@ -118,48 +109,36 @@
     }
 
     function renderTable(sites, withMeta) {
-      let html = "";
+      let html = `<table id="dataTable" class="display"><thead><tr>
+        <th>Site</th>
+        <th>Filename</th>
+        <th>Data Date</th>
+        ${withMeta ? "<th>Launch Time</th><th>Status</th>" : ""}
+      </tr></thead><tbody>`;
+
       for (const [site, files] of Object.entries(sites)) {
-        html += `<div class="site-block"><h2>${site}</h2>`;
-        if (files.length === 0) {
-          html += "<p>No files found.</p>";
-        } else if (files[0].name && files[0].name.startsWith("Error:")) {
-          html += `<p style="color:red;">${files[0].name}</p>`;
-        } else {
-          html += `<table>
-            <colgroup>
-              <col style="width:5%">
-              <col style="width:45%">
-              <col style="width:25%">
-              ${withMeta ? '<col style="width:25%">' : ""}
-            </colgroup>
-            <tr><th>#</th><th>Filename</th>`;
-          if (withMeta) html += `<th>Launch Time</th><th>Status</th>`;
+        files.forEach(f => {
+          html += `<tr>
+            <td>${f.site || site}</td>
+            <td><a href="/load_from_ftp/${site}/${f.name}" target="_blank">${f.name}</a></td>
+            <td>${f.file_date || "-"}</td>`;
+          if (withMeta) {
+            let issues = f.flight_issues || "-";
+            if (Array.isArray(issues)) issues = issues.join(", ");
+            let statusClass = "status-ok";
+            if (issues.includes("Ascent Stop") || issues.includes("Not reaching")) statusClass = "status-warn";
+            else if (issues !== "OK" && issues !== "-") statusClass = "status-issues";
+            html += `<td>${f.launch_time || "-"}</td><td class="${statusClass}">${issues}</td>`;
+          }
           html += `</tr>`;
-          files.forEach((f, i) => {
-            html += `<tr>
-              <td>${i+1}</td>
-              <td><a href="/load_from_ftp/${site}/${f.name}">${f.name}</a></td>`;
-            if (withMeta) {
-              let issues = f.flight_issues || "-";
-              if (Array.isArray(issues)) issues = issues.join(", ");
-              if (issues === "OK") {
-                html += `<td>${f.launch_time || "-"}</td><td class="status-ok">${issues}</td>`;
-              } else if (issues.includes("Ascent Stop") || issues.includes("Not reaching")) {
-                html += `<td>${f.launch_time || "-"}</td><td class="status-warn">${issues}</td>`;
-              } else if (issues !== "-") {
-                html += `<td>${f.launch_time || "-"}</td><td class="status-issues">${issues}</td>`;
-              } else {
-                html += `<td>${f.launch_time || "-"}</td><td>-</td>`;
-              }
-            }
-            html += `</tr>`;
-          });
-          html += "</table>";
-        }
-        html += "</div>";
+        });
       }
+
+      html += "</tbody></table>";
       document.getElementById("content").innerHTML = html;
+
+      // ✅ Activate DataTables
+      new DataTable('#dataTable');
     }
 
     async function showMetadata() {

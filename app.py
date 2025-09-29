@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-import os
+import os, re
 import json
 import ftplib
 import subprocess
@@ -12,6 +12,7 @@ from flask import (
 from functools import wraps
 
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load local .env file (ignored in production)
 load_dotenv()
@@ -210,7 +211,11 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                     selected = selected[: (limit or cfg.get("limit", 10))]
 
                     for fname in selected:
-                        item = {"name": fname}
+                        item = {
+                            "name": fname,
+                            "site": site,
+                            "file_date": extract_date_from_filename(fname)
+                        }
                         if with_meta:
                             try:
                                 # download file temporarily
@@ -225,7 +230,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                                     if launch_time:
                                         item["launch_time"] = launch_time
                     
-                                # 👉 run flight analysis
+                                # run flight analysis
                                 issues = analyze_flight(df_meta, df_levels)
                                 if issues:
                                     item["flight_issues"] = issues
@@ -235,15 +240,14 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                                 item["flight_issues"] = [f"Error: {e}"]
                         site_files.append(item)
                     
-
                     ftp.cwd(cfg["base_path"])  # back to root
                     result[site] = site_files
                 except Exception as e:
-                    result[site] = [{"name": f"Error: {e}"}]
+                    result[site] = [{"name": f"Error: {e}", "site": site, "file_date": "-"}]
     except Exception as e:
-        result["GLOBAL"] = [{"name": f"FTP Error: {e}"}]
+        result["GLOBAL"] = [{"name": f"FTP Error: {e}", "site": "GLOBAL", "file_date": "-"}]
     return result
-
+    
 # --- API routes ---
 @app.route("/api/sites")
 @login_required
@@ -321,6 +325,17 @@ def analyze_flight(df_meta, df_levels):
 
     return issues or ["OK"]
 
+def extract_date_from_filename(fname: str):
+    # Match 14-digit date string like 20250905000000
+    m = re.search(r"(\d{14})", fname)
+    if m:
+        s = m.group(1)
+        try:
+            dt = datetime.strptime(s, "%Y%m%d%H%M%S")
+            return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+        except Exception:
+            return "-"
+    return "-"
 
 # --- Routes ---
 @app.route("/dashboard")
