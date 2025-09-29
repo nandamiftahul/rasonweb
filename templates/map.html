@@ -234,6 +234,11 @@
         if (meta.station_lat != null) html += `<b>Station Lat</b>: ${meta.station_lat}°<br>`;
         if (meta.station_lon != null) html += `<b>Station Lon</b>: ${meta.station_lon}°<br>`;
         if (meta.station_height_m != null) html += `<b>Station Height</b>: ${Number(meta.station_height_m).toFixed(1)} m<br>`;
+        // ✅ Show flight issues if available
+        if (meta.flight_issues && meta.flight_issues.length > 0) {
+          html += `<b>Status</b>: ${meta.flight_issues.join(", ")}<br>`;
+        }
+        
         for (const [k,v] of Object.entries(meta)) {
           if (["launch_time","station_lat","station_lon","station_height_m"].includes(k)) continue;
           html += `<b>${k}</b>: ${v}<br>`;

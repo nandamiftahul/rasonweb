@@ -217,16 +217,24 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                                 local_path = os.path.join(app.config["UPLOAD_FOLDER"], fname)
                                 with open(local_path, "wb") as f:
                                     ftp.retrbinary(f"RETR " + fname, f.write)
-
+                    
                                 decoded = decode_bufr(local_path)
-                                df_meta, _ = parse_bufr(decoded)
+                                df_meta, df_levels = parse_bufr(decoded)
                                 if not df_meta.empty:
                                     launch_time = df_meta.iloc[0].get("launch_time")
                                     if launch_time:
                                         item["launch_time"] = launch_time
+                    
+                                # 👉 run flight analysis
+                                issues = analyze_flight(df_meta, df_levels)
+                                if issues:
+                                    item["flight_issues"] = issues
+                    
                             except Exception as e:
                                 item["launch_time"] = f"Error: {e}"
+                                item["flight_issues"] = [f"Error: {e}"]
                         site_files.append(item)
+                    
 
                     ftp.cwd(cfg["base_path"])  # back to root
                     result[site] = site_files
@@ -269,8 +277,12 @@ def download_and_process(site, filename):
 
         decoded = decode_bufr(local_path)
         df_meta, df_levels = parse_bufr(decoded)
+        
+        issues = analyze_flight(df_meta, df_levels)   # ⬅️ add here
         metadata = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        metadata["flight_issues"] = issues            # ⬅️ save into metadata
         rason_levels = df_levels.to_dict("records") if not df_levels.empty else []
+        
     except Exception as e:
         print(f"FTP download error: {e}")
         metadata, rason_levels = {}, []
@@ -280,6 +292,34 @@ def safe_float(val):
         return float(val)
     except (TypeError, ValueError):
         return np.nan
+
+def analyze_flight(df_meta, df_levels):
+    issues = []
+
+    # --- Temperature check ---
+    if df_levels["temp_C"].isna().sum() > len(df_levels) * 0.3:
+        issues.append("Bad Temp: too many missing values")
+    if (df_levels["temp_C"] > 60).any():
+        issues.append("Temp KO: unrealistic values > ±60 °C")
+
+    # --- Ascent stop ---
+    if "ascent_rate_mps" in df_levels:
+        if (df_levels["ascent_rate_mps"] <= 0).rolling(5, min_periods=1).sum().max() >= 5:
+            issues.append("Ascent Stop: balloon stopped rising")
+
+    # --- Max height check ---
+    if "pressure_hPa" in df_levels:
+        min_p = df_levels["pressure_hPa"].min()
+        if min_p > 100:
+            issues.append("Not reaching 100 hPa")
+        if min_p > 30:
+            issues.append("Not reaching 30 hPa")
+
+    # --- GPS check ---
+    if "latitude" in df_levels and df_levels["latitude"].isna().sum() > len(df_levels) * 0.2:
+        issues.append("GPS Fail: too many missing positions")
+
+    return issues or ["OK"]
 
 
 # --- Routes ---
@@ -334,8 +374,12 @@ def index():
 
         decoded = decode_bufr(filepath)
         df_meta, df_levels = parse_bufr(decoded)
+        
+        issues = analyze_flight(df_meta, df_levels)   # ⬅️ add here
         metadata = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        metadata["flight_issues"] = issues            # ⬅️ save into metadata
         rason_levels = df_levels.to_dict("records") if not df_levels.empty else []
+
 
         return redirect(url_for("index"))
 
