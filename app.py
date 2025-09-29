@@ -331,7 +331,7 @@ def dashboard():
     if not selected_ext:
         selected_ext = ".bfr"
 
-    limit = request.args.get("limit", type=int, default=5)
+    limit = request.args.get("limit", type=int, default=2)
 
     sites = fetch_all_sites(ext_filter=selected_ext, limit=limit)
     return render_template(
