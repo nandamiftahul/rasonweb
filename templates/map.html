@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Radiosonde Viewer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body, html { margin:0; padding:0; height:100%; font-family:sans-serif; }
+    #map { height:100%; width:100%; }
+
+    #controls {
+      position:absolute;
+      bottom:10px;
+      left:50%;
+      transform:translateX(-50%);
+      background:white;
+      padding:8px;
+      border-radius:8px;
+      box-shadow:0 0 6px rgba(0,0,0,0.4);
+      display:flex;
+      align-items:center;
+      gap:6px;
+      z-index:1000;
+    }
+
+    #infoPanel, #metaPanel {
+      position:absolute;
+      top:80px;
+      background:white;
+      padding:10px;
+      border-radius:6px;
+      box-shadow:0 0 6px rgba(0,0,0,0.4);
+      z-index:1000;
+      font-size:14px;
+      width:260px;
+      max-height:80%;
+      overflow-y:auto;
+    }
+    #infoPanel { right:20px; }
+    #metaPanel { left:20px; }
+
+    #chartsPanel {
+      position:absolute;
+      bottom:80px;
+      left:20px;
+      width:740px;
+      height:320px;
+      background:white;
+      border-radius:6px;
+      box-shadow:0 0 6px rgba(0,0,0,0.4);
+      z-index:1000;
+      padding:6px;
+      display:flex;
+      gap:10px;
+    }
+    .chartBox { flex:1; height:100%; }
+
+    #topBar {
+      position:absolute;
+      top:10px;
+      right:10px;
+      z-index:1200;
+      background:white;
+      padding:6px 10px;
+      border-radius:6px;
+      box-shadow:0 0 6px rgba(0,0,0,0.3);
+    }
+    #topBar a { text-decoration:none; color:#333; font-size:14px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Upload form -->
+  <form method="POST" enctype="multipart/form-data"
+        style="position:absolute; top:10px; left:10px; z-index:1000; background:white; padding:6px; border-radius:6px;">
+    <input type="file" name="rasonfiles" accept=".bufr">
+    <button type="submit">Upload Radiosonde</button>
+  </form>
+
+  <!-- Logout button -->
+  <div id="topBar">
+    <a href="{{ url_for('dashboard') }}">🏠 Dashboard</a> |
+    <a href="{{ url_for('logout') }}">🚪 Logout</a>
+  </div>
+
+  <!-- Metadata panel -->
+  <div id="metaPanel">
+    <b>Station Metadata</b>
+    <div id="metaContent">No metadata</div>
+  </div>
+
+  <!-- Per-level info panel -->
+  <div id="infoPanel">
+    <b>Level Info</b>
+    <div id="infoContent">No data loaded</div>
+  </div>
+
+  <!-- Charts Panel -->
+  <div id="chartsPanel">
+    <div class="chartBox"><canvas id="windChart"></canvas></div>
+    <div class="chartBox"><canvas id="thermoChart"></canvas></div>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <button type="button" onclick="prevFrame()">⏮ Prev</button>
+    <button type="button" onclick="togglePlay()"><span id="playBtn">▶ Play</span></button>
+    <button type="button" onclick="nextFrame()">Next ⏭</button>
+    <input type="range" id="frameSlider" min="0" value="0" step="1" style="width:200px;">
+    <span id="frameText">0/0</span>
+    <button type="button" onclick="toggleCharts()" id="chartsBtn">📊 Hide Charts</button>
+  </div>
+
+  <script>
+    // --- Map ---
+    const map = L.map('map', { zoomControl: false }).setView([0,0], 3);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom:19, attribution:'© OpenStreetMap'
+    }).addTo(map);
+
+    // --- State ---
+    let frame = 0, total = 0, playing = false, timer = null;
+    let balloonMarker = null, pathLine = null;
+    let allLevels = [];  // full profile in memory
+    let launchDateUTC = null; // Date object (UTC) parsed from metadata.launch_time
+
+    // --- Balloon icon ---
+    const balloonIcon = L.divIcon({
+      html: "<div style='font-size:64px;'>🎈</div>",
+      className: "",
+      iconSize: [64, 64],
+      iconAnchor: [32, 64]
+    });
+
+    // --- Charts ---
+    const windChartData = { datasets: [
+      { label: 'Ascent Rate (m/s)', data: [], borderColor: 'blue', showLine:true },
+      { label: 'Wind Speed (m/s)', data: [], borderColor: 'red', showLine:true }
+    ]};
+    const windChart = new Chart(document.getElementById('windChart'), {
+      type: 'scatter', data: windChartData,
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          x: { title: { display: true, text: 'Value (m/s)' } },
+          y: { title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 25000 }
+        }
+      }
+    });
+
+    const thermoChartData = { datasets: [
+      { label: 'Temp (°C)', data: [], borderColor: 'orange', showLine:true },
+      { label: 'Dewpoint (°C)', data: [], borderColor: 'cyan', showLine:true }
+    ]};
+    const thermoChart = new Chart(document.getElementById('thermoChart'), {
+      type: 'scatter', data: thermoChartData,
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          x: { title: { display: true, text: 'Temperature (°C)' } },
+          y: { title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 25000 }
+        }
+      }
+    });
+
+    // --- Toggle Charts Panel ---
+    function toggleCharts() {
+      const panel = document.getElementById("chartsPanel");
+      const btn = document.getElementById("chartsBtn");
+      if (panel.style.display === "none") {
+        panel.style.display = "flex";
+        btn.innerText = "📊 Hide Charts";
+      } else {
+        panel.style.display = "none";
+        btn.innerText = "📊 Show Charts";
+      }
+    }
+
+    // --- Helpers for UTC time ---
+    function parseLaunchUTC(str) {
+      // expects "YYYY-MM-DD HH:MM:SS UTC"
+      if (!str) return null;
+      const iso = str.replace(' UTC', 'Z'); // force UTC
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    function formatUTC(date) {
+      // YYYY-MM-DD HH:MM:SS UTC
+      const pad = n => String(n).padStart(2,'0');
+      const y = date.getUTCFullYear();
+      const m = pad(date.getUTCMonth()+1);
+      const d = pad(date.getUTCDate());
+      const hh = pad(date.getUTCHours());
+      const mm = pad(date.getUTCMinutes());
+      const ss = pad(date.getUTCSeconds());
+      return `${y}-${m}-${d} ${hh}:${mm}:${ss} UTC`;
+    }
+
+    // --- Load metadata ---
+    fetch('/metadata')
+      .then(r => r.ok ? r.json() : {})
+      .then(meta => {
+        if (!meta || meta.error) return;
+        // parse launch_time into Date
+        launchDateUTC = parseLaunchUTC(meta.launch_time);
+
+        let html = "";
+        if (meta.launch_time) html += `<b>Launch Time</b>: ${meta.launch_time}<br>`;
+        if (meta.station_lat != null) html += `<b>Station Lat</b>: ${meta.station_lat}°<br>`;
+        if (meta.station_lon != null) html += `<b>Station Lon</b>: ${meta.station_lon}°<br>`;
+        if (meta.station_height_m != null) html += `<b>Station Height</b>: ${Number(meta.station_height_m).toFixed(1)} m<br>`;
+        for (const [k,v] of Object.entries(meta)) {
+          if (["launch_time","station_lat","station_lon","station_height_m"].includes(k)) continue;
+          html += `<b>${k}</b>: ${v}<br>`;
+        }
+        document.getElementById("metaContent").innerHTML = html || "No metadata";
+      })
+      .catch(() => {});
+
+    // --- Load all levels ---
+    initLevels();
+
+    async function initLevels() {
+      try {
+        const r = await fetch('/all_levels');
+        if (r.ok) {
+          const arr = await r.json();
+          if (Array.isArray(arr) && arr.length > 0) {
+            allLevels = arr;
+            total = allLevels.length;
+            document.getElementById("frameSlider").max = Math.max(0, total - 1);
+            updateFrameText(); // initial text with time if possible
+            loadRason();
+            return;
+          }
+        }
+      } catch {}
+      // Fallback using server-side total + /value?frame=
+      const srvTotal = {{ total|default(0) }};
+      if (srvTotal > 0) {
+        const promises = [];
+        for (let i = 0; i < srvTotal; i++) {
+          promises.push(fetch(`/value?frame=${i}`).then(x => x.json()).catch(() => null));
+        }
+        const results = (await Promise.all(promises)).filter(x => x && !x.error);
+        if (results.length) {
+          allLevels = results;
+          total = allLevels.length;
+          document.getElementById("frameSlider").max = Math.max(0, total - 1);
+          updateFrameText();
+          loadRason();
+        }
+      }
+    }
+
+    function isFiniteNumber(x) {
+      return typeof x === 'number' && Number.isFinite(x);
+    }
+
+    function updateFrameText() {
+      let base = `${frame + 1}/${total}`;
+      const data = allLevels[frame];
+      if (data && data.time_s != null && launchDateUTC) {
+        const t = Number(data.time_s) || 0;
+        const ts = new Date(launchDateUTC.getTime() + t * 1000);
+        base += ` | ${formatUTC(ts)} (t=${Math.round(t)} s)`;
+      }
+      document.getElementById("frameText").innerText = base;
+    }
+
+    function loadRason() {
+      if (!allLevels.length) {
+        document.getElementById("infoContent").innerText = "No radiosonde";
+        return;
+      }
+
+      frame = (frame % allLevels.length + allLevels.length) % allLevels.length;
+      const data = allLevels[frame];
+
+      // UI
+      document.getElementById("frameSlider").value = frame;
+      updateFrameText();
+
+      // Info (numbers 1 decimal; full precision for lat/lon)
+      let html = "";
+      for (const [k,v] of Object.entries(data)) {
+        if (v == null) continue;
+        if (k === "latitude" || k === "longitude") {
+          html += `<b>${k}</b>: ${v}°<br>`;
+        } else if (typeof v === "number") {
+          html += `<b>${k}</b>: ${Number(v).toFixed(1)}<br>`;
+        } else {
+          html += `<b>${k}</b>: ${v}<br>`;
+        }
+      }
+      document.getElementById("infoContent").innerHTML = html || "No data";
+
+      // Charts (rebuild subset 0..frame)
+      const subset = allLevels.slice(0, frame + 1);
+      windChartData.datasets[0].data = subset.map(l => ({ x: l.ascent_rate_mps ?? null, y: l.height_m }));
+      windChartData.datasets[1].data = subset.map(l => ({ x: l.wind_speed_mps ?? null, y: l.height_m }));
+      thermoChartData.datasets[0].data = subset.map(l => ({ x: l.temp_C ?? null, y: l.height_m }));
+      thermoChartData.datasets[1].data = subset.map(l => ({ x: l.dewpoint_C ?? null, y: l.height_m }));
+
+      // Auto-scale >25 km
+      const h = data.height_m;
+      if (isFiniteNumber(h) && h > 25000) {
+        windChart.options.scales.y.suggestedMax = null;
+        thermoChart.options.scales.y.suggestedMax = null;
+      } else {
+        windChart.options.scales.y.suggestedMax = 25000;
+        thermoChart.options.scales.y.suggestedMax = 25000;
+      }
+      windChart.update();
+      thermoChart.update();
+
+      // Balloon path up to current frame
+      const trackCoords = subset
+        .filter(l => isFiniteNumber(l.latitude) && isFiniteNumber(l.longitude))
+        .map(l => [l.latitude, l.longitude]);
+
+      if (isFiniteNumber(data.latitude) && isFiniteNumber(data.longitude)) {
+        const latlng = [data.latitude, data.longitude];
+        if (balloonMarker) balloonMarker.setLatLng(latlng);
+        else balloonMarker = L.marker(latlng, { icon: balloonIcon }).addTo(map);
+
+        if (frame === 0 && trackCoords.length > 1) {
+          setTimeout(() => map.fitBounds(trackCoords), 0);
+        }
+      }
+
+      if (trackCoords.length >= 2) {
+        if (pathLine) pathLine.setLatLngs(trackCoords);
+        else pathLine = L.polyline(trackCoords, { color: "red" }).addTo(map);
+      } else if (pathLine) {
+        pathLine.setLatLngs(trackCoords);
+      }
+    }
+
+    function nextFrame() { if (!allLevels.length) return; frame = (frame + 1) % total; loadRason(); }
+    function prevFrame() { if (!allLevels.length) return; frame = (frame - 1 + total) % total; loadRason(); }
+    function togglePlay() {
+      if (!allLevels.length) return;
+      if (playing) { clearInterval(timer); playing=false; document.getElementById("playBtn").innerText="▶ Play"; }
+      else { timer=setInterval(nextFrame, 1000); playing=true; document.getElementById("playBtn").innerText="⏸ Pause"; }
+    }
+    document.getElementById("frameSlider").addEventListener("input", function () {
+      if (!allLevels.length) return;
+      frame = parseInt(this.value, 10) || 0;
+      loadRason();
+    });
+  </script>
+</body>
+</html>

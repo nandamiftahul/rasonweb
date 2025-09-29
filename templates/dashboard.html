@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Radiosonde FTP Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    table { border-collapse: collapse; margin: 20px auto; width: 80%; }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px 10px;
+      text-align: left;
+    }
+    th { background-color: #f0f0f0; }
+    .site-block {
+      margin-bottom: 40px;
+    }
+    .logout {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #eee;
+      padding: 6px 12px;
+      border-radius: 4px;
+    }
+    .logout a {
+      text-decoration: none;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="logout"><a href="{{ url_for('logout') }}">🚪 Logout</a></div>
+  <h1>Radiosonde FTP Dashboard</h1>
+
+  {% for site, files in sites.items() %}
+    <div class="site-block">
+      <h2>{{ site }}</h2>
+      {% if files and files[0].startswith("Error:") %}
+        <p style="color:red;">{{ files[0] }}</p>
+      {% elif files %}
+        <table>
+          <tr>
+            <th>#</th>
+            <th>Filename</th>
+          </tr>
+          {% for f in files %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>
+              <a href="{{ url_for('load_from_ftp', site=site, filename=f) }}">
+                {{ f }}
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p>No files found.</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  <div style="text-align:center;">
+    <a href="{{ url_for('index') }}">➡ Go to Radiosonde Viewer</a>
+  </div>
+</body>
+</html>

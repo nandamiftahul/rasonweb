@@ -1,0 +1,272 @@
+#! /usr/bin/python3
+import os
+import json
+import ftplib
+import subprocess
+import pandas as pd
+import numpy as np
+from flask import (
+    Flask, render_template, request, redirect,
+    url_for, jsonify, session
+)
+from functools import wraps
+
+# --- Load configuration ---
+with open("config.json") as f:
+    CONFIG = json.load(f)
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app = Flask(__name__)
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
+
+# --- Authentication ---
+VALID_USERS = {"admin": "meteomodem"}
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if username in VALID_USERS and VALID_USERS[username] == password:
+            session["user"] = username
+            return redirect(url_for("dashboard"))
+        else:
+            return render_template("login.html", error="Invalid credentials")
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect(url_for("login"))
+
+# --- Global store ---
+rason_levels = []   # list of dicts (per level)
+metadata = {}       # dict for station metadata
+
+# --- BUFR decode ---
+def decode_bufr(filepath):
+    result = subprocess.run(
+        ["pybufrkit", "decode", "-a", filepath],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"BUFR decode failed: {result.stderr}")
+    return result.stdout
+
+# --- Parse BUFR ---
+def parse_bufr(decoded_text):
+    meta = {}
+    levels = []
+    current = {}
+    station_lat, station_lon = None, None
+
+    for line in decoded_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        # --- Metadata ---
+        if "WMO BLOCK NUMBER" in line:
+            meta["wmo_block"] = int(line.split()[-1])
+        elif "WMO STATION NUMBER" in line:
+            meta["wmo_station"] = int(line.split()[-1])
+        elif line.startswith("004001 YEAR"):
+            meta["year"] = int(line.split()[-1])
+        elif line.startswith("004002 MONTH"):
+            meta["month"] = int(line.split()[-1])
+        elif line.startswith("004003 DAY"):
+            meta["day"] = int(line.split()[-1])
+        elif line.startswith("004004 HOUR"):
+            meta["hour"] = int(line.split()[-1])
+        elif line.startswith("004005 MINUTE"):
+            meta["minute"] = int(line.split()[-1])
+        elif line.startswith("004006 SECOND"):
+            meta["second"] = int(line.split()[-1])
+        elif "LATITUDE (HIGH ACCURACY)" in line and "005001" in line:
+            station_lat = float(line.split()[-1])
+            meta["station_lat"] = station_lat
+        elif "LONGITUDE (HIGH ACCURACY)" in line and "006001" in line:
+            station_lon = float(line.split()[-1])
+            meta["station_lon"] = station_lon
+        elif "HEIGHT OF STATION GROUND" in line:
+            meta["station_height_m"] = float(line.split()[-1])
+
+        # --- Level separator ---
+        elif line.startswith("# ---") and current:
+            levels.append(current)
+            current = {}
+
+        # --- Per-level data ---
+        elif "PRESSURE" in line and "007004" in line:
+            current["pressure_hPa"] = float(line.split()[-1]) / 100.0
+        elif "GEOPOTENTIAL HEIGHT" in line and "010009" in line:
+            current["height_m"] = float(line.split()[-1])
+        elif "TEMPERATURE/AIR TEMPERATURE" in line:
+            current["temp_C"] = float(line.split()[-1]) - 273.15
+        elif "DEW-POINT TEMPERATURE" in line:
+            current["dewpoint_C"] = float(line.split()[-1]) - 273.15
+        elif "WIND DIRECTION" in line and "011001" in line:
+            current["wind_dir_deg"] = float(line.split()[-1])
+        elif "WIND SPEED" in line and "011002" in line:
+            current["wind_speed_mps"] = float(line.split()[-1])
+        elif "LATITUDE DISPLACEMENT" in line and "005015" in line:
+            current["lat_disp"] = float(line.split()[-1])
+        elif "LONGITUDE DISPLACEMENT" in line and "006015" in line:
+            current["lon_disp"] = float(line.split()[-1])
+        elif "LONG TIME PERIOD OR DISPLACEMENT" in line and "004086" in line:
+            current["time_s"] = float(line.split()[-1])
+        elif "EXTENDED VERTICAL SOUNDING SIGNIFICANCE" in line and "008042" in line:
+            current["status_flag"] = line.split()[-1]
+        elif "TRACKING TECHNIQUE/STATUS OF SYSTEM USED" in line and "002014" in line:
+            meta["system_status"] = line.split()[-1]
+
+    if current:
+        levels.append(current)
+
+    df_meta = pd.DataFrame([meta])
+    df_levels = pd.DataFrame(levels).replace({None: np.nan})
+
+    # Ascent rate
+    if "time_s" in df_levels and "height_m" in df_levels:
+        delta_h = df_levels["height_m"].diff()
+        delta_t = df_levels["time_s"].diff()
+        delta_t[delta_t <= 0] = np.nan
+        df_levels["ascent_rate_mps"] = delta_h / delta_t
+        df_levels.loc[df_levels["ascent_rate_mps"] > 20, "ascent_rate_mps"] = np.nan
+        df_levels.loc[df_levels["ascent_rate_mps"] < 0, "ascent_rate_mps"] = np.nan
+
+    if station_lat is not None and "lat_disp" in df_levels:
+        df_levels["latitude"] = station_lat + df_levels["lat_disp"].fillna(0)
+    if station_lon is not None and "lon_disp" in df_levels:
+        df_levels["longitude"] = station_lon + df_levels["lon_disp"].fillna(0)
+
+    # --- Combine launch time ---
+    if all(k in meta for k in ("year","month","day","hour","minute","second")):
+        meta["launch_time"] = (
+            f"{meta['year']:04d}-{meta['month']:02d}-{meta['day']:02d} "
+            f"{meta['hour']:02d}:{meta['minute']:02d}:{meta['second']:02d} UTC"
+        )
+        # remove old fields so they don't appear in df_meta
+        for k in ("year","month","day","hour","minute","second"):
+            meta.pop(k, None)
+    
+    # --- Convert to DataFrame AFTER cleanup ---
+    df_meta = pd.DataFrame([meta])
+
+    return df_meta, df_levels
+
+# --- FTP utility ---
+def fetch_all_sites():
+    result = {}
+    cfg = CONFIG["ftp"]
+    exts = cfg.get("file_ext", [".bufr"])   # list of allowed extensions
+
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(cfg["base_path"])
+            sites = ftp.nlst()
+
+            for site in sites:
+                try:
+                    ftp.cwd(f"{cfg['base_path']}/{site}")
+                    all_files = ftp.nlst()
+                    bufr_files = [f for f in all_files if any(f.endswith(ext) for ext in exts)]
+                    bufr_files.sort(reverse=True)
+                    result[site] = bufr_files[: cfg.get("limit", 10)]
+                    ftp.cwd(cfg["base_path"])
+                except Exception as e:
+                    result[site] = [f"Error: {e}"]
+    except Exception as e:
+        result["GLOBAL"] = [f"FTP Error: {e}"]
+    return result
+
+def download_and_process(site, filename):
+    """Fetch BUFR file from FTP and process into rason_levels + metadata."""
+    global rason_levels, metadata
+    cfg = CONFIG["ftp"]
+    local_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(f"{cfg['base_path']}/{site}")
+            with open(local_path, "wb") as f:
+                ftp.retrbinary(f"RETR {filename}", f.write)
+
+        decoded = decode_bufr(local_path)
+        df_meta, df_levels = parse_bufr(decoded)
+        metadata = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        rason_levels = df_levels.to_dict("records") if not df_levels.empty else []
+    except Exception as e:
+        print(f"FTP download error: {e}")
+        metadata, rason_levels = {}, []
+        
+# --- Routes ---
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    sites_data = fetch_all_sites()
+    return render_template("dashboard.html", sites=sites_data)
+
+@app.route("/load_from_ftp/<site>/<filename>")
+@login_required
+def load_from_ftp(site, filename):
+    download_and_process(site, filename)
+    return redirect(url_for("index"))
+
+@app.route("/", methods=["GET", "POST"])
+@login_required
+def index():
+    global rason_levels, metadata
+    if request.method == "POST":
+        f = request.files["rasonfiles"]
+        if not f or not f.filename:
+            return redirect(url_for("index"))
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], f.filename)
+        f.save(filepath)
+
+        decoded = decode_bufr(filepath)
+        df_meta, df_levels = parse_bufr(decoded)
+        metadata = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        rason_levels = df_levels.to_dict("records") if not df_levels.empty else []
+        return redirect(url_for("index"))
+
+    return render_template("map.html", total=len(rason_levels))
+
+@app.route("/value")
+@login_required
+def rason_value():
+    if not rason_levels:
+        return jsonify({"error": "No radiosonde"}), 404
+    idx = int(request.args.get("frame", 0)) % len(rason_levels)
+    return jsonify(rason_levels[idx])
+
+@app.route("/metadata")
+@login_required
+def rason_metadata():
+    if not metadata:
+        return jsonify({"error": "No metadata"}), 404
+    return jsonify(metadata)
+
+@app.route("/all_levels")
+@login_required
+def all_levels_route():
+    return jsonify(rason_levels)
+
+if __name__ == "__main__":
+    app.run(debug=True)

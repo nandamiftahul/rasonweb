@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Login - Radiosonde Viewer</title>
+  <style>
+    body, html {
+      margin:0; padding:0; height:100%;
+      display:flex; align-items:center; justify-content:center;
+      background:#f0f2f5; font-family:sans-serif;
+    }
+    #loginBox {
+      background:white;
+      padding:30px;
+      border-radius:10px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.2);
+      width:320px;
+      text-align:center;
+    }
+    #loginBox h2 {
+      margin-top:0; margin-bottom:20px;
+      font-size:20px; color:#333;
+    }
+    #loginBox input {
+      width:90%;
+      padding:10px;
+      margin:8px 0;
+      border:1px solid #ccc;
+      border-radius:5px;
+      font-size:14px;
+    }
+    #loginBox button {
+      width:95%;
+      padding:10px;
+      margin-top:15px;
+      background:#0078d7;
+      color:white;
+      border:none;
+      border-radius:5px;
+      font-size:15px;
+      cursor:pointer;
+    }
+    #loginBox button:hover {
+      background:#005a9e;
+    }
+    .error {
+      color:red;
+      font-size:13px;
+      margin-top:10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="loginBox">
+    <h2>🔑 Radiosonde Viewer</h2>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="POST">
+      <input type="text" name="username" placeholder="Username" required><br>
+      <input type="password" name="password" placeholder="Password" required><br>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+</body>
+</html>
