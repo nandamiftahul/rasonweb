@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, jsonify, session
+    url_for, jsonify, session, send_file, Response
 )
 from functools import wraps
 
@@ -42,7 +42,11 @@ VALID_USERS = {
     "admin": "meteomodem",
     "trial1": "trialpass",
     "trial2": "12345",
-    "guest": "guest123"
+    "guest": "guest123",
+    "user1": "user123",
+    "user2": "user123",
+    "user3": "user123",
+    "bmkg" : "Bmkg2025$"
 }
 
 def login_required(f):
@@ -337,6 +341,122 @@ def extract_date_from_filename(fname: str):
             return "-"
     return "-"
 
+def generate_wmo_temp(df_meta, df_levels):
+    """
+    Generate WMO TEMP message (TTAA, TTBB, TTCC, TTDD).
+    Encoded into real 5-digit group format (5 groups per line, WMO style).
+    """
+
+    if df_meta.empty or df_levels.empty:
+        return "No data"
+
+    block = int(df_meta.iloc[0].get("wmo_block", 99))
+    station = int(df_meta.iloc[0].get("wmo_station", 999))
+    d = df_meta.iloc[0].get("day", 1)
+    h = df_meta.iloc[0].get("hour", 0)
+
+    # Sort levels by pressure descending
+    df_levels = df_levels.sort_values("pressure_hPa", ascending=False)
+
+    # --- Helpers ---
+    def encode_temp_group(p, t, td):
+        if pd.isna(p) or pd.isna(t):
+            return "/////"
+        p100 = int(round(p / 10)) % 1000  # compress to 3 digits
+        t10 = int(round(t * 10)) % 1000
+        td_dep = int(round((t - td) * 10)) if pd.notna(td) else 99
+        return f"{p100:03d}{t10:02d}{td_dep:02d}"[:5]
+
+    def encode_wind_group(wd, ws):
+        if pd.isna(wd) or pd.isna(ws):
+            return "/////"
+        dd = int(round(wd / 10)) % 36  # tens of degrees
+        ff = int(round(ws)) % 1000
+        return f"{dd:02d}{ff:03d}"[:5]
+
+    def pack_groups(groups):
+        """Pack groups 5 per line (WMO style)."""
+        lines = []
+        for i in range(0, len(groups), 5):
+            lines.append(" ".join(groups[i:i+5]))
+        return lines
+
+    lines = []
+
+    # --- TTAA ---
+    lines.append(f"TTAA {block:02d}{station:03d} {d:02d}{h:02d}00")
+    groups = []
+    for _, row in df_levels[df_levels["pressure_hPa"] >= 100].iterrows():
+        tgrp = encode_temp_group(row.get("pressure_hPa"), row.get("temp_C"), row.get("dewpoint_C"))
+        wgrp = encode_wind_group(row.get("wind_dir_deg"), row.get("wind_speed_mps"))
+        groups.extend([tgrp, wgrp])
+    lines.extend(pack_groups(groups))
+
+    # --- TTBB ---
+    lines.append(f"TTBB {block:02d}{station:03d} {d:02d}{h:02d}00")
+    groups = []
+    for _, row in df_levels[(df_levels["pressure_hPa"] < 1000) & (df_levels["pressure_hPa"] > 100)].iterrows():
+        if pd.notna(row.get("temp_C")) and pd.notna(row.get("dewpoint_C")):
+            groups.append(encode_temp_group(row.get("pressure_hPa"), row.get("temp_C"), row.get("dewpoint_C")))
+    if groups:
+        lines.extend(pack_groups(groups))
+
+    # --- TTCC ---
+    lines.append(f"TTCC {block:02d}{station:03d} {d:02d}{h:02d}00")
+    groups = []
+    for _, row in df_levels[df_levels["pressure_hPa"] < 100].iterrows():
+        tgrp = encode_temp_group(row.get("pressure_hPa"), row.get("temp_C"), row.get("dewpoint_C"))
+        wgrp = encode_wind_group(row.get("wind_dir_deg"), row.get("wind_speed_mps"))
+        groups.extend([tgrp, wgrp])
+    if groups:
+        lines.extend(pack_groups(groups))
+
+    # --- TTDD ---
+    lines.append(f"TTDD {block:02d}{station:03d} {d:02d}{h:02d}00")
+    groups = []
+    for _, row in df_levels.iterrows():
+        if pd.notna(row.get("wind_dir_deg")) and pd.notna(row.get("wind_speed_mps")):
+            groups.append(encode_wind_group(row.get("wind_dir_deg"), row.get("wind_speed_mps")))
+    if groups:
+        lines.extend(pack_groups(groups))
+
+    lines.append("NNNN")
+    return "\n".join(lines)
+
+def download_from_ftp(site, filename):
+    """Fetch file from FTP and return local path only (no processing)."""
+    cfg = CONFIG["ftp"]
+    local_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(f"{cfg['base_path']}/{site}")
+            with open(local_path, "wb") as f:
+                ftp.retrbinary(f"RETR " + filename, f.write)
+    except Exception as e:
+        raise RuntimeError(f"FTP download error: {e}")
+    return local_path
+
+@app.route("/download/<site>/<filename>")
+@login_required
+def download_file(site, filename):
+    cfg = CONFIG["ftp"]
+    local_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(f"{cfg['base_path']}/{site}")
+            with open(local_path, "wb") as f:
+                ftp.retrbinary(f"RETR " + filename, f.write)
+    except Exception as e:
+        return f"FTP download error: {e}", 500
+
+    # Only support .bfr download for now
+    return send_file(local_path, as_attachment=True)
+
 # --- Routes ---
 @app.route("/dashboard")
 @login_required
@@ -420,6 +540,25 @@ def rason_metadata():
 @login_required
 def all_levels_route():
     return jsonify(rason_levels)
+
+
+@app.route("/download_wmo/<site>/<filename>")
+@login_required
+def download_wmo(site, filename):
+    try:
+        local_path = download_from_ftp(site, filename)
+        decoded = decode_bufr(local_path)
+        df_meta, df_levels = parse_bufr(decoded)
+        wmo_text = generate_wmo_temp(df_meta, df_levels)
+
+        return Response(
+            wmo_text,
+            mimetype="text/plain",
+            headers={"Content-Disposition": f"attachment;filename={filename}.wmo.txt"}
+        )
+    except Exception as e:
+        return f"Error generating WMO: {e}", 500
+
 
 
 if __name__ == "__main__":

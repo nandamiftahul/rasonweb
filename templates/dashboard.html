@@ -114,14 +114,17 @@
         <th>Filename</th>
         <th>Data Date</th>
         ${withMeta ? "<th>Launch Time</th><th>Status</th>" : ""}
+        <th>.bfr</th>
+        <th>WMO</th>
       </tr></thead><tbody>`;
-
+    
       for (const [site, files] of Object.entries(sites)) {
         files.forEach(f => {
           html += `<tr>
             <td>${f.site || site}</td>
             <td><a href="/load_from_ftp/${site}/${f.name}" target="_blank">${f.name}</a></td>
             <td>${f.file_date || "-"}</td>`;
+          
           if (withMeta) {
             let issues = f.flight_issues || "-";
             if (Array.isArray(issues)) issues = issues.join(", ");
@@ -130,16 +133,24 @@
             else if (issues !== "OK" && issues !== "-") statusClass = "status-issues";
             html += `<td>${f.launch_time || "-"}</td><td class="${statusClass}">${issues}</td>`;
           }
+    
+          // ✅ Separate columns for .bfr and WMO downloads
+          html += `<td><a href="/download/${site}/${f.name}" target="_blank">⬇</a></td>`;
+          html += `<td><a href="/download_wmo/${site}/${f.name}" target="_blank">⬇</a></td>`;
+    
           html += `</tr>`;
         });
       }
-
+    
       html += "</tbody></table>";
       document.getElementById("content").innerHTML = html;
-
+    
       // ✅ Activate DataTables
       new DataTable('#dataTable');
     }
+
+    
+
 
     async function showMetadata() {
       document.getElementById("progressOverlay").style.display = "flex";
