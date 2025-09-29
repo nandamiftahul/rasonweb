@@ -187,10 +187,10 @@ def parse_bufr(decoded_text):
     return df_meta, df_levels
 
 # --- FTP utility ---
-def fetch_all_sites():
+def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
     result = {}
     cfg = CONFIG["ftp"]
-    exts = cfg.get("file_ext", [".bufr",".bfh",".bfr"])   # list of allowed extensions
+    exts = [e.lower() for e in (ext_filter or cfg.get("file_ext", [".bufr"]))]
 
     try:
         with ftplib.FTP() as ftp:
@@ -200,18 +200,58 @@ def fetch_all_sites():
             sites = ftp.nlst()
 
             for site in sites:
+                site_files = []
                 try:
                     ftp.cwd(f"{cfg['base_path']}/{site}")
                     all_files = ftp.nlst()
-                    bufr_files = [f for f in all_files if any(f.endswith(ext) for ext in exts)]
-                    bufr_files.sort(reverse=True)
-                    result[site] = bufr_files[: cfg.get("limit", 10)]
-                    ftp.cwd(cfg["base_path"])
+                    # filter extensions (case-insensitive)
+                    selected = [f for f in all_files if any(f.lower().endswith(ext) for ext in exts)]
+                    selected.sort(reverse=True)
+                    selected = selected[: (limit or cfg.get("limit", 10))]
+
+                    for fname in selected:
+                        item = {"name": fname}
+                        if with_meta:
+                            try:
+                                # download file temporarily
+                                local_path = os.path.join(app.config["UPLOAD_FOLDER"], fname)
+                                with open(local_path, "wb") as f:
+                                    ftp.retrbinary(f"RETR " + fname, f.write)
+
+                                decoded = decode_bufr(local_path)
+                                df_meta, _ = parse_bufr(decoded)
+                                if not df_meta.empty:
+                                    launch_time = df_meta.iloc[0].get("launch_time")
+                                    if launch_time:
+                                        item["launch_time"] = launch_time
+                            except Exception as e:
+                                item["launch_time"] = f"Error: {e}"
+                        site_files.append(item)
+
+                    ftp.cwd(cfg["base_path"])  # back to root
+                    result[site] = site_files
                 except Exception as e:
-                    result[site] = [f"Error: {e}"]
+                    result[site] = [{"name": f"Error: {e}"}]
     except Exception as e:
-        result["GLOBAL"] = [f"FTP Error: {e}"]
+        result["GLOBAL"] = [{"name": f"FTP Error: {e}"}]
     return result
+
+# --- API routes ---
+@app.route("/api/sites")
+@login_required
+def api_sites():
+    ext = request.args.get("ext") or None
+    limit = int(request.args.get("limit") or CONFIG["ftp"].get("limit", 10))
+    sites = fetch_all_sites(ext_filter=[ext] if ext else None, limit=limit, with_meta=False)
+    return jsonify(sites)
+
+@app.route("/api/sites_with_meta")
+@login_required
+def api_sites_with_meta():
+    ext = request.args.get("ext") or None
+    limit = int(request.args.get("limit") or CONFIG["ftp"].get("limit", 10))
+    sites = fetch_all_sites(ext_filter=[ext] if ext else None, limit=limit, with_meta=True)
+    return jsonify(sites)
 
 def download_and_process(site, filename):
     """Fetch BUFR file from FTP and process into rason_levels + metadata."""
@@ -246,8 +286,34 @@ def safe_float(val):
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    sites_data = fetch_all_sites()
-    return render_template("dashboard.html", sites=sites_data)
+    # Default to ".bfr" if ext is missing or empty
+    selected_ext = request.args.get("ext")
+    if not selected_ext:
+        selected_ext = ".bfr"
+
+    limit = request.args.get("limit", type=int, default=5)
+
+    sites = fetch_all_sites(ext_filter=selected_ext, limit=limit)
+    return render_template(
+        "dashboard.html",
+        sites=sites,
+        selected_ext=selected_ext,
+        limit=limit
+    )
+
+
+@app.route("/api/filemeta/<site>/<filename>")
+@login_required
+def file_metadata(site, filename):
+    try:
+        local_path = download_from_ftp(site, filename)
+        decoded = decode_bufr(local_path)
+        df_meta, _ = parse_bufr(decoded)
+        meta = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        return jsonify({"launch_time": meta.get("launch_time", "-")})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/load_from_ftp/<site>/<filename>")
 @login_required
