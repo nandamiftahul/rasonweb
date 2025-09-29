@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 import os
+from dotenv import load_dotenv
 import json
 import ftplib
 import subprocess
@@ -11,9 +12,22 @@ from flask import (
 )
 from functools import wraps
 
-# --- Load configuration ---
-with open("config.json") as f:
-    CONFIG = json.load(f)
+# Load local .env file (ignored in production)
+load_dotenv()
+
+# --- Load configuration from environment ---
+CONFIG = {
+    "ftp": {
+        "name": os.getenv("FTP_NAME", "Unknown"),
+        "host": os.getenv("FTP_HOST", "localhost"),
+        "port": int(os.getenv("FTP_PORT", "21")),
+        "user": os.getenv("FTP_USER", "anonymous"),
+        "password": os.getenv("FTP_PASS", ""),
+        "base_path": os.getenv("FTP_BASE_PATH", "/UA"),
+        "file_ext": os.getenv("FTP_FILE_EXT", ".bufr,.bfh,.bfr").split(","),
+        "limit": int(os.getenv("FTP_LIMIT", "10"))
+    }
+}
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
