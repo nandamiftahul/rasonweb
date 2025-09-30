@@ -5,3 +5,4 @@ pybufrkit
 gunicorn
 python-dotenv
 metpy
+geopy
