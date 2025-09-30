@@ -42,19 +42,21 @@
     #metaPanel { left:20px; }
 
     #chartsPanel {
-      position:absolute;
-      bottom:80px;
-      left:20px;
-      width:1110px;
-      height:320px;
-      background:white;
-      border-radius:6px;
-      box-shadow:0 0 6px rgba(0,0,0,0.4);
-      z-index:1000;
-      padding:6px;
-      display:flex;
-      gap:10px;
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);  /
+      width: 1110px;
+      height: 320px;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.4);
+      z-index: 1000;
+      padding: 6px;
+      display: flex;
+      gap: 10px;
     }
+
     .chartBox { flex:1; height:100%; }
 
     #topBar {
@@ -89,7 +91,10 @@
 
   <!-- Metadata panel -->
   <div id="metaPanel">
-    <b>Station Metadata</b>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <b>Station Metadata</b>
+      <button id="toggleMeta" style="border:none; background:none; font-size:16px; cursor:pointer;">−</button>
+    </div>
     <div id="metaContent">No metadata</div>
   </div>
 
@@ -283,55 +288,100 @@
     // Turn "1" → "1 – Aneroid" for known keys;
     // leave values that are already "1 – Aneroid" unchanged.
     function formatMetaValue(key, value) {
-      if (value == null || value === "") return value;
-      if (typeof value === "string" && value.includes("–")) return value;   // already formatted
-      const map = SENSOR_MAPS[key];
+      if (value == null || value === "") return "-";
+    
+      // If already formatted like "2 – Hydrogen"
+      if (typeof value === "string" && value.includes("–")) return value;
+    
+      // Try map with exact key
+      let map = SENSOR_MAPS[key];
+      if (!map) {
+        // Try fallback: remove "type_of_" prefix
+        const altKey = key.replace(/^type_of_/, "");
+        map = SENSOR_MAPS[altKey];
+      }
+    
       const code = Number(value);
       if (map && Number.isFinite(code)) {
-        return `${code} – ${map[code] ?? "Unknown"}`;
+        const meaning = map[code] ?? "Unknown";
+        return `${code} – ${meaning}`;
       }
+    
       return value;
     }
+    
+    // Map primary keys to possible alias keys the backend might send
+    const ALT_KEYS = {
+      type_of_pressure_sensor: "pressure_sensor_type",
+      type_of_temperature_sensor: "temperature_sensor_type",
+      type_of_humidity_sensor: "humidity_sensor_type",
+      type_of_balloon: "balloon_type",
+      type_of_gas_used_in_balloon: "balloon_gas_type",
+      balloon_manufacturer: "balloon_manufacturer" // (no alias, keep for consistency)
+    };
+    
+    // Safely retrieve the raw value for a metadata field (try primary, then alias)
+    function getMeta(meta, key) {
+      const v = meta[key];
+      if (v !== undefined && v !== null && v !== "") return v;
+      const alt = ALT_KEYS[key];
+      if (alt && meta[alt] !== undefined && meta[alt] !== null && meta[alt] !== "") return meta[alt];
+      return "-";
+    }
+    
+
 
     // --- Load metadata ---
     fetch('/metadata')
       .then(r => r.ok ? r.json() : {})
       .then(meta => {
         if (!meta || meta.error) return;
-  
-        // parse launch_time into Date for time slider
+    
         launchDateUTC = parseLaunchUTC(meta.launch_time);
-  
-        // Build HTML in a fixed order first, then append any remaining keys
+    
         let html = "";
-  
-        // Show Status/Issues first if present
+    
+        // --- Station info ---
+        html += `<h4>📍 Station</h4>`;
+        html += `<b>Launch Time</b>: ${formatMetaValue("launch_time", meta.launch_time)}<br>`;
+        html += `<b>Lat</b>: ${meta.station_lat ?? "-"}<br>`;
+        html += `<b>Lon</b>: ${meta.station_lon ?? "-"}<br>`;
+        html += `<b>Height</b>: ${meta.station_height_m ?? "-"} m<br>`;
+    
+        // --- Radiosonde ---
+        html += `<h4>🎈 Radiosonde</h4>`;
+        html += `<b>Serial</b>: ${meta.radiosonde_serial_number ?? "-"}<br>`;
+        html += `<b>Frequency</b>: ${meta.radiosonde_operating_frequency ?? "-"}<br>`;
+        html += `<b>Pressure Sensor</b>: ${formatMetaValue("type_of_pressure_sensor", getMeta(meta, "type_of_pressure_sensor"))}<br>`;
+        html += `<b>Temp Sensor</b>: ${formatMetaValue("type_of_temperature_sensor", getMeta(meta, "type_of_temperature_sensor"))}<br>`;
+        html += `<b>Humidity Sensor</b>: ${formatMetaValue("type_of_humidity_sensor", getMeta(meta, "type_of_humidity_sensor"))}<br>`;
+        html += `<b>Software</b>: ${meta.software_version ?? "-"}<br>`;
+    
+        // --- Balloon ---
+        html += `<h4>🎈 Balloon</h4>`;
+        html += `<b>Type</b>: ${formatMetaValue("type_of_balloon", getMeta(meta, "type_of_balloon"))}<br>`;
+        html += `<b>Gas</b>: ${formatMetaValue("type_of_gas_used_in_balloon", getMeta(meta, "type_of_gas_used_in_balloon"))}<br>`;
+        if (meta.balloon_manufacturer || getMeta(meta, "balloon_manufacturer") !== "-") {
+          html += `<b>Manufacturer</b>: ${formatMetaValue("balloon_manufacturer", getMeta(meta, "balloon_manufacturer"))}<br>`;
+        }
+
+    
+        // --- Flight results ---
+        html += `<h4>✈ Flight</h4>`;
         if (Array.isArray(meta.flight_issues) && meta.flight_issues.length > 0) {
           html += `<b>Status</b>: ${meta.flight_issues.join(", ")}<br>`;
         }
-  
-        // Primary ordered fields
-        const shown = new Set(["flight_issues"]);
-        for (const key of META_PRIMARY_ORDER) {
-          if (meta[key] == null || meta[key] === "") continue;
-          shown.add(key);
-          const label = METADATA_LABELS[key] || key;
-          html += `<b>${label}</b>: ${formatMetaValue(key, meta[key])}<br>`;
-        }
-  
-        // Append other keys not in the primary list (skip noisy ones you already format elsewhere)
-        for (const [k, v] of Object.entries(meta)) {
-          if (v == null || v === "" || shown.has(k)) continue;
-          // Skip any internal keys if needed
-          const label = METADATA_LABELS[k] || k;
-          html += `<b>${label}</b>: ${formatMetaValue(k, v)}<br>`;
-        }
-  
-        document.getElementById("metaContent").innerHTML = html || "No metadata";
+        html += `<b>Termination</b>: ${formatMetaValue("reason_for_termination", meta.reason_for_termination)}<br>`;
+        html += `<b>End Pressure</b>: ${meta.end_pressure ?? "-"}<br>`;
+        html += `<b>Max Height</b>: ${meta.max_height ?? "-"}<br>`;
+        html += `<b>End Distance</b>: ${meta.end_distance ?? "-"}<br>`;
+        html += `<b>Ascent Rate</b>: ${meta.avg_ascent_rate ?? "-"}<br>`;
+    
+        document.getElementById("metaContent").innerHTML = html;
       })
       .catch(() => {});
-  
 
+ 
     // --- Load all levels ---
     initLevels();
 
@@ -470,6 +520,23 @@
       frame = parseInt(this.value, 10) || 0;
       loadRason();
     });
+    
+    // --- Metadata toggle ---
+    document.addEventListener("DOMContentLoaded", () => {
+      const btn = document.getElementById("toggleMeta");
+      const content = document.getElementById("metaContent");
+      btn.addEventListener("click", () => {
+        if (content.style.display === "none") {
+          content.style.display = "block";
+          btn.textContent = "−";
+        } else {
+          content.style.display = "none";
+          btn.textContent = "+";
+        }
+      });
+    });
+    
+
   </script>
 </body>
 </html>
