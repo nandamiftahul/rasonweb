@@ -123,8 +123,30 @@
           <h2>Metadata</h2>
           <table class="meta-table">
             <tbody>
+              {% set labels = {
+                "radiosonde_serial_number": "Serial Number",
+                "radiosonde_operating_frequency": "Frequency",
+                "reason_for_termination": "Reason for Termination",
+                "type_of_pressure_sensor": "Pressure Sensor",
+                "type_of_temperature_sensor": "Temperature Sensor",
+                "type_of_humidity_sensor": "Humidity Sensor",
+                "type_of_balloon": "Balloon Type",
+                "type_of_gas_used_in_balloon": "Balloon Gas",
+                "software_version": "Software",
+                "station_lat": "Station Lat",
+                "station_lon": "Station Lon",
+                "station_height_m": "Station Height",
+                "end_time": "End Time",
+                "end_pressure": "End Pressure",
+                "max_height": "Max Height",
+                "end_distance": "End Distance",
+                "avg_ascent_rate": "Avg Ascent Rate"
+              } %}
               {% for k, v in meta.items() %}
-                <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+                <tr>
+                  <th>{{ labels.get(k, k) }}</th>
+                  <td>{{ v }}</td>
+                </tr>
               {% endfor %}
             </tbody>
           </table>
@@ -209,7 +231,7 @@
         colorCell(cell, label, val);
       });
 
-      // Headline coloring (Skew-T and Hodograph)
+      // Headline coloring
       [["capeVal","CAPE"], ["cinVal","CIN"], ["liVal","Lifted Index"], ["kiVal","K Index"],
        ["shear1","0–1 km Bulk Shear"], ["shear6","0–6 km Bulk Shear"],
        ["srh1","SRH"], ["srh3","SRH"]].forEach(([id,label]) => {

@@ -217,7 +217,11 @@ def parse_bufr(decoded_text):
                 pass
         elif "SOFTWARE IDENTIFICATION AND VERSION NUMBER" in line or "025061" in line:
             meta["software_version"] = _extract_bytes_field(line)
-
+        elif "REASON FOR TERMINATION" in line or "008021" in line:
+            try:
+                meta["reason_for_termination"] = int(line.split()[-1])
+            except Exception:
+                pass
 
         # --- Level separator ---
         elif line.startswith("# ---") and current:
@@ -283,6 +287,26 @@ def parse_bufr(decoded_text):
 
     return df_meta, df_levels
 
+# --- Mappings ---
+REASON_MAP = {
+    0: "Not specified",
+    1: "Balloon burst",
+    2: "Battery exhausted",
+    3: "Receiver failure",
+    4: "Telemetry interrupted",
+    5: "Manual termination",
+    6: "Other",
+}
+
+SENSOR_MAPS = {
+    "pressure": {0:"Unknown",1:"Aneroid",2:"Capacitive",3:"Other"},
+    "temperature": {0:"Unknown",1:"Thermistor",2:"Platinum",3:"Other"},
+    "humidity": {0:"Unknown",1:"Hair",2:"Capacitive",3:"Carbon",4:"Other"},
+    "balloon": {0:"Unknown",1:"Latex",2:"Polyethylene",3:"Other"},
+    "balloon_gas": {0:"Unknown",1:"Hydrogen",2:"Helium"},
+    "balloon_manufacturer": {0:"Unknown",1:"Totex",2:"Kaysam",3:"Other"},
+}
+
 # --- FTP utility ---
 def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
     result = {}
@@ -301,7 +325,6 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                 try:
                     ftp.cwd(f"{cfg['base_path']}/{site}")
                     all_files = ftp.nlst()
-                    # filter extensions (case-insensitive)
                     selected = [f for f in all_files if any(f.lower().endswith(ext) for ext in exts)]
                     selected.sort(reverse=True)
                     selected = selected[: (limit or cfg.get("limit", 10))]
@@ -314,7 +337,6 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                         }
                         if with_meta:
                             try:
-                                # download file temporarily
                                 local_path = os.path.join(app.config["UPLOAD_FOLDER"], fname)
                                 with open(local_path, "wb") as f:
                                     ftp.retrbinary(f"RETR " + fname, f.write)
@@ -323,16 +345,42 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                                 df_meta, df_levels = parse_bufr(decoded)
 
                                 if not df_meta.empty:
-                                    launch_time = df_meta.iloc[0].get("launch_time")
+                                    meta_row = df_meta.iloc[0]
+
+                                    # Launch time
+                                    launch_time = meta_row.get("launch_time")
                                     if launch_time:
                                         item["launch_time"] = launch_time
 
-                                    # radiosonde serial number
-                                    sn = df_meta.iloc[0].get("radiosonde_serial_number")
+                                    # Radiosonde serial number
+                                    sn = meta_row.get("radiosonde_serial_number")
                                     if sn:
                                         item["radiosonde_serial_number"] = sn
 
-                                # flight issues
+                                    # Reason for termination
+                                    term_code = meta_row.get("reason_for_termination")
+                                    if pd.notna(term_code):
+                                        code = int(term_code)
+                                        meaning = REASON_MAP.get(code, "Unknown")
+                                        item["reason_for_termination"] = f"{code} – {meaning}"
+
+                                    # Sensor & balloon types
+                                    alias_groups = {
+                                        "pressure": ["pressure_sensor_type", "type_of_pressure_sensor"],
+                                        "temperature": ["temperature_sensor_type", "type_of_temperature_sensor"],
+                                        "humidity": ["humidity_sensor_type", "type_of_humidity_sensor"],
+                                        "balloon": ["balloon_type", "type_of_balloon"],
+                                        "balloon_gas": ["balloon_gas_type", "type_of_gas_used_in_balloon"],
+                                        "balloon_manufacturer": ["balloon_manufacturer"],
+                                    }
+                                    for group, keys in alias_groups.items():
+                                        mapping = SENSOR_MAPS[group]
+                                        for k in keys:
+                                            code = meta_row.get(k)
+                                            if pd.notna(code):
+                                                item[k] = f"{int(code)} – {mapping.get(int(code), 'Unknown')}"
+
+                                # Flight issues
                                 issues = analyze_flight(df_meta, df_levels)
                                 if issues:
                                     item["flight_issues"] = issues
@@ -350,19 +398,19 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                                         if pd.notna(max_height):
                                             item["max_height"] = f"{max_height:.0f} m"
 
-                                        # End time (launch_time + time_s)
+                                        # End time
                                         if "time_s" in df_levels and not df_meta.empty:
-                                            launch_time = pd.to_datetime(df_meta.iloc[0].get("launch_time"))
+                                            launch_time = pd.to_datetime(meta_row.get("launch_time"))
                                             if pd.notna(launch_time):
                                                 end_time = launch_time + pd.to_timedelta(df_levels["time_s"].max(), unit="s")
                                                 item["end_time"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
 
-                                        # Distance from station (last lat/lon)
+                                        # Distance from station
                                         if {"latitude", "longitude"} <= set(df_levels.columns) and not df_meta.empty:
                                             last_lat = df_levels["latitude"].dropna().iloc[-1]
                                             last_lon = df_levels["longitude"].dropna().iloc[-1]
-                                            st_lat = df_meta.iloc[0].get("station_lat")
-                                            st_lon = df_meta.iloc[0].get("station_lon")
+                                            st_lat = meta_row.get("station_lat")
+                                            st_lon = meta_row.get("station_lon")
                                             if st_lat and st_lon and pd.notna(last_lat) and pd.notna(last_lon):
                                                 dist = geodesic((st_lat, st_lon), (last_lat, last_lon)).km
                                                 item["end_distance"] = f"{dist:.1f} km"
@@ -382,7 +430,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
 
                         site_files.append(item)
 
-                    ftp.cwd(cfg["base_path"])  # back to root
+                    ftp.cwd(cfg["base_path"])
                     result[site] = site_files
                 except Exception as e:
                     result[site] = [{"name": f"Error: {e}", "site": site, "file_date": "-"}]
@@ -413,6 +461,7 @@ def download_and_process(site, filename):
     local_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
 
     try:
+        # --- Download from FTP ---
         with ftplib.FTP() as ftp:
             ftp.connect(cfg["host"], cfg.get("port", 21))
             ftp.login(cfg["user"], cfg["password"])
@@ -420,65 +469,118 @@ def download_and_process(site, filename):
             with open(local_path, "wb") as f:
                 ftp.retrbinary(f"RETR " + filename, f.write)
 
+        # --- Decode & parse ---
         decoded = decode_bufr(local_path)
         df_meta, df_levels = parse_bufr(decoded)
         issues = analyze_flight(df_meta, df_levels)
 
+        # --- User store ---
         store = get_user_store()
         store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        meta = store["metadata"]
 
-        # --- Normalize radiosonde frequency (Hz → MHz with 3 decimals) ---
-        if "radiosonde_operating_frequency" in store["metadata"]:
+        # --- Normalize radiosonde frequency (Hz → MHz) ---
+        if "radiosonde_operating_frequency" in meta:
             try:
-                hz_val = float(store["metadata"]["radiosonde_operating_frequency"])
-                mhz_val = hz_val / 1e6
-                store["metadata"]["radiosonde_operating_frequency"] = f"{mhz_val:.3f} MHz"
+                hz_val = float(meta["radiosonde_operating_frequency"])
+                meta["radiosonde_operating_frequency"] = f"{hz_val/1e6:.3f} MHz"
             except Exception:
                 pass
 
-        # --- Extra derived flight metadata ---
+        # === Map numeric codes to "code – meaning" (keep original key names) ===
+        # Reason for termination
+        if "reason_for_termination" in meta and meta["reason_for_termination"] not in (None, ""):
+            try:
+                code = int(meta["reason_for_termination"])
+                reason_map = {
+                    0: "Not specified",
+                    1: "Balloon burst",
+                    2: "Battery exhausted",
+                    3: "Receiver failure",
+                    4: "Telemetry interrupted",
+                    5: "Manual termination",
+                    6: "Other",
+                }
+                meta["reason_for_termination"] = f"{code} – {reason_map.get(code, 'Unknown')}"
+            except Exception:
+                pass
+
+        # Sensor/Balloon type code tables.
+        # We handle BOTH possible key styles that might come from parse_bufr.
+        sensor_maps = {
+            "pressure": {0:"Unknown",1:"Aneroid",2:"Capacitive",3:"Other"},
+            "temperature": {0:"Unknown",1:"Thermistor",2:"Platinum",3:"Other"},
+            "humidity": {0:"Unknown",1:"Hair",2:"Capacitive",3:"Carbon",4:"Other"},
+            "balloon": {0:"Unknown",1:"Latex",2:"Polyethylene",3:"Other"},
+            "balloon_gas": {0:"Unknown",1:"Hydrogen",2:"Helium"},
+            "balloon_manufacturer": {0:"Unknown",1:"Totex",2:"Kaysam",3:"Other"},
+        }
+        # key aliases seen in different decoders
+        alias_groups = {
+            "pressure": ["pressure_sensor_type", "type_of_pressure_sensor"],
+            "temperature": ["temperature_sensor_type", "type_of_temperature_sensor"],
+            "humidity": ["humidity_sensor_type", "type_of_humidity_sensor"],
+            "balloon": ["balloon_type", "type_of_balloon"],
+            "balloon_gas": ["balloon_gas_type", "type_of_gas_used_in_balloon"],
+            "balloon_manufacturer": ["balloon_manufacturer"],
+        }
+        for group, keys in alias_groups.items():
+            mapping = sensor_maps[group]
+            for k in keys:
+                if k in meta and meta[k] not in (None, ""):
+                    try:
+                        code = int(meta[k])
+                        meta[k] = f"{code} – {mapping.get(code, 'Unknown')}"
+                    except Exception:
+                        pass  # keep original if not int
+
+        # --- Derived flight metadata (end_time, end_pressure, etc.) ---
         try:
             if not df_levels.empty:
                 # End pressure
-                end_pressure = df_levels["pressure_hPa"].dropna().min()
+                if "pressure_hPa" in df_levels:
+                    end_p = df_levels["pressure_hPa"].dropna().min()
+                    if pd.notna(end_p):
+                        meta["end_pressure"] = f"{end_p:.1f} hPa"
 
                 # Max height
-                max_height = df_levels["height_m"].dropna().max()
+                if "height_m" in df_levels:
+                    max_h = df_levels["height_m"].dropna().max()
+                    if pd.notna(max_h):
+                        meta["max_height"] = f"{max_h:.0f} m"
 
                 # End time = launch_time + max(time_s)
                 end_time = None
                 if "time_s" in df_levels and not df_meta.empty:
-                    launch_time = pd.to_datetime(df_meta.iloc[0].get("launch_time"))
-                    if pd.notna(launch_time):
-                        end_time = launch_time + pd.to_timedelta(df_levels["time_s"].max(), unit="s")
+                    lt = pd.to_datetime(df_meta.iloc[0].get("launch_time"))
+                    if pd.notna(lt):
+                        end_time = lt + pd.to_timedelta(df_levels["time_s"].max(), unit="s")
+                        meta["end_time"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
 
-                # Distance from station to last point
-                distance_km = None
-                if {"latitude", "longitude"} <= set(df_levels.columns) and not df_meta.empty:
-                    last_lat = df_levels["latitude"].dropna().iloc[-1]
-                    last_lon = df_levels["longitude"].dropna().iloc[-1]
-                    st_lat = float(store["metadata"].get("station_lat", np.nan))
-                    st_lon = float(store["metadata"].get("station_lon", np.nan))
-                    if not np.isnan(st_lat) and not np.isnan(st_lon) and pd.notna(last_lat) and pd.notna(last_lon):
-                        distance_km = geodesic((st_lat, st_lon), (last_lat, last_lon)).km
+                # Distance from station to last lat/lon
+                if {"latitude","longitude"} <= set(df_levels.columns) and not df_meta.empty:
+                    last_lat = df_levels["latitude"].dropna().iloc[-1] if df_levels["latitude"].notna().any() else None
+                    last_lon = df_levels["longitude"].dropna().iloc[-1] if df_levels["longitude"].notna().any() else None
+                    st_lat = meta.get("station_lat")
+                    st_lon = meta.get("station_lon")
+                    if all(v is not None for v in (last_lat,last_lon,st_lat,st_lon)):
+                        try:
+                            dist_km = geodesic((float(st_lat), float(st_lon)), (float(last_lat), float(last_lon))).km
+                            meta["end_distance"] = f"{dist_km:.1f} km"
+                        except Exception:
+                            pass
 
                 # Avg ascent rate = max_height / elapsed_seconds
-                ascent_rate = None
-                if "time_s" in df_levels and "height_m" in df_levels:
+                if "height_m" in df_levels and "time_s" in df_levels and df_levels["time_s"].notna().any():
+                    max_h = df_levels["height_m"].dropna().max()
                     elapsed = df_levels["time_s"].max() - df_levels["time_s"].min()
-                    if elapsed > 0 and pd.notna(max_height):
-                        ascent_rate = max_height / elapsed
-
-                # Save into metadata dict
-                store["metadata"]["end_time"] = end_time.strftime("%Y-%m-%d %H:%M:%S") if end_time else "-"
-                store["metadata"]["end_pressure"] = f"{end_pressure:.1f} hPa" if pd.notna(end_pressure) else "-"
-                store["metadata"]["max_height"] = f"{max_height:.0f} m" if pd.notna(max_height) else "-"
-                store["metadata"]["end_distance"] = f"{distance_km:.1f} km" if distance_km else "-"
-                store["metadata"]["avg_ascent_rate"] = f"{ascent_rate:.2f} m/s" if ascent_rate else "-"
+                    if pd.notna(max_h) and elapsed and elapsed > 0:
+                        meta["avg_ascent_rate"] = f"{(max_h/elapsed):.2f} m/s"
         except Exception as e:
             print("Extra metadata calc failed in download_and_process:", e)
 
-        store["metadata"]["flight_issues"] = issues
+        # --- Save & exit ---
+        meta["flight_issues"] = issues
         store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
 
     except Exception as e:
@@ -847,17 +949,16 @@ def raob_analysis(site, filename):
         srh_0_1km = srh_0_3km = np.nan * units("m^2/s^2")
         if (u is not None) and (v is not None) and (hgt is not None):
             try:
-                # Ensure sorted by height
                 sort_idx = np.argsort(hgt)
                 hgt_sorted = hgt[sort_idx]
                 u_sorted = u[sort_idx]
                 v_sorted = v[sort_idx]
-        
-                # Storm motion (Bunkers right mover)
-                rmotion, lmotion, mean_wind = mpcalc.bunkers_storm_motion(p_w, u_sorted, v_sorted, hgt_sorted)
+
+                rmotion, lmotion, mean_wind = mpcalc.bunkers_storm_motion(
+                    p_w, u_sorted, v_sorted, hgt_sorted
+                )
                 storm_u, storm_v = rmotion
-        
-                # SRH integrations
+
                 srh_0_1km, _, _ = mpcalc.storm_relative_helicity(
                     hgt_sorted, u_sorted, v_sorted,
                     depth=1000*units.m, bottom=0*units.m,
@@ -870,7 +971,6 @@ def raob_analysis(site, filename):
                 )
             except Exception as e:
                 print("SRH calculation failed:", e)
-        
 
         # --- Freezing Level ---
         freezing_level = "-"
@@ -881,26 +981,23 @@ def raob_analysis(site, filename):
         except Exception:
             pass
 
-        # --- Tropopause (WMO: lapse rate ≤ 2 °C/km, must persist 2 km) ---
+        # --- Tropopause ---
         tropopause_level = "-"
         try:
             if {"height_m", "temp_C", "pressure_hPa"} <= set(thermo.columns):
                 T_vals = thermo["temp_C"].values
                 Z_vals = thermo["height_m"].values
                 P_vals = thermo["pressure_hPa"].values
-        
-                # Only consider above ~500 hPa (ignore boundary layer)
+
                 mask = P_vals < 500
                 T_vals = T_vals[mask]
                 Z_vals = Z_vals[mask]
                 P_vals = P_vals[mask]
-        
+
                 if len(T_vals) > 5:
-                    # Compute lapse rate AFTER filtering
-                    lapse_rate = np.gradient(T_vals, Z_vals) * 1000.0  # °C/km
-        
+                    lapse_rate = np.gradient(T_vals, Z_vals) * 1000.0
                     for i in range(len(Z_vals)):
-                        if lapse_rate[i] <= 2.0:  # WMO condition
+                        if lapse_rate[i] <= 2.0:
                             z_top = Z_vals[i] + 2000.0
                             mask2 = (Z_vals >= Z_vals[i]) & (Z_vals <= z_top)
                             if np.any(mask2):
@@ -910,9 +1007,6 @@ def raob_analysis(site, filename):
                                     break
         except Exception as e:
             print("Tropopause calc failed:", e)
-        
-
-
 
         # --- Skew-T plot ---
         fig1 = plt.figure(figsize=(6, 6))
@@ -937,7 +1031,8 @@ def raob_analysis(site, filename):
             ax = fig2.add_subplot(1, 1, 1)
             hodo = Hodograph(ax, component_range=60.0)
             hodo.add_grid(increment=20)
-            hodo.plot(u.to("m/s"), v.to("m/s"), color="b")
+            hodo.plot((-u).to("m/s"), (-v).to("m/s"), color="b")
+            ax.set_aspect('equal', adjustable='box')
             ax.set_title("Hodograph")
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", bbox_inches="tight")
@@ -970,9 +1065,40 @@ def raob_analysis(site, filename):
             "Tropopause": tropopause_level,
         }
 
+        # --- Metadata formatting ---
+        meta = df_meta.to_dict("records")[0]
+
+        # Reason for termination
+        if "reason_for_termination" in meta and meta["reason_for_termination"] not in (None, ""):
+            try:
+                code = int(meta["reason_for_termination"])
+                meta["reason_for_termination"] = f"{code} – {REASON_MAP.get(code, 'Unknown')}"
+            except Exception:
+                pass
+
+        # Sensor & balloon codes
+        alias_groups = {
+            "pressure": ["pressure_sensor_type", "type_of_pressure_sensor"],
+            "temperature": ["temperature_sensor_type", "type_of_temperature_sensor"],
+            "humidity": ["humidity_sensor_type", "type_of_humidity_sensor"],
+            "balloon": ["balloon_type", "type_of_balloon"],
+            "balloon_gas": ["balloon_gas_type", "type_of_gas_used_in_balloon"],
+            "balloon_manufacturer": ["balloon_manufacturer"],
+        }
+        for group, keys in alias_groups.items():
+            mapping = SENSOR_MAPS[group]
+            for k in keys:
+                if k in meta and meta[k] not in (None, ""):
+                    try:
+                        code = int(meta[k])
+                        meta[k] = f"{code} – {mapping.get(code, 'Unknown')}"
+                    except Exception:
+                        pass
+
+        # --- Render ---
         return render_template(
             "raob.html",
-            meta=df_meta.to_dict("records")[0],
+            meta=meta,
             indices=indices,
             skewt_img=skewt_img,
             hodo_img=hodo_img

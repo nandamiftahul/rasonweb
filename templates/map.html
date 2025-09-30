@@ -221,41 +221,116 @@
       return `${y}-${m}-${d} ${hh}:${mm}:${ss} UTC`;
     }
 
+    // Pretty labels for selected metadata keys
+    const METADATA_LABELS = {
+      launch_time: "Launch Time",
+      station_lat: "Station Lat",
+      station_lon: "Station Lon",
+      station_height_m: "Station Height",
+      radiosonde_serial_number: "Serial Number",
+      radiosonde_operating_frequency: "Frequency",
+      reason_for_termination: "Reason for Termination",
+      type_of_pressure_sensor: "Pressure Sensor",
+      type_of_temperature_sensor: "Temperature Sensor",
+      type_of_humidity_sensor: "Humidity Sensor",
+      type_of_balloon: "Balloon Type",
+      type_of_gas_used_in_balloon: "Balloon Gas",
+      software_version: "Software"
+    };
+  
+    // Preferred display order
+    const META_PRIMARY_ORDER = [
+      "launch_time",
+      "station_lat",
+      "station_lon",
+      "station_height_m",
+      "radiosonde_serial_number",
+      "radiosonde_operating_frequency",
+      "reason_for_termination",
+      "type_of_pressure_sensor",
+      "type_of_temperature_sensor",
+      "type_of_humidity_sensor",
+      "type_of_balloon",
+      "type_of_gas_used_in_balloon",
+      "software_version"
+    ];
+
+    // Fallback maps to render "code – meaning" if backend only sends numbers.
+    const SENSOR_MAPS = {
+      pressure_sensor_type: {0:"Unknown",1:"Aneroid",2:"Capacitive",3:"Other"},
+      type_of_pressure_sensor: {0:"Unknown",1:"Aneroid",2:"Capacitive",3:"Other"},
+    
+      temperature_sensor_type: {0:"Unknown",1:"Thermistor",2:"Platinum",3:"Other"},
+      type_of_temperature_sensor: {0:"Unknown",1:"Thermistor",2:"Platinum",3:"Other"},
+    
+      humidity_sensor_type: {0:"Unknown",1:"Hair",2:"Capacitive",3:"Carbon",4:"Other"},
+      type_of_humidity_sensor: {0:"Unknown",1:"Hair",2:"Capacitive",3:"Carbon",4:"Other"},
+    
+      balloon_type: {0:"Unknown",1:"Latex",2:"Polyethylene",3:"Other"},
+      type_of_balloon: {0:"Unknown",1:"Latex",2:"Polyethylene",3:"Other"},
+    
+      balloon_gas_type: {0:"Unknown",1:"Hydrogen",2:"Helium"},
+      type_of_gas_used_in_balloon: {0:"Unknown",1:"Hydrogen",2:"Helium"},
+    
+      balloon_manufacturer: {0:"Unknown",1:"Totex",2:"Kaysam",3:"Other"},
+    
+      reason_for_termination: {
+        0:"Not specified",1:"Balloon burst",2:"Battery exhausted",
+        3:"Receiver failure",4:"Telemetry interrupted",5:"Manual termination",6:"Other"
+      }
+    };
+    
+    // Turn "1" → "1 – Aneroid" for known keys;
+    // leave values that are already "1 – Aneroid" unchanged.
+    function formatMetaValue(key, value) {
+      if (value == null || value === "") return value;
+      if (typeof value === "string" && value.includes("–")) return value;   // already formatted
+      const map = SENSOR_MAPS[key];
+      const code = Number(value);
+      if (map && Number.isFinite(code)) {
+        return `${code} – ${map[code] ?? "Unknown"}`;
+      }
+      return value;
+    }
+
     // --- Load metadata ---
     fetch('/metadata')
       .then(r => r.ok ? r.json() : {})
       .then(meta => {
         if (!meta || meta.error) return;
-        // parse launch_time into Date
+  
+        // parse launch_time into Date for time slider
         launchDateUTC = parseLaunchUTC(meta.launch_time);
-
+  
+        // Build HTML in a fixed order first, then append any remaining keys
         let html = "";
-        if (meta.launch_time) html += `<b>Launch Time</b>: ${meta.launch_time}<br>`;
-        if (meta.station_lat != null) html += `<b>Station Lat</b>: ${meta.station_lat}°<br>`;
-        if (meta.station_lon != null) html += `<b>Station Lon</b>: ${meta.station_lon}°<br>`;
-        if (meta.station_height_m != null) html += `<b>Station Height</b>: ${Number(meta.station_height_m).toFixed(1)} m<br>`;
-        if (meta.radiosonde_serial_number) html += `<b>Serial Number</b>: ${meta.radiosonde_serial_number}<br>`;
-        if (meta.radiosonde_operating_frequency) html += `<b>Frequency</b>: ${meta.radiosonde_operating_frequency} <br>`;
-        if (meta.balloon_manufacturer != null) html += `<b>Balloon Manufacturer</b>: ${meta.balloon_manufacturer}<br>`;
-        if (meta.software_version) html += `<b>Software</b>: ${meta.software_version}<br>`;
-        // ✅ Show flight issues if available
-        if (meta.flight_issues && meta.flight_issues.length > 0) {
+  
+        // Show Status/Issues first if present
+        if (Array.isArray(meta.flight_issues) && meta.flight_issues.length > 0) {
           html += `<b>Status</b>: ${meta.flight_issues.join(", ")}<br>`;
         }
- 
-        for (const [k,v] of Object.entries(meta)) {
-          if ([
-            "launch_time","station_lat","station_lon","station_height_m",
-            "flight_issues",
-            "radiosonde_serial_number","radiosonde_operating_frequency",
-            "balloon_manufacturer","software_version"
-          ].includes(k)) continue;
-          html += `<b>${k}</b>: ${v}<br>`;
+  
+        // Primary ordered fields
+        const shown = new Set(["flight_issues"]);
+        for (const key of META_PRIMARY_ORDER) {
+          if (meta[key] == null || meta[key] === "") continue;
+          shown.add(key);
+          const label = METADATA_LABELS[key] || key;
+          html += `<b>${label}</b>: ${formatMetaValue(key, meta[key])}<br>`;
         }
-        
+  
+        // Append other keys not in the primary list (skip noisy ones you already format elsewhere)
+        for (const [k, v] of Object.entries(meta)) {
+          if (v == null || v === "" || shown.has(k)) continue;
+          // Skip any internal keys if needed
+          const label = METADATA_LABELS[k] || k;
+          html += `<b>${label}</b>: ${formatMetaValue(k, v)}<br>`;
+        }
+  
         document.getElementById("metaContent").innerHTML = html || "No metadata";
       })
       .catch(() => {});
+  
 
     // --- Load all levels ---
     initLevels();

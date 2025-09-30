@@ -171,8 +171,8 @@
     /* Column width adjustments */
     #dataTable th:nth-child(2),
     #dataTable td:nth-child(2) {
-      min-width: 260px !important;   /* Filename wider */
-      width: 350px !important;
+      min-width: 50px !important;   /* Filename wider */
+      width: 50px !important;
     }
   
     #dataTable th:nth-child(5),
@@ -272,7 +272,7 @@
     function renderTable(sites, withMeta) {
       let html = `<table id="dataTable" class="display"><thead><tr>
         <th>Site</th>
-        <th>Filename</th>
+        <th>File</th>
         <th>Data Date</th>`;
     
       if (withMeta) {
@@ -280,6 +280,7 @@
           <th>Launch Time</th>
           <th>End Time</th>
           <th>Status</th>
+          <th>Reason of End</th>
           <th>Serial</th>
           <th>End Pressure</th>
           <th>Max Height</th>
@@ -297,7 +298,11 @@
         files.forEach(f => {
           html += `<tr>
             <td>${f.site || site}</td>
-            <td><a href="/load_from_ftp/${site}/${f.name}" target="_blank">${f.name}</a></td>
+            <td style="text-align:center;">
+              <a href="/load_from_ftp/${site}/${f.name}" target="_blank" title="${f.name}">
+                📄
+              </a>
+            </td>
             <td>${f.file_date || "-"}</td>`;
     
           if (withMeta) {
@@ -310,6 +315,7 @@
             html += `<td>${f.launch_time || "-"}</td>`;
             html += `<td>${f.end_time || "-"}</td>`
             html += `<td class="${statusClass}">${issues}</td>`;
+            html += `<td>${f.reason_for_termination || "-"}</td>`;
             html += `<td>${f.radiosonde_serial_number || "-"}</td>`;;
             html += `<td>${f.end_pressure || "-"}</td>`;
             html += `<td>${f.max_height || "-"}</td>`;
