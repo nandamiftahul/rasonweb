@@ -76,7 +76,7 @@
   <!-- Upload form -->
   <form method="POST" enctype="multipart/form-data"
         style="position:absolute; top:10px; left:10px; z-index:1000; background:white; padding:6px; border-radius:6px;">
-    <input type="file" name="rasonfiles" accept=".bufr,.bfr,.bfh">
+    <input type="file" name="rasonfiles" accept=".bufr,.bfr,.bfh,.bin">
     <button type="submit">Upload Radiosonde</button>
   </form>
 
@@ -234,15 +234,25 @@
         if (meta.station_lat != null) html += `<b>Station Lat</b>: ${meta.station_lat}°<br>`;
         if (meta.station_lon != null) html += `<b>Station Lon</b>: ${meta.station_lon}°<br>`;
         if (meta.station_height_m != null) html += `<b>Station Height</b>: ${Number(meta.station_height_m).toFixed(1)} m<br>`;
+        if (meta.radiosonde_serial_number) html += `<b>Serial Number</b>: ${meta.radiosonde_serial_number}<br>`;
+        if (meta.radiosonde_operating_frequency) html += `<b>Frequency</b>: ${meta.radiosonde_operating_frequency} <br>`;
+        if (meta.balloon_manufacturer != null) html += `<b>Balloon Manufacturer</b>: ${meta.balloon_manufacturer}<br>`;
+        if (meta.software_version) html += `<b>Software</b>: ${meta.software_version}<br>`;
         // ✅ Show flight issues if available
         if (meta.flight_issues && meta.flight_issues.length > 0) {
           html += `<b>Status</b>: ${meta.flight_issues.join(", ")}<br>`;
         }
-        
+ 
         for (const [k,v] of Object.entries(meta)) {
-          if (["launch_time","station_lat","station_lon","station_height_m"].includes(k)) continue;
+          if ([
+            "launch_time","station_lat","station_lon","station_height_m",
+            "flight_issues",
+            "radiosonde_serial_number","radiosonde_operating_frequency",
+            "balloon_manufacturer","software_version"
+          ].includes(k)) continue;
           html += `<b>${k}</b>: ${v}<br>`;
         }
+        
         document.getElementById("metaContent").innerHTML = html || "No metadata";
       })
       .catch(() => {});

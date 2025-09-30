@@ -11,6 +11,7 @@
       background: #f8fafc;
       color: #222;
     }
+  
     header {
       background: #0d6efd;
       color: white;
@@ -19,6 +20,7 @@
       position: relative;
     }
     header h1 { margin: 0; font-size: 28px; }
+  
     .logout {
       position: absolute; top: 15px; right: 20px;
     }
@@ -32,13 +34,13 @@
       transition: background 0.2s;
     }
     .logout a:hover { background: #e9ecef; }
-
+  
     main {
-      max-width: 1200px;
+      max-width: 1600px;
       margin: 20px auto;
       padding: 0 20px;
     }
-
+  
     .card {
       background: white;
       border-radius: 8px;
@@ -46,14 +48,14 @@
       margin: 20px 0;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-
+  
     h2 {
       margin-top: 0;
       color: #0d6efd;
       border-bottom: 2px solid #0d6efd33;
       padding-bottom: 5px;
     }
-
+  
     .filters {
       text-align: center;
       margin: 10px 0 20px 0;
@@ -71,7 +73,7 @@
       cursor: pointer;
     }
     button:hover { background: #0b5ed7; }
-
+  
     table.dataTable {
       width: 100% !important;
       margin-top: 10px !important;
@@ -79,7 +81,7 @@
       overflow: hidden;
       box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     }
-
+  
     /* Progress overlay */
     #progressOverlay {
       position: fixed;
@@ -108,12 +110,12 @@
       50% { width: 80%; }
       100% { width: 0%; }
     }
-
+  
     /* Status colors */
     .status-ok { color: green; font-weight: bold; }
     .status-warn { color: orange; font-weight: bold; }
     .status-issues { color: red; font-weight: bold; }
-
+  
     .link-box {
       text-align:center;
       margin-top:20px;
@@ -128,7 +130,71 @@
       transition: background 0.2s;
     }
     .link-box a:hover { background:#0b5ed7; }
+  
+    /* ==============================
+       DataTable adjustments
+       ============================== */
+    #dataTable {
+      width: 100% !important;
+      table-layout: fixed;      /* ensures header/body alignment */
+      font-size: 14px;
+      border-collapse: collapse;
+    }
+  
+    #dataTable th, #dataTable td {
+      white-space: normal;   /* allow text to wrap */
+      word-wrap: break-word; /* break long words if needed */
+      overflow-wrap: break-word; /* modern browsers */
+      padding: 8px 12px;
+      vertical-align: top;   /* align text nicely at the top */
+    }
+  
+    /* Fix DataTables header/body width mismatch */
+    .dataTables_wrapper .dataTables_scrollHeadInner,
+    .dataTables_wrapper .dataTables_scrollHead table {
+      width: 100% !important;
+    }
+  
+    /* Allow horizontal scroll when too many columns */
+    .dataTables_wrapper {
+      overflow-x: auto;
+    }
+
+    /* Site column small */
+    #dataTable th:nth-child(1),
+    #dataTable td:nth-child(1) {
+      min-width: 80px !important;
+      max-width: 100px !important;
+      width: 100px !important;
+    }
+
+    /* Column width adjustments */
+    #dataTable th:nth-child(2),
+    #dataTable td:nth-child(2) {
+      min-width: 260px !important;   /* Filename wider */
+      width: 350px !important;
+    }
+  
+    #dataTable th:nth-child(5),
+    #dataTable td:nth-child(5) {
+      min-width: 110px !important;   /* Status medium */
+      width: 110px !important;
+    }
+  
+    /* Always make the last 3 columns (.bfr, WMO, RAOB) narrow */
+    #dataTable th:nth-last-child(3),
+    #dataTable td:nth-last-child(3),
+    #dataTable th:nth-last-child(2),
+    #dataTable td:nth-last-child(2),
+    #dataTable th:nth-last-child(1),
+    #dataTable td:nth-last-child(1) {
+      min-width: 20px !important;
+      max-width: 30px !important;
+      width: 30px !important;
+      text-align: center !important;
+    }
   </style>
+
 
   <!-- ✅ DataTables CSS/JS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
@@ -159,6 +225,7 @@
             <option value=".bufr" {% if selected_ext==".bufr" %}selected{% endif %}>.bufr</option>
             <option value=".bfh" {% if selected_ext==".bfh" %}selected{% endif %}>.bfh</option>
             <option value=".bfr" {% if selected_ext==".bfr" %}selected{% endif %}>.bfr</option>
+            <option value=".bin" {% if selected_ext==".bin" %}selected{% endif %}>.bin</option>
             <option value="" {% if not selected_ext or selected_ext=="all" %}selected{% endif %}>All</option>
           </select>
 
@@ -206,40 +273,77 @@
       let html = `<table id="dataTable" class="display"><thead><tr>
         <th>Site</th>
         <th>Filename</th>
-        <th>Data Date</th>
-        ${withMeta ? "<th>Launch Time</th><th>Status</th>" : ""}
+        <th>Data Date</th>`;
+    
+      if (withMeta) {
+        html += `
+          <th>Launch Time</th>
+          <th>End Time</th>
+          <th>Status</th>
+          <th>Serial</th>
+          <th>End Pressure</th>
+          <th>Max Height</th>
+          <th>Distance</th>
+          <th>Avg Ascent</th>`;
+      }
+    
+      html += `
         <th>.bfr</th>
         <th>WMO</th>
         <th>RAOB</th>
       </tr></thead><tbody>`;
-
+    
       for (const [site, files] of Object.entries(sites)) {
         files.forEach(f => {
           html += `<tr>
             <td>${f.site || site}</td>
             <td><a href="/load_from_ftp/${site}/${f.name}" target="_blank">${f.name}</a></td>
             <td>${f.file_date || "-"}</td>`;
-
+    
           if (withMeta) {
             let issues = f.flight_issues || "-";
             if (Array.isArray(issues)) issues = issues.join(", ");
             let statusClass = "status-ok";
             if (issues.includes("Ascent Stop") || issues.includes("Not reaching")) statusClass = "status-warn";
             else if (issues !== "OK" && issues !== "-") statusClass = "status-issues";
-            html += `<td>${f.launch_time || "-"}</td><td class="${statusClass}">${issues}</td>`;
+    
+            html += `<td>${f.launch_time || "-"}</td>`;
+            html += `<td>${f.end_time || "-"}</td>`
+            html += `<td class="${statusClass}">${issues}</td>`;
+            html += `<td>${f.radiosonde_serial_number || "-"}</td>`;;
+            html += `<td>${f.end_pressure || "-"}</td>`;
+            html += `<td>${f.max_height || "-"}</td>`;
+            html += `<td>${f.end_distance || "-"}</td>`;
+            html += `<td>${f.avg_ascent_rate || "-"}</td>`;
           }
-
+    
           html += `<td><a href="/download/${site}/${f.name}" target="_blank">⬇</a></td>`;
           html += `<td><a href="/download_wmo/${site}/${f.name}" target="_blank">⬇</a></td>`;
           html += `<td><a href="/raob/${site}/${f.name}" target="_blank">📊</a></td>`;
           html += `</tr>`;
         });
       }
-
+    
       html += "</tbody></table>";
       document.getElementById("content").innerHTML = html;
-      new DataTable('#dataTable');
+    
+      // Destroy any previous instance (prevents double-inits and misalignment)
+      if ($.fn.DataTable.isDataTable('#dataTable')) {
+        $('#dataTable').DataTable().destroy();
+      }
+      
+      // Initialize with scroll and then adjust columns
+      $('#dataTable').DataTable({
+        scrollX: true,
+        autoWidth: false,
+        ordering: false,                // optional, removes width jitter from sort icons
+        drawCallback: function () {     // ensure final alignment after draw
+          this.api().columns.adjust();
+        }
+      });
+
     }
+
 
     async function showMetadata() {
       document.getElementById("progressOverlay").style.display = "flex";
