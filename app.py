@@ -326,8 +326,25 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                     ftp.cwd(f"{cfg['base_path']}/{site}")
                     all_files = ftp.nlst()
                     selected = [f for f in all_files if any(f.lower().endswith(ext) for ext in exts)]
-                    selected.sort(reverse=True)
-                    selected = selected[: (limit or cfg.get("limit", 10))]
+                    # Attach parsed date to each file
+                    items = []
+                    for fname in selected:
+                        dt_str = extract_date_from_filename(fname)
+                        try:
+                            dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S UTC")
+                        except Exception:
+                            dt = datetime.min
+                        items.append((fname, dt))
+                    
+                    # Sort by datetime (newest first)
+                    items.sort(key=lambda x: x[1], reverse=True)
+                    
+                    # Only keep the last N (limit)
+                    items = items[: (limit or cfg.get("limit", 10))]
+                    
+                    # Build back list of names
+                    selected = [fname for fname, dt in items]
+                    
 
                     for fname in selected:
                         item = {
