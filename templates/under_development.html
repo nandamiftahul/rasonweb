@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Under Development - Radiosonde Monitoring</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body, html {
+      margin:0; padding:0; height:100%;
+      display:flex; align-items:center; justify-content:center;
+      font-family:"Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color:white;
+    }
+
+    .container {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 40px 50px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      max-width: 400px;
+    }
+
+    .container h1 {
+      margin: 0 0 20px;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .container p {
+      font-size: 15px;
+      color: #dbeafe;
+      margin-bottom: 25px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background: linear-gradient(to right, #00b4ff, #0078d7);
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      background: linear-gradient(to right, #0095cc, #0062b5);
+    }
+
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚠️ Page Under Development</h1>
+    <p>This feature is currently being built. Please check back later.</p>
+    <a href="{{ url_for('main_page') }}" class="btn">⬅ Back to Main Menu</a>
+    <div class="footer">
+      Powered by <b>Terrindo</b> · <b>BMKG</b> · <b>Meteomodem</b>
+    </div>
+  </div>
+</body>
+</html>

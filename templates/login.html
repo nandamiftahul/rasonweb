@@ -1,64 +1,127 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Login - Radiosonde Viewer</title>
+  <title>Login - Radiosonde Data Resume</title>
+
+  <!-- Lokal Inter Font -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter.css') }}">
+
   <style>
     body, html {
       margin:0; padding:0; height:100%;
       display:flex; align-items:center; justify-content:center;
-      background:#f0f2f5; font-family:sans-serif;
-    }
-    #loginBox {
-      background:white;
-      padding:30px;
-      border-radius:10px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.2);
-      width:320px;
-      text-align:center;
-    }
-    #loginBox h2 {
-      margin-top:0; margin-bottom:20px;
-      font-size:20px; color:#333;
-    }
-    #loginBox input {
-      width:90%;
-      padding:10px;
-      margin:8px 0;
-      border:1px solid #ccc;
-      border-radius:5px;
-      font-size:14px;
-    }
-    #loginBox button {
-      width:95%;
-      padding:10px;
-      margin-top:15px;
-      background:#0078d7;
+      font-family:"Inter", sans-serif;
+      background: radial-gradient(circle at 80% 15%, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 20%, transparent 60%),
+                  linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-size: cover;
+      overflow:hidden;
       color:white;
-      border:none;
-      border-radius:5px;
-      font-size:15px;
-      cursor:pointer;
     }
-    #loginBox button:hover {
-      background:#005a9e;
+
+    .login-box {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 35px 25px;
+      width: 280px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
     }
+
+    .login-box h2 {
+      margin: 0 0 20px;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: #fff;
+    }
+
+    .login-box input {
+      width: 90%;
+      padding: 7px;
+      margin: 6px 0;
+      border: none;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 13px;
+      text-align: center;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    .login-box input::placeholder { color: rgba(255,255,255,0.7); }
+
+    .login-box input:focus {
+      outline: none;
+      background: rgba(255,255,255,0.25);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+    }
+
+    .login-box button {
+      width: 92%;
+      padding: 8px;
+      margin-top: 12px;
+      background: linear-gradient(to right, #00b4ff, #0078d7);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .login-box button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
     .error {
-      color:red;
+      color:#ff8080;
       font-size:13px;
-      margin-top:10px;
+      margin-bottom:10px;
+    }
+
+    .powered {
+      margin-top: 22px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 0.3px;
+    }
+
+    .powered span {
+      color: #dbeafe;
+      font-weight: 500;
     }
   </style>
 </head>
 <body>
-  <div id="loginBox">
-    <h2>🔑 Radiosonde Viewer</h2>
+  <div class="login-box">
+    <h2>LOGIN</h2>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <form method="POST">
-      <input type="text" name="username" placeholder="Username" required><br>
-      <input type="password" name="password" placeholder="Password" required><br>
+      <input type="text" name="username" placeholder="Username" required>
+      <input type="password" name="password" placeholder="Password" required>
       <button type="submit">Login</button>
     </form>
+    <div class="powered">
+      Powered by <span>Terrindo</span> · <span>BMKG</span> · <span>Meteomodem</span>
+    </div>
   </div>
+
+  <!-- jQuery Lokal -->
+  <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+
+  <!-- DataTables Lokal -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/datatables/datatables.min.css') }}">
+  <script src="{{ url_for('static', filename='libs/datatables/datatables.min.js') }}"></script>
+
+  <!-- Leaflet Lokal -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/leaflet/leaflet.css') }}">
+  <script src="{{ url_for('static', filename='libs/leaflet/leaflet.js') }}"></script>
 </body>
 </html>

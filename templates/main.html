@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Main Menu - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+
+  <!-- ✅ Leaflet lokal -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/leaflet/leaflet.css') }}">
+  <script src="{{ url_for('static', filename='libs/leaflet/leaflet.js') }}"></script>
+
+  <!-- ✅ jQuery lokal -->
+  <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+
+  <!-- ✅ DataTables lokal -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/datatables/datatables.min.css') }}">
+  <script src="{{ url_for('static', filename='libs/datatables/datatables.min.js') }}"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      overflow-y: auto; /* ✅ biar bisa discroll ke bawah */
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 230px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 10px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .sidebar h2 {
+      font-size: 18px;
+      margin-bottom: 30px;
+      color: #dbeafe;
+      text-align: center;
+    }
+
+    .sidebar a {
+      display: block;
+      text-decoration: none;
+      color: white;
+      width: 100%;
+      padding: 12px 15px;
+      border-radius: 8px;
+      text-align: center;
+      margin: 8px 0;
+      transition: background 0.3s;
+    }
+
+    .sidebar a:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .logout {
+      margin-top: auto;
+      font-size: 14px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      text-decoration: none;
+      color: #fca5a5;
+    }
+
+    .logout:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    /* Main content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      overflow: visible;
+    }
+
+    /* 🌟 Header modern glass style */
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 35px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .header-box:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    .header-icon {
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      color: #dbeafe;
+      box-shadow: 0 0 10px rgba(255,255,255,0.25);
+    }
+
+    .header-text h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .header-text p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: #dbeafe;
+      opacity: 0.9;
+    }
+
+    .header-logos {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .header-logos img {
+      height: 36px;
+      opacity: 0.9;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .header-logos img:hover {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+
+    /* Cards grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 25px;
+      text-align: center;
+      color: white;
+      text-decoration: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      background: rgba(255,255,255,0.15);
+    }
+
+    .card h3 {
+      margin: 12px 0 6px;
+      font-size: 18px;
+    }
+
+    .card p {
+      font-size: 13px;
+      color: #dbeafe;
+    }
+
+    /* Map container (tinggi lebih besar, bisa di-scroll ke bawah) */
+    #indoMap {
+      width: 100%;
+      height: 80vh;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      margin-bottom: 40px;
+    }
+
+    /* Footer putih dengan logo besar di bawah */
+    .footer {
+      background: #ffffff;
+      padding: 25px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid #e5e7eb;
+      border-radius: 0 0 10px 10px;
+      flex-shrink: 0;
+    }
+
+    .footer img {
+      height: 60px;
+      opacity: 0.95;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .footer img:hover {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sidebar">
+    <h2>Radiosonde Monitoring</h2>
+    <a href="{{ url_for('dashboard') }}" target="_blank">📊 Data Resume</a>
+    <a href="{{ url_for('index') }}" target="_blank">🗺️ Map</a>
+    <a href="{{ url_for('under_development') }}" target="_blank">📡 Data Quality</a>
+    <a href="{{ url_for('under_development') }}" target="_blank">📁 Archive</a>
+    <a href="{{ url_for('under_development') }}" target="_blank">⚙️ Settings</a>
+    <a href="{{ url_for('under_development') }}" target="_blank">🧭 Analytics</a>
+    <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
+  </div>
+
+  <div class="main">
+    <!-- 🌤️ Header -->
+    <div class="header-box">
+      <div class="header-icon">🎈</div>
+      <div class="header-text">
+        <h1>Radiosonde Data Monitoring</h1>
+        <p>Real-time upper-air observation and analysis dashboard</p>
+      </div>
+
+      <div class="header-logos">
+        <img src="{{ url_for('static', filename='images/terrindo.png') }}" alt="Terrindo">
+        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div class="card-grid">
+      <a href="{{ url_for('dashboard') }}" class="card" target="_blank">
+        <h3>📊 Data Resume</h3>
+        <p>Access the main dashboard summary of Radiosonde observations.</p>
+      </a>
+      <a href="{{ url_for('index') }}" class="card" target="_blank">
+        <h3>🗺️ Map View</h3>
+        <p>View Radiosonde stations and trajectories on the map.</p>
+      </a>
+      <a href="{{ url_for('under_development') }}" class="card" target="_blank">
+        <h3>📡 Data Quality</h3>
+        <p>Under Development</p>
+      </a>
+      <a href="{{ url_for('under_development') }}" class="card" target="_blank">
+        <h3>📁 Archive</h3>
+        <p>Under Development</p>
+      </a>
+      <a href="{{ url_for('under_development') }}" class="card" target="_blank">
+        <h3>⚙️ Settings</h3>
+        <p>Under Development</p>
+      </a>
+      <a href="{{ url_for('under_development') }}" class="card" target="_blank">
+        <h3>🧭 Analytics</h3>
+        <p>Under Development</p>
+      </a>
+    </div>
+
+    <!-- Map -->
+    <div id="indoMap"></div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+    </div>
+  </div>
+
+  <script>
+    var map = L.map('indoMap').setView([-2, 118], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    function style(feature) {
+      return {
+        fillColor: getRandomColor(),
+        weight: 1,
+        opacity: 1,
+        color: 'white',
+        dashArray: '3',
+        fillOpacity: 0.7
+      };
+    }
+
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    function onEachFeature(feature, layer) {
+      const name = feature.properties.Propinsi || feature.properties.NAME_1 || feature.properties.provinsi;
+      layer.bindPopup("Provinsi: " + name);
+    }
+
+    fetch("{{ url_for('static', filename='geojson/indonesia-provinces.geojson') }}")
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, { style: style, onEachFeature: onEachFeature }).addTo(map);
+      })
+      .catch(err => console.error("Gagal memuat GeoJSON:", err));
+  </script>
+</body>
+</html>

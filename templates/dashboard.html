@@ -1,104 +1,182 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Radiosonde FTP Dashboard</title>
+  <title>Radiosonde Data Resume</title>
+
+  <!-- Fonts + DataTables Lokal -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/datatables/datatables.min.css') }}">
+  <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='libs/datatables/datatables.min.js') }}"></script>
+
+
   <style>
     body {
-      font-family: "Segoe UI", Roboto, Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f8fafc;
-      color: #222;
+      font-family: "Inter", sans-serif;
+      margin: 0; padding: 0;
+      background: #f4f6fb; color: #333;
+      transition: background 0.3s, color 0.3s;
     }
-  
+
+    /* ================= HEADER ================= */
     header {
       background: #0d6efd;
-      color: white;
-      padding: 20px;
-      text-align: center;
+      color: #fff;
+      padding: 12px 25px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       position: relative;
     }
-    header h1 { margin: 0; font-size: 28px; }
-  
-    .logout {
-      position: absolute; top: 15px; right: 20px;
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 15px;
     }
+
+    .header-left img {
+      height: 40px;
+      background: white;
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+    }
+
+    /* Logout */
+    .logout {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .logout a {
       background: white;
       color: #0d6efd;
-      padding: 6px 12px;
-      border-radius: 6px;
+      padding: 6px 16px;
+      border-radius: 999px; /* ellipse */
       text-decoration: none;
       font-weight: 500;
-      transition: background 0.2s;
+      transition: all 0.2s;
     }
-    .logout a:hover { background: #e9ecef; }
-  
+
+    .logout a:hover {
+      background: #e9ecef;
+      transform: scale(1.03);
+    }
+
+    /* Dark mode toggle */
+    #darkToggle {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: none;
+      font-size: 18px;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    #darkToggle:hover { background: rgba(255,255,255,0.35); transform: scale(1.1); }
+
     main {
       max-width: 1600px;
       margin: 20px auto;
       padding: 0 20px;
     }
-  
+
+    /* ================= CARD ================= */
     .card {
-      background: white;
-      border-radius: 8px;
+      background: #fff;
+      border-radius: 12px;
       padding: 20px;
       margin: 20px 0;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+      transition: background 0.3s, color 0.3s;
     }
-  
+
     h2 {
       margin-top: 0;
       color: #0d6efd;
+      font-weight: 600;
       border-bottom: 2px solid #0d6efd33;
-      padding-bottom: 5px;
+      padding-bottom: 6px;
     }
-  
+
+    /* Filters */
     .filters {
-      text-align: center;
-      margin: 10px 0 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
     }
-    select, button {
-      padding: 6px 12px;
-      margin: 0 5px;
+    select, button, input[type="date"] {
+      padding: 8px 12px;
       border: 1px solid #ccc;
-      border-radius: 6px;
+      border-radius: 8px;
+      font-size: 14px;
     }
     button {
       background: #0d6efd;
-      color: white;
+      color: #fff;
       border: none;
       cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
     }
-    button:hover { background: #0b5ed7; }
-  
+    button:hover { background: #0b5ed7; transform: translateY(-1px); }
+
+    /* Table */
     table.dataTable {
       width: 100% !important;
       margin-top: 10px !important;
-      border-radius: 6px;
+      border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      font-size: 14px;
+      border-collapse: collapse;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-  
+    table.dataTable thead th {
+      background: #f1f3f5 !important;
+      font-weight: 600;
+      color: #334155;
+      padding: 10px;
+    }
+    table.dataTable tbody td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+    }
+    table.dataTable tbody tr:hover { background: #f8f9fa; }
+
+    /* Status colors */
+    .status-ok { color: #198754; font-weight: 600; }
+    .status-warn { color: #fd7e14; font-weight: 600; }
+    .status-issues { color: #dc3545; font-weight: 600; }
+
     /* Progress overlay */
     #progressOverlay {
-      position: fixed;
-      top: 0; left: 0;
+      position: fixed; top: 0; left: 0;
       width: 100%; height: 100%;
       background: rgba(255,255,255,0.9);
       display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
+      align-items: center; justify-content: center;
       flex-direction: column;
+      z-index: 2000;
     }
     .progress-bar {
       width: 60%; height: 20px;
       background: #eee;
-      border-radius: 10px;
-      overflow: hidden;
+      border-radius: 10px; overflow: hidden;
+      margin-bottom: 12px;
     }
     .progress-bar-inner {
       width: 0%; height: 100%;
@@ -110,101 +188,65 @@
       50% { width: 80%; }
       100% { width: 0%; }
     }
-  
-    /* Status colors */
-    .status-ok { color: green; font-weight: bold; }
-    .status-warn { color: orange; font-weight: bold; }
-    .status-issues { color: red; font-weight: bold; }
-  
+
+    /* Navigation */
     .link-box {
-      text-align:center;
-      margin-top:20px;
+      text-align:center; margin-top:20px;
     }
     .link-box a {
       display:inline-block;
-      padding:8px 14px;
+      padding:10px 16px;
       background:#0d6efd;
       color:white;
-      border-radius:6px;
+      border-radius:8px;
       text-decoration:none;
       transition: background 0.2s;
     }
     .link-box a:hover { background:#0b5ed7; }
-  
-    /* ==============================
-       DataTable adjustments
-       ============================== */
-    #dataTable {
-      width: 100% !important;
-      table-layout: fixed;      /* ensures header/body alignment */
-      font-size: 14px;
-      border-collapse: collapse;
-    }
-  
-    #dataTable th, #dataTable td {
-      white-space: normal;   /* allow text to wrap */
-      word-wrap: break-word; /* break long words if needed */
-      overflow-wrap: break-word; /* modern browsers */
-      padding: 8px 12px;
-      vertical-align: top;   /* align text nicely at the top */
-    }
-  
-    /* Fix DataTables header/body width mismatch */
-    .dataTables_wrapper .dataTables_scrollHeadInner,
-    .dataTables_wrapper .dataTables_scrollHead table {
-      width: 100% !important;
-    }
-  
-    /* Allow horizontal scroll when too many columns */
-    .dataTables_wrapper {
-      overflow-x: auto;
-    }
 
-    /* Site column small */
-    #dataTable th:nth-child(1),
-    #dataTable td:nth-child(1) {
-      min-width: 80px !important;
-      max-width: 100px !important;
-      width: 100px !important;
+    /* ================= FOOTER ================= */
+    footer {
+      text-align: center;
+      padding: 20px 10px;
+      background: rgba(255,255,255,0.6);
+      border-top: 1px solid #eaeaea;
+      margin-top: 30px;
     }
+    footer img {
+      height: 55px;
+      opacity: 0.85;
+      transition: opacity 0.2s;
+    }
+    footer img:hover { opacity: 1; }
 
-    /* Column width adjustments */
-    #dataTable th:nth-child(2),
-    #dataTable td:nth-child(2) {
-      min-width: 50px !important;   /* Filename wider */
-      width: 50px !important;
+    /* ================= DARK MODE ================= */
+    body.dark {
+      background: #121212; color: #f1f1f1;
     }
-  
-    #dataTable th:nth-child(5),
-    #dataTable td:nth-child(5) {
-      min-width: 110px !important;   /* Status medium */
-      width: 110px !important;
+    body.dark .card {
+      background: #1e1e1e; color: #f1f1f1;
+      box-shadow: 0 3px 8px rgba(255,255,255,0.05);
     }
-  
-    /* Always make the last 3 columns (.bfr, WMO, RAOB) narrow */
-    #dataTable th:nth-last-child(3),
-    #dataTable td:nth-last-child(3),
-    #dataTable th:nth-last-child(2),
-    #dataTable td:nth-last-child(2),
-    #dataTable th:nth-last-child(1),
-    #dataTable td:nth-last-child(1) {
-      min-width: 20px !important;
-      max-width: 30px !important;
-      width: 30px !important;
-      text-align: center !important;
+    body.dark table.dataTable thead th {
+      background: #222 !important; color: #eee;
     }
+    body.dark table.dataTable tbody tr:hover { background: #2a2a2a; }
+    body.dark h2 { color: #66b2ff; border-color: #66b2ff33; }
+    body.dark footer { background: rgba(30,30,30,0.8); border-top-color: #333; }
   </style>
-
-
-  <!-- ✅ DataTables CSS/JS -->
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 </head>
 <body>
   <header>
-    <h1>Radiosonde FTP Dashboard</h1>
-    <div class="logout"><a href="{{ url_for('logout') }}">🚪 Logout</a></div>
+    <div class="header-left">
+      <img src="/static/images/TBR2.png" alt="Terrindo Logo">
+      <img src="/static/images/bmkg.png" alt="BMKG Logo">
+      <span class="header-title">Radiosonde Data Resume</span>
+    </div>
+
+    <div class="logout">
+      <button id="darkToggle" title="Toggle Dark Mode">🌙</button>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
   </header>
 
   <!-- Progress overlay -->
@@ -214,8 +256,6 @@
   </div>
 
   <main>
-
-    <!-- Filters card -->
     <div class="card">
       <h2>Filters</h2>
       <div class="filters">
@@ -229,14 +269,12 @@
             <option value="" {% if not selected_ext or selected_ext=="all" %}selected{% endif %}>All</option>
           </select>
 
-          <label for="limit">Files per site:</label>
-          <select name="limit" id="limit">
-            <option value="2" {% if limit==2 %}selected{% endif %}>2</option>
-            <option value="5" {% if limit==5 %}selected{% endif %}>5</option>
-            <option value="10" {% if limit==10 %}selected{% endif %}>10</option>
-            <option value="20" {% if limit==20 %}selected{% endif %}>20</option>
-            <option value="50" {% if limit==50 %}selected{% endif %}>50</option>
-          </select>
+          <!-- ✅ NEW DATE FILTER -->
+          <label for="startDate">Start Date:</label>
+          <input type="date" id="startDate" name="start_date">
+
+          <label for="endDate">End Date:</label>
+          <input type="date" id="endDate" name="end_date">
 
           <button type="submit">Apply</button>
           <button type="button" onclick="showMetadata()">Show Metadata</button>
@@ -244,21 +282,22 @@
       </div>
     </div>
 
-    <!-- Table card -->
     <div class="card">
       <h2>Files</h2>
       <div id="content"></div>
     </div>
 
-    <!-- Navigation -->
     <div class="link-box">
       <a href="{{ url_for('index') }}">➡ Go to Radiosonde Viewer</a>
     </div>
-
   </main>
 
+  <footer>
+    <img src="/static/images/Meteomodem.png" alt="Meteomodem Logo">
+  </footer>
+
   <script>
-    async function loadSites(params="") {
+    async function loadSites(params = "") {
       try {
         const res = await fetch("/api/sites" + params);
         const sites = await res.json();
@@ -271,112 +310,116 @@
 
     function renderTable(sites, withMeta) {
       let html = `<table id="dataTable" class="display"><thead><tr>
-        <th>Site</th>
-        <th>File</th>
-        <th>Data Date</th>`;
-    
+        <th>Site</th><th>File</th><th>Data Date</th>`;
       if (withMeta) {
-        html += `
-          <th>Launch Time</th>
-          <th>End Time</th>
-          <th>Status</th>
-          <th>Reason of End</th>
-          <th>Serial</th>
-          <th>End Pressure</th>
-          <th>Max Height</th>
-          <th>Distance</th>
-          <th>Avg Ascent</th>`;
+        html += `<th>Launch Time</th><th>End Time</th><th>Status</th>
+                 <th>Reason of End</th><th>Serial</th><th>End Pressure</th>
+                 <th>Max Height</th><th>Distance</th><th>Avg Ascent</th>`;
       }
-    
-      html += `
-        <th>.bfr</th>
-        <th>WMO</th>
-        <th>RAOB</th>
-      </tr></thead><tbody>`;
-    
+      html += `<th>.bfr</th><th>WMO</th><th>Analysis</th></tr></thead><tbody>`;
+
       for (const [site, files] of Object.entries(sites)) {
         files.forEach(f => {
+          let issues = f.flight_issues || "-";
+          if (Array.isArray(issues)) issues = issues.join(", ");
+          let statusClass = "status-ok";
+          if (issues.includes("Ascent Stop") || issues.includes("Not reaching")) statusClass = "status-warn";
+          else if (issues !== "OK" && issues !== "-") statusClass = "status-issues";
+
           html += `<tr>
             <td>${f.site || site}</td>
             <td style="text-align:center;">
-              <a href="/load_from_ftp/${site}/${f.name}" target="_blank" title="${f.name}">
-                📄
-              </a>
+              <a href="/load_from_ftp/${site}/${f.name}" target="_blank" title="${f.name}">📄</a>
             </td>
             <td>${f.file_date || "-"}</td>`;
-    
           if (withMeta) {
-            let issues = f.flight_issues || "-";
-            if (Array.isArray(issues)) issues = issues.join(", ");
-            let statusClass = "status-ok";
-            if (issues.includes("Ascent Stop") || issues.includes("Not reaching")) statusClass = "status-warn";
-            else if (issues !== "OK" && issues !== "-") statusClass = "status-issues";
-    
-            html += `<td>${f.launch_time || "-"}</td>`;
-            html += `<td>${f.end_time || "-"}</td>`
-            html += `<td class="${statusClass}">${issues}</td>`;
-            html += `<td>${f.reason_for_termination || "-"}</td>`;
-            html += `<td>${f.radiosonde_serial_number || "-"}</td>`;;
-            html += `<td>${f.end_pressure || "-"}</td>`;
-            html += `<td>${f.max_height || "-"}</td>`;
-            html += `<td>${f.end_distance || "-"}</td>`;
-            html += `<td>${f.avg_ascent_rate || "-"}</td>`;
+            html += `<td>${f.launch_time || "-"}</td>
+                     <td>${f.end_time || "-"}</td>
+                     <td class="${statusClass}">${issues}</td>
+                     <td>${f.reason_for_termination || "-"}</td>
+                     <td>${f.radiosonde_serial_number || "-"}</td>
+                     <td>${f.end_pressure || "-"}</td>
+                     <td>${f.max_height || "-"}</td>
+                     <td>${f.end_distance || "-"}</td>
+                     <td>${f.avg_ascent_rate || "-"}</td>`;
           }
-    
-          html += `<td><a href="/download/${site}/${f.name}" target="_blank">⬇</a></td>`;
-          html += `<td><a href="/download_wmo/${site}/${f.name}" target="_blank">⬇</a></td>`;
-          html += `<td><a href="/raob/${site}/${f.name}" target="_blank">📊</a></td>`;
-          html += `</tr>`;
+          html += `<td><a href="/download/${site}/${f.name}" target="_blank">⬇</a></td>
+                   <td><a href="/download_wmo/${site}/${f.name}" target="_blank">⬇</a></td>
+                   <td><a href="/raob/${site}/${f.name}" target="_blank">📊</a></td>
+          </tr>`;
         });
       }
-    
       html += "</tbody></table>";
       document.getElementById("content").innerHTML = html;
-    
-      // Destroy any previous instance (prevents double-inits and misalignment)
-      if ($.fn.DataTable.isDataTable('#dataTable')) {
-        $('#dataTable').DataTable().destroy();
-      }
-      
-      // Initialize with scroll and then adjust columns
-      $('#dataTable').DataTable({
-        scrollX: true,
-        autoWidth: false,
-        ordering: false,                // optional, removes width jitter from sort icons
-        drawCallback: function () {     // ensure final alignment after draw
-          this.api().columns.adjust();
-        }
-      });
 
+      if ($.fn.DataTable.isDataTable('#dataTable')) $('#dataTable').DataTable().destroy();
+      $('#dataTable').DataTable({ scrollX: true, autoWidth: false, order: [[2,"desc"]] });
     }
-
 
     async function showMetadata() {
       document.getElementById("progressOverlay").style.display = "flex";
       try {
         const ext = document.getElementById("ext").value;
-        const limit = document.getElementById("limit").value;
-        const params = `?ext=${encodeURIComponent(ext)}&limit=${encodeURIComponent(limit)}`;
+        const startDate = document.getElementById("startDate").value;
+        const endDate = document.getElementById("endDate").value;
+
+        if (startDate && endDate && endDate < startDate) {
+          alert("⚠️ End Date cannot be earlier than Start Date!");
+          document.getElementById("progressOverlay").style.display = "none";
+          return;
+        }
+
+        let params = `?ext=${encodeURIComponent(ext)}`;
+        if (startDate) params += `&start_date=${encodeURIComponent(startDate)}`;
+        if (endDate) params += `&end_date=${encodeURIComponent(endDate)}`;
+
         const res = await fetch("/api/sites_with_meta" + params);
         const sites = await res.json();
         renderTable(sites, true);
       } catch (err) {
-        document.getElementById("content").innerHTML =
-          `<p style="color:red;">Error loading metadata: ${err}</p>`;
+        document.getElementById("content").innerHTML = `<p style="color:red;">Error loading metadata: ${err}</p>`;
       } finally {
         document.getElementById("progressOverlay").style.display = "none";
       }
     }
 
-    loadSites("?ext={{ selected_ext }}&limit={{ limit }}");
+    // Dark mode toggle
+    const toggleBtn = document.getElementById("darkToggle");
+    toggleBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+      toggleBtn.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
+    });
 
-    document.getElementById("filterForm").addEventListener("submit", function(e) {
+    // Handle form submission (Apply)
+    document.getElementById("filterForm").addEventListener("submit", async function(e) {
       e.preventDefault();
       const ext = document.getElementById("ext").value;
-      const limit = document.getElementById("limit").value;
-      const params = `?ext=${encodeURIComponent(ext)}&limit=${encodeURIComponent(limit)}`;
-      loadSites(params);
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+    
+      if (startDate && endDate && endDate < startDate) {
+        alert("⚠️ End Date cannot be earlier than Start Date!");
+        return;
+      }
+    
+      let params = `?ext=${encodeURIComponent(ext)}`;
+      if (startDate) params += `&start_date=${encodeURIComponent(startDate)}`;
+      if (endDate) params += `&end_date=${encodeURIComponent(endDate)}`;
+    
+      // ✅ Tambahkan overlay sama seperti showMetadata
+      document.getElementById("progressOverlay").style.display = "flex";
+      try {
+        await loadSites(params);   // tetap panggil /api/sites (bukan metadata)
+      } catch (err) {
+        document.getElementById("content").innerHTML = `<p style="color:red;">Error loading sites: ${err}</p>`;
+      } finally {
+        document.getElementById("progressOverlay").style.display = "none";
+      }
     });
+
+
+    // Initial load
+    loadSites("?ext={{ selected_ext }}");
   </script>
 </body>
 </html>

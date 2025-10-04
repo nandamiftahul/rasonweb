@@ -494,11 +494,17 @@
         const latlng = [data.latitude, data.longitude];
         if (balloonMarker) balloonMarker.setLatLng(latlng);
         else balloonMarker = L.marker(latlng, { icon: balloonIcon }).addTo(map);
-
-        if (frame === 0 && trackCoords.length > 1) {
-          setTimeout(() => map.fitBounds(trackCoords), 0);
+      
+        // ✅ Zoom otomatis ke posisi balon saat load pertama
+        if (frame === 0) {
+          if (trackCoords.length > 1) {
+            setTimeout(() => map.fitBounds(trackCoords), 0);
+          } else {
+            map.setView(latlng, 9); // zoom manual kalau hanya 1 titik
+          }
         }
       }
+
 
       if (trackCoords.length >= 2) {
         if (pathLine) pathLine.setLatLngs(trackCoords);

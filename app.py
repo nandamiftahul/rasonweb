@@ -12,7 +12,8 @@ from flask import (
 from functools import wraps
 from collections import defaultdict
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
 import matplotlib
 matplotlib.use("Agg")  # safe for server
 import matplotlib.pyplot as plt
@@ -89,7 +90,7 @@ def login():
         password = request.form.get("password")
         if username in VALID_USERS and VALID_USERS[username] == password:
             session["user"] = username
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("main_page"))
         else:
             return render_template("login.html", error="Invalid credentials")
     return render_template("login.html")
@@ -308,7 +309,28 @@ SENSOR_MAPS = {
 }
 
 # --- FTP utility ---
-def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
+def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
+                    start_date=None, end_date=None):
+
+    _tz = None  # fallback (pakai UTC kalau zoneinfo tidak ada)
+
+    # --- Default window: today 00:00 WIT -> tomorrow 00:00 WIT, converted to UTC (naive) ---
+    if start_date is None or end_date is None:
+        now_local = datetime.now(_tz) if _tz else datetime.utcnow().replace(tzinfo=timezone.utc)
+        today_local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_local_midnight = today_local_midnight + timedelta(days=1)
+
+        def to_utc_naive(dt_local):
+            # jadikan UTC naive agar comparable dengan dt hasil strptime (naive) dari filename "UTC"
+            if dt_local.tzinfo is None:
+                return dt_local  # sudah naive (anggap UTC)
+            return dt_local.astimezone(timezone.utc).replace(tzinfo=None)
+
+        if start_date is None:
+            start_date = to_utc_naive(today_local_midnight)
+        if end_date is None:
+            end_date = to_utc_naive(tomorrow_local_midnight)
+
     result = {}
     cfg = CONFIG["ftp"]
     exts = [e.lower() for e in (ext_filter or cfg.get("file_ext", [".bufr"]))]
@@ -331,7 +353,14 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                     for fname in selected:
                         dt_str = extract_date_from_filename(fname)
                         try:
+                            # contoh format: "%Y-%m-%d %H:%M:%S UTC"
                             dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S UTC")
+                            # ⚖️ Filter dengan window [start_date, end_date)
+                            if start_date or end_date:
+                                if start_date and dt < start_date:
+                                    continue
+                                if end_date and dt >= end_date:  # end eksklusif
+                                    continue
                         except Exception:
                             dt = datetime.min
                         items.append((fname, dt))
@@ -345,7 +374,6 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
                     # Build back list of names
                     selected = [fname for fname, dt in items]
                     
-
                     for fname in selected:
                         item = {
                             "name": fname,
@@ -460,16 +488,41 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False):
 @login_required
 def api_sites():
     ext = request.args.get("ext") or None
-    limit = int(request.args.get("limit") or CONFIG["ftp"].get("limit", 10))
-    sites = fetch_all_sites(ext_filter=[ext] if ext else None, limit=limit, with_meta=False)
+    limit = request.args.get("limit")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
+
+    sites = fetch_all_sites(
+        ext_filter=[ext] if ext else None,
+        limit=int(limit) if limit else None,
+        with_meta=False,
+        start_date=start_dt,
+        end_date=end_dt
+    )
     return jsonify(sites)
+
 
 @app.route("/api/sites_with_meta")
 @login_required
 def api_sites_with_meta():
     ext = request.args.get("ext") or None
-    limit = int(request.args.get("limit") or CONFIG["ftp"].get("limit", 10))
-    sites = fetch_all_sites(ext_filter=[ext] if ext else None, limit=limit, with_meta=True)
+    limit = request.args.get("limit")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
+
+    sites = fetch_all_sites(
+        ext_filter=[ext] if ext else None,
+        limit=int(limit) if limit else None,
+        with_meta=True,
+        start_date=start_dt,
+        end_date=end_dt
+    )
     return jsonify(sites)
 
 def download_and_process(site, filename):
@@ -826,9 +879,12 @@ def index():
         decoded = decode_bufr(filepath)
         df_meta, df_levels = parse_bufr(decoded)
 
+        # 🔧 Tambahkan analisis issues di sini
+        issues = analyze_flight(df_meta, df_levels)
+
         store = get_user_store()
         store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
-        
+
         # --- Normalize radiosonde frequency (Hz → MHz with 3 decimals) ---
         if "radiosonde_operating_frequency" in store["metadata"]:
             try:
@@ -837,10 +893,9 @@ def index():
                 store["metadata"]["radiosonde_operating_frequency"] = f"{mhz_val:.3f} MHz"
             except Exception:
                 pass
-        
+
         store["metadata"]["flight_issues"] = issues
         store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
-
 
         return redirect(url_for("index"))
 
@@ -1123,6 +1178,21 @@ def raob_analysis(site, filename):
 
     except Exception as e:
         return f"RAOB error: {e}", 500
+
+@app.route("/main")
+@login_required
+def main_page():
+    return render_template("main.html")
+
+@app.route("/map")
+@login_required
+def map():
+    return render_template("map.html")
+
+@app.route("/underdev")
+@login_required
+def under_development():
+    return render_template("under_development.html")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0",port=8080,debug=True)
