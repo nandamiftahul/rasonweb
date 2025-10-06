@@ -106,17 +106,78 @@
       transform: scale(1.3);
     }
 
+    #uploadFilterBar select, 
+    #uploadFilterBar input[type="date"], 
+    #uploadFilterBar button {
+      padding: 5px 8px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+    }
+    
+    #uploadFilterBar button {
+      background-color: #0078d7;
+      color: white;
+      cursor: pointer;
+      border: none;
+    }
+    
+    #uploadFilterBar button:hover {
+      background-color: #005fa3;
+    }
+
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Upload form -->
-  <form method="POST" enctype="multipart/form-data"
-        style="position:absolute; top:10px; left:10px; z-index:1000; background:white; padding:6px; border-radius:6px;">
-    <input type="file" name="rasonfiles" accept=".bufr,.bfr,.bfh,.bin">
-    <button type="submit">Upload Radiosonde</button>
-  </form>
+  <!-- Upload + Filter Container -->
+  <div id="uploadFilterBar" style="
+    position:absolute; top:10px; left:10px; z-index:1000;
+    background:white; padding:8px 10px; border-radius:8px;
+    box-shadow:0 0 6px rgba(0,0,0,0.3);
+    display:flex; align-items:center; gap:10px;">
+  
+    <!-- Upload -->
+    <form method="POST" enctype="multipart/form-data" id="uploadForm" style="display:flex; align-items:center; gap:6px;">
+      <input type="file" name="rasonfiles" accept=".bufr,.bfr,.bfh,.bin">
+      <button type="submit">Upload Radiosonde</button>
+    </form>
+  
+    <!-- Filter -->
+    <div id="filterBar" style="display:flex; align-items:center; gap:6px;">
+      <label>Site:</label>
+      <select id="siteSelect">
+        <option value="aceh">Aceh</option>
+        <option value="tarakan">Tarakan</option>
+        <option value="sorong">Sorong</option>
+        <option value="cilacap">Cilacap</option>
+        <option value="pangkalanbun">Pangkalanbun</option>
+        <option value="ranai">Ranai</option>
+      </select>
+    
+      <label>Date:</label>
+      <input type="date" id="dateSelect">
+    
+      <label>Hour:</label>
+      <select id="hourSelect">
+        <option value="00">00Z</option>
+        <option value="12">12Z</option>
+      </select>
+    
+      <label>Type:</label>
+      <select id="typeSelect">
+        <option value=".bfr">.bfr</option>
+        <option value=".bufr">.bufr</option>
+        <option value=".bfh">.bfh</option>
+        <option value=".bin">.bin</option>
+      </select>
+    
+      <button onclick="applyFilter()">Apply</button>
+    </div>
+  </div>
+
+
 
   <!-- Logout button -->
   <div id="topBar">
@@ -174,13 +235,71 @@
       maxZoom: 19, attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS'
     });
     
-    const esriTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 13, attribution: 'Tiles © Esri — Source: Esri, USGS, NOAA'
-    });
-    
     const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
       maxZoom: 20, attribution: '© Google Maps Hybrid'
     });
+
+    const himawariTrueColor = L.tileLayer(
+      "https://himawari8.nict.go.jp/himawari8/himawari-8-bands/TC/{z}/{x}/{y}.png",
+      {
+        maxZoom: 8,
+        attribution: "© NICT Himawari-8 True Color (demo tiles)",
+        opacity: 0.7,
+      }
+    );
+    
+    const himawariIR = L.tileLayer(
+      "https://himawari8.nict.go.jp/himawari8/himawari-8-bands/IR/{z}/{x}/{y}.png",
+      {
+        maxZoom: 8,
+        attribution: "© NICT Himawari-8 Infrared (demo tiles)",
+        opacity: 0.7,
+      }
+    );
+
+    // === Himawari (WMS, time-aware) dari NASA GIBS ===
+    // Catatan: ini layer IR Band 13. Bisa diganti ke layer GIBS lain kalau perlu.
+    const himawariWMS = L.tileLayer.wms(
+      "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+      {
+        layers: "Himawari_AHI_Band13_Clean_Infrared",
+        format: "image/png",
+        transparent: true,
+        opacity: 0.6,
+        tileSize: 512,   // WMS GIBS umumnya 512 px tiles
+        time: null       // akan kita set dinamis nanti
+      }
+    );
+
+    // === HIMA GIBS (Band 13 Clean IR) ===
+    const himawariLayer = L.tileLayer.wms(
+      "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
+      {
+        layers: "Himawari_AHI_Band13_Clean_Infrared",
+        format: "image/png",
+        transparent: true,
+        opacity: 0.7,
+        tileSize: 512,
+        version: "1.3.0",
+        time: "2025-10-06T12:00:00Z",
+        attribution: "NASA GIBS / Himawari-8 AHI Band13"
+      }
+    );
+
+    // === Fungsi untuk update waktu Himawari ===
+    function setHimawariTime(dateUTC) {
+      // Bulatkan ke kelipatan 10 menit (slot GIBS)
+      const rounded = new Date(Math.floor(dateUTC.getTime() / (10 * 60 * 1000)) * (10 * 60 * 1000));
+      const iso = rounded.toISOString().split('.')[0] + "Z";
+      console.log("[Himawari] Update time:", iso);
+      himawariLayer.setParams({ time: iso });
+      if (!map.hasLayer(himawariLayer)) {
+        map.addLayer(himawariLayer);
+      }
+    }
+
+    // Tambahkan langsung untuk tes awal
+    // himawariLayer.addTo(map);
     
     // --- Default layer ---
     osm.addTo(map);
@@ -189,11 +308,17 @@
     const baseMaps = {
       "🗺️ OpenStreetMap": osm,
       "🛰️ Satellite (Esri)": esriSat,
-      "🌍 Terrain (Esri)": esriTerrain,
       "🧭 Hybrid (Google)": googleHybrid
     };
-    L.control.layers(baseMaps, {}, { position: 'bottomleft', collapsed: true }).addTo(map);
     
+    const overlayMaps = {
+      //"🌤 Himawari-8 True Color": himawariTrueColor,
+      //"🌡 Himawari-8 Infrared": himawariIR,
+      //"🕒 Himawari-8 IR (GIBS, time-aware)": himawariWMS, 
+      "🌤 Himawari-8 IR (Band 13)": himawariLayer
+    };
+
+    L.control.layers(baseMaps, overlayMaps, { position: "bottomleft" }).addTo(map);
 
     // --- State ---
     let frame = 0, total = 0, playing = false, timer = null;
@@ -435,7 +560,10 @@
         if (!meta || meta.error) return;
     
         launchDateUTC = parseLaunchUTC(meta.launch_time);
-    
+        // Sinkronkan overlay WMS ke waktu peluncuran
+        if (launchDateUTC) {
+          setHimawariTime(launchDateUTC);
+        }
         let html = "";
     
         // --- Station info ---
@@ -542,7 +670,12 @@
       // UI
       document.getElementById("frameSlider").value = frame;
       updateFrameText();
-
+      // ... di dalam loadRason(), setelah const data = allLevels[frame];
+      if (data && launchDateUTC && typeof data.time_s === "number") {
+        const ts = new Date(launchDateUTC.getTime() + (data.time_s * 1000));
+        setHimawariTime(ts);
+      }
+      
       // Info (numbers 1 decimal; full precision for lat/lon)
       let html = "";
       for (const [k,v] of Object.entries(data)) {
@@ -643,6 +776,52 @@
       });
     });
     
+    async function applyFilter() {
+      const site  = document.getElementById("siteSelect").value;
+      const date  = document.getElementById("dateSelect").value; // YYYY-MM-DD
+      const hour  = document.getElementById("hourSelect").value; // "00" / "12"
+      const ftype = document.getElementById("typeSelect").value; // ".bfr" / ".bufr" / ".bfh" / ".bin"
+    
+      if (!site || !date || !hour || !ftype) {
+        alert("⚠️ Mohon pilih site, tanggal, jam, dan tipe file!");
+        return;
+      }
+    
+      // kirim filter ke backend
+      const body = new URLSearchParams({ site, date, hour, ftype });
+      let data;
+      try {
+        const res = await fetch("/api/filter", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+          credentials: "same-origin"   // penting, bawa cookie login
+        });
+        data = await res.json();
+      } catch (e) {
+        console.error(e);
+        alert("❌ Gagal menghubungi /api/filter");
+        return;
+      }
+    
+      if (data.status === "no_files") {
+        alert("⚠️ " + (data.message || "Tidak ada file yang cocok"));
+        return;
+      }
+      if (data.status !== "ok" || !Array.isArray(data.files) || data.files.length === 0) {
+        alert("❌ Filter error.");
+        return;
+      }
+    
+      // pilih file (ambil yang 'terbaru' berdasarkan nama)
+      const chosen = data.files.sort().slice(-1)[0];
+      // update Himawari ke waktu radiosonde
+      const selectedDateTime = new Date(`${date}T${hour}:00:00Z`);
+      setHimawariTime(selectedDateTime);
+      if (!map.hasLayer(himawariLayer)) himawariLayer.addTo(map);
+      // redirect ke loader → backend download/parse → redirect balik ke /
+      window.location.href = `/load_from_ftp/${encodeURIComponent(site)}/${encodeURIComponent(chosen)}`;
+    }
 
   </script>
 </body>
