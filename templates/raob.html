@@ -3,109 +3,133 @@
 <head>
   <meta charset="utf-8">
   <title>Radiosonde RAOB Analysis</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter.css') }}">
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
 
   <style>
+    * { box-sizing: border-box; }
     body {
+      margin: 0;
       font-family: "Inter", sans-serif;
-      margin: 0; padding: 0;
-      background: #f4f6fb;
-      color: #333;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
     }
 
-    /* === HEADER (copy from dashboard) === */
-    header {
-      background: #0d6efd;
-      color: #fff;
-      padding: 12px 25px;
+    /* === Header === */
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      position: relative;
+      gap: 18px;
+      margin: 30px 40px;
     }
-    .header-left { display: flex; align-items: center; gap: 15px; }
-    .header-left img {
-      height: 40px;
-      background: white;
-      border-radius: 8px;
-      padding: 4px;
-    }
-    .header-title { font-size: 18px; font-weight: 600; letter-spacing: 0.4px; }
-    .logout { display: flex; align-items: center; gap: 10px; }
-    .logout a {
-      background: white;
-      color: #0d6efd;
-      padding: 6px 16px;
-      border-radius: 999px;
-      text-decoration: none;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-    .logout a:hover { background: #e9ecef; transform: scale(1.03); }
-    #darkToggle {
-      background: rgba(255,255,255,0.2);
-      color: white;
-      border: none;
-      font-size: 18px;
-      border-radius: 50%;
-      width: 36px; height: 36px;
-      cursor: pointer;
-      transition: background 0.3s, transform 0.2s;
-    }
-    #darkToggle:hover { background: rgba(255,255,255,0.35); transform: scale(1.1); }
 
+    .header-icon {
+      width: 50px; height: 50px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: #dbeafe;
+    }
+
+    .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px; }
+    .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
+
+    .header-logos {
+      position: absolute;
+      right: 20px; top: 50%;
+      transform: translateY(-50%);
+      display: flex; gap: 12px; align-items: center;
+    }
+    .header-logos img { height: 36px; opacity: 0.9; }
+
+    /* === Layout === */
     main {
-      max-width: 1400px;
-      margin: 25px auto;
-      padding: 0 20px;
+      flex: 1;
+      padding: 0 40px 40px;
+      display: flex;
+      justify-content: center;
     }
 
     .grid {
       display: grid;
       grid-template-columns: 2fr 1fr;
       gap: 20px;
+      width: 100%;
+      max-width: 1400px;
     }
 
     .card {
-      background: white;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
       border-radius: 12px;
       padding: 20px;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
       margin-bottom: 20px;
     }
 
     h2 {
       margin-top: 0;
-      color: #0d6efd;
+      margin-bottom: 10px;
+      color: #fff;
       font-weight: 600;
-      border-bottom: 2px solid #0d6efd33;
+      border-bottom: 2px solid rgba(255,255,255,0.2);
       padding-bottom: 6px;
     }
 
     .headline {
       font-size: 15px;
       margin-bottom: 10px;
-      background: #f0f2f5;
+      background: rgba(255,255,255,0.1);
       padding: 6px 10px;
       border-radius: 6px;
       font-weight: bold;
       text-align: center;
+      color: #dbeafe;
     }
 
+    /* === Image size equal (SkewT & Hodograph) === */
+    .card img {
+      display: block;
+      margin: 10px auto;
+      width: 85%;
+      max-width: 650px;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+    }
+
+    #skewtImg, #hodoImg {
+      width: 85%;
+      max-width: 650px;
+    }
+
+    /* === Tables === */
     .meta-table, .indices-table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 10px;
       font-size: 14px;
+      color: #f8fafc;
     }
-    th, td { border: 1px solid #ddd; padding: 6px 10px; }
-    th { background: #f1f3f5; text-align: left; }
+    th, td { border: 1px solid rgba(255,255,255,0.2); padding: 6px 10px; }
+    th { background: rgba(255,255,255,0.15); text-align: left; }
     .val { font-weight: bold; }
 
+    /* === Buttons === */
     .btn {
       display: inline-block;
-      background: #0d6efd;
+      background: #2563eb;
       color: white;
       padding: 6px 12px;
       border-radius: 6px;
@@ -114,8 +138,9 @@
       margin-top: 8px;
       transition: background 0.3s;
     }
-    .btn:hover { background: #0b5ed7; }
+    .btn:hover { background: #1e40af; }
 
+    /* === Legend + Analysis === */
     .legend {
       display: flex;
       justify-content: space-around;
@@ -123,7 +148,7 @@
       gap: 15px;
       margin-top: 10px;
     }
-    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; color: #dbeafe; }
     .legend span {
       display: inline-block;
       width: 16px; height: 16px;
@@ -131,51 +156,51 @@
     }
 
     .analysis-box {
-      background: #eef5ff;
-      border-left: 5px solid #0d6efd;
+      background: rgba(255,255,255,0.1);
+      border-left: 5px solid #60a5fa;
       padding: 10px 15px;
       border-radius: 6px;
       line-height: 1.5;
       margin-top: 12px;
       font-size: 14px;
+      color: #e0e7ff;
     }
 
-    /* === FOOTER === */
-    footer {
-      text-align: center;
-      padding: 25px 10px;
+    /* === Footer === */
+    .footer {
       background: #ffffff;
+      padding: 25px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       border-top: 1px solid #e5e7eb;
-      margin-top: 30px;
+      border-radius: 0 0 10px 10px;
     }
-    footer img {
-      height: 55px;
-      opacity: 0.9;
-      transition: opacity 0.3s;
+    .footer span {
+      color: #222;
+      font-weight: 600;
+      margin-right: 10px;
+      font-size: 15px;
     }
-    footer img:hover { opacity: 1; }
-
-    /* === DARK MODE === */
-    body.dark { background: #121212; color: #f1f1f1; }
-    body.dark .card { background: #1e1e1e; color: #f1f1f1; }
-    body.dark th { background: #222; }
-    body.dark .analysis-box { background: #1e2733; border-left-color: #66b2ff; }
-    body.dark h2 { color: #66b2ff; border-color: #66b2ff33; }
-    body.dark footer { background: rgba(30,30,30,0.8); border-top-color: #333; }
+    .footer img {
+      height: 60px;
+      opacity: 0.95;
+      margin: 0 10px;
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div class="header-left">
-      <img src="/static/images/TBR2.png" alt="Terrindo">
-      <img src="/static/images/bmkg.png" alt="BMKG">
-      <span class="header-title">Radiosonde RAOB Analysis</span>
+  <!-- Header -->
+  <div class="header-box">
+    <div class="header-icon">🎈</div>
+    <div class="header-text">
+      <h1>Radiosonde RAOB Analysis</h1>
+      <p>Thermodynamic and kinematic indices visualization</p>
     </div>
-    <div class="logout">
-      <button id="darkToggle" title="Toggle Dark Mode">🌙</button>
-      <a href="{{ url_for('logout') }}">Logout</a>
+    <div class="header-logos">
+      <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
     </div>
-  </header>
+  </div>
 
   <main>
     <div class="grid">
@@ -184,12 +209,12 @@
         <div class="card">
           <h2>Skew-T Log-P</h2>
           <div class="headline">
-            CAPE: <span id="capeVal">{{ indices["CAPE (J/kg)"] }}</span> J/kg &nbsp; | 
-            CIN: <span id="cinVal">{{ indices["CIN (J/kg)"] }}</span> J/kg &nbsp; | 
-            LI: <span id="liVal">{{ indices["Lifted Index (°C)"] }}</span> &nbsp; | 
+            CAPE: <span id="capeVal">{{ indices["CAPE (J/kg)"] }}</span> J/kg | 
+            CIN: <span id="cinVal">{{ indices["CIN (J/kg)"] }}</span> J/kg | 
+            LI: <span id="liVal">{{ indices["Lifted Index (°C)"] }}</span> | 
             KI: <span id="kiVal">{{ indices["K Index (°C)"] }}</span>
           </div>
-          <img id="skewtImg" src="data:image/png;base64,{{ skewt_img }}" alt="Skew-T">
+          <img id="skewtImg" src="data:image/png;base64,{{ skewt_img }}" alt="Skew-T Diagram">
           <div style="text-align:center;">
             <a class="btn" onclick="downloadPlot('skewtImg','skewt.png')">⬇ Download PNG</a>
           </div>
@@ -212,9 +237,9 @@
         <div class="card">
           <h2>Hodograph</h2>
           <div class="headline">
-            Shear 0–1 km: <span id="shear1">{{ indices["0–1 km Bulk Shear (kt)"] }}</span> kt &nbsp; | 
-            Shear 0–6 km: <span id="shear6">{{ indices["0–6 km Bulk Shear (kt)"] }}</span> kt <br>
-            SRH 0–1 km: <span id="srh1">{{ indices["SRH 0–1 km (m²/s²)"] }}</span> &nbsp; | 
+            Shear 0–1 km: <span id="shear1">{{ indices["0–1 km Bulk Shear (kt)"] }}</span> kt | 
+            Shear 0–6 km: <span id="shear6">{{ indices["0–6 km Bulk Shear (kt)"] }}</span> kt<br>
+            SRH 0–1 km: <span id="srh1">{{ indices["SRH 0–1 km (m²/s²)"] }}</span> | 
             SRH 0–3 km: <span id="srh3">{{ indices["SRH 0–3 km (m²/s²)"] }}</span>
           </div>
           {% if hodo_img %}
@@ -252,7 +277,7 @@
             <hr>
             <div id="quickSummary"></div>
             <div style="text-align:center; margin-top:10px;">
-              <a href="{{ url_for('raob_doc') }}" target="_blank" class="btn">📘 View Analysis Algorithm</a>
+              <a href="{{ url_for('raob_doc') }}" target="_blank" class="btn">📘 View Algorithm Documentation</a>
             </div>
           </div>
         </div>
@@ -260,19 +285,14 @@
     </div>
   </main>
 
-  <footer>
-    <img src="/static/images/Meteomodem.png" alt="Meteomodem Logo">
-  </footer>
+  <!-- Footer -->
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+    <img src="{{ url_for('static', filename='images/terrindofull.png') }}" alt="Terrindo Logo">
+  </div>
 
   <script>
-    // === DARK MODE ===
-    const toggleBtn = document.getElementById("darkToggle");
-    toggleBtn.addEventListener("click", () => {
-      document.body.classList.toggle("dark");
-      toggleBtn.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
-    });
-
-    // === CSV DOWNLOAD ===
     function downloadCSV() {
       const rows = document.querySelectorAll("#indicesTable tr");
       let csvContent = "data:text/csv;charset=utf-8,Parameter,Value\n";
@@ -288,18 +308,16 @@
       document.body.removeChild(link);
     }
 
-    // === IMAGE DOWNLOAD ===
-    function downloadPlot(imgId, filename) {
-      const img = document.getElementById(imgId);
+    function downloadPlot(id, name) {
+      const img = document.getElementById(id);
       const a = document.createElement("a");
       a.href = img.src;
-      a.download = filename;
+      a.download = name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     }
 
-    // === COLOR LOGIC (applied to both headline and table) ===
     function colorCell(cell, label, val) {
       if (label.includes("CAPE") && !isNaN(val)) {
         if (val > 2000) cell.style.color = "red";
@@ -322,7 +340,6 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      // Table coloring
       document.querySelectorAll("#indicesTable tr").forEach(row => {
         const label = row.querySelector("th")?.innerText || "";
         const cell = row.querySelector("td.val");
@@ -331,7 +348,6 @@
         colorCell(cell, label, val);
       });
 
-      // Headline coloring (top CAPE, CIN, LI, KI)
       [["capeVal","CAPE"],["cinVal","CIN"],["liVal","Lifted Index"],["kiVal","K Index"],
        ["shear1","Shear"],["shear6","Shear"],["srh1","SRH"],["srh3","SRH"]]
        .forEach(([id,label])=>{

@@ -4,182 +4,199 @@
   <meta charset="utf-8">
   <title>Radiosonde Data Resume</title>
 
-  <!-- Fonts + DataTables Lokal -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter.css') }}">
+  <!-- Fonts + DataTables -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='libs/datatables/datatables.min.css') }}">
   <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
   <script src="{{ url_for('static', filename='libs/datatables/datatables.min.js') }}"></script>
 
-
   <style>
+    * { box-sizing: border-box; }
+
     body {
+      margin: 0;
       font-family: "Inter", sans-serif;
-      margin: 0; padding: 0;
-      background: #f4f6fb; color: #333;
-      transition: background 0.3s, color 0.3s;
-    }
-
-    /* ================= HEADER ================= */
-    header {
-      background: #0d6efd;
-      color: #fff;
-      padding: 12px 25px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      position: relative;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .header-left img {
-      height: 40px;
-      background: white;
-      border-radius: 8px;
-      padding: 4px;
-    }
-
-    .header-title {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.4px;
-    }
-
-    /* Logout */
-    .logout {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .logout a {
-      background: white;
-      color: #0d6efd;
-      padding: 6px 16px;
-      border-radius: 999px; /* ellipse */
-      text-decoration: none;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .logout a:hover {
-      background: #e9ecef;
-      transform: scale(1.03);
-    }
-
-    /* Dark mode toggle */
-    #darkToggle {
-      background: rgba(255,255,255,0.2);
+      flex-direction: row;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
       color: white;
-      border: none;
-      font-size: 18px;
-      border-radius: 50%;
-      width: 36px;
-      height: 36px;
-      cursor: pointer;
-      transition: background 0.3s, transform 0.2s;
+      overflow-y: auto;
+      transition: all 0.3s ease;
     }
 
-    #darkToggle:hover { background: rgba(255,255,255,0.35); transform: scale(1.1); }
-
-    main {
-      max-width: 1600px;
-      margin: 20px auto;
-      padding: 0 20px;
-    }
-
-    /* ================= CARD ================= */
-    .card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      margin: 20px 0;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.05);
-      transition: background 0.3s, color 0.3s;
-    }
-
-    h2 {
-      margin-top: 0;
-      color: #0d6efd;
-      font-weight: 600;
-      border-bottom: 2px solid #0d6efd33;
-      padding-bottom: 6px;
-    }
-
-    /* Filters */
-    .filters {
+    /* Sidebar */
+    .sidebar {
+      width: 230px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,0.15);
       display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
+      padding: 20px 10px;
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      z-index: 10;
+      transition: transform 0.3s ease;
     }
+    .sidebar.hidden { transform: translateX(-240px); }
+
+    .sidebar h2 { font-size: 18px; margin-bottom: 30px; color: #dbeafe; text-align: center; }
+    .sidebar a {
+      display: block; text-decoration: none; color: white;
+      width: 100%; padding: 12px 15px; border-radius: 8px;
+      text-align: left; margin: 8px 0; transition: background 0.3s;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.15); }
+    .logout { margin-top: auto; font-size: 14px; padding: 8px 14px; background: rgba(255,255,255,0.1); border-radius: 6px; color: #fca5a5; text-decoration: none; }
+    .logout:hover { background: rgba(255,255,255,0.2); }
+
+    /* Toggle button */
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      width: 28px; height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(5px);
+    }
+    .toggle-btn.hidden-position { left: 10px; }
+    .toggle-btn:hover { background: rgba(255,255,255,0.4); }
+
+    /* Main area */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      margin-left: 230px;
+      transition: margin-left 0.3s ease;
+      width: calc(100% - 230px);
+    }
+    .main.expanded { margin-left: 0; width: 100%; }
+
+    /* Header */
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 35px;
+    }
+    .header-icon {
+      width: 50px; height: 50px; background: rgba(255,255,255,0.15);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: #dbeafe;
+    }
+    .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; }
+    .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
+    .header-logos { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
+    .header-logos img { height: 36px; opacity: 0.9; }
+
+    /* Card */
+    .card {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 20px 25px;
+      margin-bottom: 25px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    }
+
+    h2 { margin-top: 0; color: #fff; font-weight: 600; }
+
     select, button, input[type="date"] {
       padding: 8px 12px;
-      border: 1px solid #ccc;
       border-radius: 8px;
+      border: none;
       font-size: 14px;
+      outline: none;
     }
     button {
       background: #0d6efd;
-      color: #fff;
-      border: none;
+      color: white;
       cursor: pointer;
-      transition: background 0.2s, transform 0.2s;
+      transition: background 0.2s;
     }
-    button:hover { background: #0b5ed7; transform: translateY(-1px); }
+    button:hover { background: #0b5ed7; }
 
-    /* Table */
+    /* DataTables */
+    .dataTables_wrapper { width: 100% !important; overflow: hidden !important; }
     table.dataTable {
       width: 100% !important;
-      margin-top: 10px !important;
+      table-layout: auto !important;
+      color: #111;
+      background: white;
       border-radius: 8px;
-      overflow: hidden;
-      font-size: 14px;
-      border-collapse: collapse;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-top: 10px;
     }
-    table.dataTable thead th {
-      background: #f1f3f5 !important;
-      font-weight: 600;
-      color: #334155;
-      padding: 10px;
+    .dataTables_scrollHead, .dataTables_scrollBody {
+      width: 100% !important;
+      transition: width 0.3s ease;
     }
-    table.dataTable tbody td {
-      padding: 8px 12px;
-      border-bottom: 1px solid #eee;
-      vertical-align: top;
+    .dataTables_scrollBody {
+      overflow-x: auto !important;
+      overflow-y: visible !important;
+      -webkit-overflow-scrolling: touch;
     }
-    table.dataTable tbody tr:hover { background: #f8f9fa; }
 
-    /* Status colors */
     .status-ok { color: #198754; font-weight: 600; }
     .status-warn { color: #fd7e14; font-weight: 600; }
     .status-issues { color: #dc3545; font-weight: 600; }
 
-    /* Progress overlay */
+    /* Footer */
+    .footer {
+      background: #ffffff;
+      padding: 25px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid #e5e7eb;
+      border-radius: 0 0 10px 10px;
+      margin-top: 40px;
+    }
+    .footer span { color: #222; font-weight: 600; margin-right: 10px; font-size: 15px; }
+    .footer img { height: 60px; opacity: 0.95; margin: 0 10px; }
+
+    /* ✅ Loading Overlay */
     #progressOverlay {
-      position: fixed; top: 0; left: 0;
+      position: fixed;
+      top: 0; left: 0;
       width: 100%; height: 100%;
       background: rgba(255,255,255,0.9);
       display: none;
-      align-items: center; justify-content: center;
+      align-items: center;
+      justify-content: center;
       flex-direction: column;
       z-index: 2000;
     }
     .progress-bar {
       width: 60%; height: 20px;
       background: #eee;
-      border-radius: 10px; overflow: hidden;
+      border-radius: 10px;
+      overflow: hidden;
       margin-bottom: 12px;
     }
     .progress-bar-inner {
-      width: 0%; height: 100%;
+      width: 0%;
+      height: 100%;
       background: #0d6efd;
       animation: progressAnim 2s infinite;
     }
@@ -188,98 +205,60 @@
       50% { width: 80%; }
       100% { width: 0%; }
     }
-
-    /* Navigation */
-    .link-box {
-      text-align:center; margin-top:20px;
+    table.dataTable td {
+      white-space: normal !important;
+      word-wrap: break-word;
+      word-break: break-word;
+      max-width: 220px; /* sesuaikan kalau ingin kolom lebih lebar */
+      vertical-align: top;
     }
-    .link-box a {
-      display:inline-block;
-      padding:10px 16px;
-      background:#0d6efd;
-      color:white;
-      border-radius:8px;
-      text-decoration:none;
-      transition: background 0.2s;
-    }
-    .link-box a:hover { background:#0b5ed7; }
-
-    /* ================= FOOTER ================= */
-    footer {
-      text-align: center;
-      padding: 20px 10px;
-      background: rgba(255,255,255,0.6);
-      border-top: 1px solid #eaeaea;
-      margin-top: 30px;
-    }
-    footer img {
-      height: 55px;
-      opacity: 0.85;
-      transition: opacity 0.2s;
-    }
-    footer img:hover { opacity: 1; }
-
-    /* ================= DARK MODE ================= */
-    body.dark {
-      background: #121212; color: #f1f1f1;
-    }
-    body.dark .card {
-      background: #1e1e1e; color: #f1f1f1;
-      box-shadow: 0 3px 8px rgba(255,255,255,0.05);
-    }
-    body.dark table.dataTable thead th {
-      background: #222 !important; color: #eee;
-    }
-    body.dark table.dataTable tbody tr:hover { background: #2a2a2a; }
-    body.dark h2 { color: #66b2ff; border-color: #66b2ff33; }
-    body.dark footer { background: rgba(30,30,30,0.8); border-top-color: #333; }
+    
   </style>
 </head>
+
 <body>
-  <header>
-    <div class="header-left">
-      <img src="/static/images/TBR2.png" alt="Terrindo Logo">
-      <img src="/static/images/bmkg.png" alt="BMKG Logo">
-      <span class="header-title">Radiosonde Data Resume</span>
-    </div>
+  <button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
 
-    <div class="logout">
-      <button id="darkToggle" title="Toggle Dark Mode">🌙</button>
-      <a href="{{ url_for('logout') }}">Logout</a>
-    </div>
-  </header>
-
-  <!-- Progress overlay -->
-  <div id="progressOverlay">
-    <div class="progress-bar"><div class="progress-bar-inner"></div></div>
-    <p>Processing files, please wait...</p>
+  <div class="sidebar" id="sidebar">
+    <h2>Radiosonde Monitoring</h2>
+    <a href="{{ url_for('dashboard') }}" style="background: rgba(255,255,255,0.15);">📊 Data Resume</a>
+    <a href="{{ url_for('index') }}" target="_blank">🗺️ Map</a>
+    <a href="{{ url_for('time_accuracy') }}" target="_blank">⏱️ Time Accuracy</a>
+    <a href="{{ url_for('height_reach') }}" target="_blank">📈 Height Reach Graph</a>
+    <a href="{{ url_for('settings_page') }}" target="_blank">⚙️ Settings</a>
+    <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
   </div>
 
-  <main>
+  <div class="main" id="mainContent">
+    <div class="header-box">
+      <div class="header-icon">📊</div>
+      <div class="header-text">
+        <h1>Radiosonde Data Resume</h1>
+        <p>Summary of file data, metadata, and analysis results</p>
+      </div>
+      <div class="header-logos">
+        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+      </div>
+    </div>
+
     <div class="card">
       <h2>Filters</h2>
-      <div class="filters">
-        <form id="filterForm">
-          <label for="ext">File Type:</label>
-          <select name="ext" id="ext">
-            <option value=".bufr" {% if selected_ext==".bufr" %}selected{% endif %}>.bufr</option>
-            <option value=".bfh" {% if selected_ext==".bfh" %}selected{% endif %}>.bfh</option>
-            <option value=".bfr" {% if selected_ext==".bfr" %}selected{% endif %}>.bfr</option>
-            <option value=".bin" {% if selected_ext==".bin" %}selected{% endif %}>.bin</option>
-            <option value="" {% if not selected_ext or selected_ext=="all" %}selected{% endif %}>All</option>
-          </select>
-
-          <!-- ✅ NEW DATE FILTER -->
-          <label for="startDate">Start Date:</label>
-          <input type="date" id="startDate" name="start_date">
-
-          <label for="endDate">End Date:</label>
-          <input type="date" id="endDate" name="end_date">
-
-          <button type="submit">Apply</button>
-          <button type="button" onclick="showMetadata()">Show Metadata</button>
-        </form>
-      </div>
+      <form id="filterForm">
+        <label>File Type:</label>
+        <select id="ext">
+          <option value=".bufr">.bufr</option>
+          <option value=".bfh">.bfh</option>
+          <option value=".bfr" selected>.bfr</option>
+          <option value=".bin">.bin</option>
+          <option value="">All</option>
+        </select>
+        <label>Start Date:</label>
+        <input type="date" id="startDate">
+        <label>End Date:</label>
+        <input type="date" id="endDate">
+        <button type="submit">Apply</button>
+        <button type="button" onclick="showMetadata()">Show Metadata</button>
+      </form>
     </div>
 
     <div class="card">
@@ -287,138 +266,127 @@
       <div id="content"></div>
     </div>
 
-    <div class="link-box">
-      <a href="{{ url_for('index') }}">➡ Go to Radiosonde Viewer</a>
+    <div class="footer">
+      <span>Powered by</span>
+      <img src="{{ url_for('static', filename='images/meteomodem.png') }}">
+      <img src="{{ url_for('static', filename='images/terrindofull.png') }}">
     </div>
-  </main>
+  </div>
 
-  <footer>
-    <img src="/static/images/Meteomodem.png" alt="Meteomodem Logo">
-  </footer>
+  <!-- ✅ Loading overlay element -->
+  <div id="progressOverlay">
+    <div class="progress-bar"><div class="progress-bar-inner"></div></div>
+    <p>Loading data, please wait...</p>
+  </div>
 
   <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      const main = document.getElementById("mainContent");
+      const btn = document.getElementById("toggleBtn");
+      const isHidden = sidebar.classList.toggle("hidden");
+      main.classList.toggle("expanded");
+
+      btn.textContent = isHidden ? "☰" : "❮";
+      btn.classList.toggle("hidden-position", isHidden);
+
+      setTimeout(() => {
+        if ($.fn.DataTable.isDataTable('#dataTable')) {
+          const table = $('#dataTable').DataTable();
+          table.columns.adjust().responsive.recalc();
+          $('.dataTables_scrollHead, .dataTables_scrollBody').css('width', '100%');
+        }
+      }, 400);
+    }
+
     async function loadSites(params = "") {
+      document.getElementById("progressOverlay").style.display = "flex";
       try {
         const res = await fetch("/api/sites" + params);
         const sites = await res.json();
         renderTable(sites, false);
-      } catch (err) {
-        document.getElementById("content").innerHTML =
-          `<p style="color:red;">Error loading sites: ${err}</p>`;
+      } finally {
+        document.getElementById("progressOverlay").style.display = "none";
       }
-    }
-
-    function renderTable(sites, withMeta) {
-      let html = `<table id="dataTable" class="display"><thead><tr>
-        <th>Site</th><th>File</th><th>Data Date</th>`;
-      if (withMeta) {
-        html += `<th>Launch Time</th><th>End Time</th><th>Status</th>
-                 <th>Reason of End</th><th>Serial</th><th>End Pressure</th>
-                 <th>Max Height</th><th>Distance</th><th>Avg Ascent</th>`;
-      }
-      html += `<th>.bfr</th><th>WMO</th><th>Analysis</th></tr></thead><tbody>`;
-
-      for (const [site, files] of Object.entries(sites)) {
-        files.forEach(f => {
-          let issues = f.flight_issues || "-";
-          if (Array.isArray(issues)) issues = issues.join(", ");
-          let statusClass = "status-ok";
-          if (issues.includes("Ascent Stop") || issues.includes("Not reaching")) statusClass = "status-warn";
-          else if (issues !== "OK" && issues !== "-") statusClass = "status-issues";
-
-          html += `<tr>
-            <td>${f.site || site}</td>
-            <td style="text-align:center;">
-              <a href="/load_from_ftp/${site}/${f.name}" target="_blank" title="${f.name}">📄</a>
-            </td>
-            <td>${f.file_date || "-"}</td>`;
-          if (withMeta) {
-            html += `<td>${f.launch_time || "-"}</td>
-                     <td>${f.end_time || "-"}</td>
-                     <td class="${statusClass}">${issues}</td>
-                     <td>${f.reason_for_termination || "-"}</td>
-                     <td>${f.radiosonde_serial_number || "-"}</td>
-                     <td>${f.end_pressure || "-"}</td>
-                     <td>${f.max_height || "-"}</td>
-                     <td>${f.end_distance || "-"}</td>
-                     <td>${f.avg_ascent_rate || "-"}</td>`;
-          }
-          html += `<td><a href="/download/${site}/${f.name}" target="_blank">⬇</a></td>
-                   <td><a href="/download_wmo/${site}/${f.name}" target="_blank">⬇</a></td>
-                   <td><a href="/raob/${site}/${f.name}" target="_blank">📊</a></td>
-          </tr>`;
-        });
-      }
-      html += "</tbody></table>";
-      document.getElementById("content").innerHTML = html;
-
-      if ($.fn.DataTable.isDataTable('#dataTable')) $('#dataTable').DataTable().destroy();
-      $('#dataTable').DataTable({ scrollX: true, autoWidth: false, order: [[2,"desc"]] });
     }
 
     async function showMetadata() {
       document.getElementById("progressOverlay").style.display = "flex";
       try {
         const ext = document.getElementById("ext").value;
-        const startDate = document.getElementById("startDate").value;
-        const endDate = document.getElementById("endDate").value;
-
-        if (startDate && endDate && endDate < startDate) {
-          alert("⚠️ End Date cannot be earlier than Start Date!");
-          document.getElementById("progressOverlay").style.display = "none";
-          return;
-        }
-
-        let params = `?ext=${encodeURIComponent(ext)}`;
-        if (startDate) params += `&start_date=${encodeURIComponent(startDate)}`;
-        if (endDate) params += `&end_date=${encodeURIComponent(endDate)}`;
-
+        const start = document.getElementById("startDate").value;
+        const end = document.getElementById("endDate").value;
+        let params = `?ext=${ext}`;
+        if (start) params += `&start_date=${start}`;
+        if (end) params += `&end_date=${end}`;
         const res = await fetch("/api/sites_with_meta" + params);
         const sites = await res.json();
         renderTable(sites, true);
-      } catch (err) {
-        document.getElementById("content").innerHTML = `<p style="color:red;">Error loading metadata: ${err}</p>`;
       } finally {
         document.getElementById("progressOverlay").style.display = "none";
       }
     }
 
-    // Dark mode toggle
-    const toggleBtn = document.getElementById("darkToggle");
-    toggleBtn.addEventListener("click", () => {
-      document.body.classList.toggle("dark");
-      toggleBtn.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
-    });
+    function renderTable(sites, withMeta) {
+      let html = `<table id='dataTable' class='display nowrap' style='width:100%'><thead><tr>
+      <th>Site</th><th>File</th><th>Data Date</th>`;
+      if (withMeta)
+        html += `<th>Launch</th><th>End</th><th>Status</th><th>Reason</th><th>Serial</th>
+                 <th>Pressure</th><th>Height</th><th>Distance</th><th>Ascent</th>`;
+      html += `<th>.bfr</th><th>WMO</th><th>Analysis</th></tr></thead><tbody>`;
 
-    // Handle form submission (Apply)
-    document.getElementById("filterForm").addEventListener("submit", async function(e) {
+      for (const [site, files] of Object.entries(sites)) {
+        files.forEach(f => {
+          let issues = Array.isArray(f.flight_issues) ? f.flight_issues.join(", ") : f.flight_issues || "-";
+          let statusClass = (issues.includes("Ascent Stop") || issues.includes("Not reaching")) ? "status-warn"
+                            : (issues !== "OK" && issues !== "-") ? "status-issues" : "status-ok";
+
+          html += `<tr>
+            <td>${site}</td>
+            <td><a href='/load_from_ftp/${site}/${f.name}' target='_blank'>📄</a></td>
+            <td>${f.file_date || "-"}</td>`;
+          if (withMeta) html += `
+            <td>${f.launch_time || "-"}</td>
+            <td>${f.end_time || "-"}</td>
+            <td class='${statusClass}'>${issues}</td>
+            <td>${f.reason_for_termination || "-"}</td>
+            <td>${f.radiosonde_serial_number || "-"}</td>
+            <td>${f.end_pressure || "-"}</td>
+            <td>${f.max_height || "-"}</td>
+            <td>${f.end_distance || "-"}</td>
+            <td>${f.avg_ascent_rate || "-"}</td>`;
+          html += `
+            <td><a href='/download/${site}/${f.name}' target='_blank'>⬇</a></td>
+            <td><a href='/download_wmo/${site}/${f.name}' target='_blank'>⬇</a></td>
+            <td><a href='/raob/${site}/${f.name}' target='_blank'>📊</a></td>
+          </tr>`;
+        });
+      }
+
+      html += "</tbody></table>";
+      document.getElementById("content").innerHTML = html;
+
+      if ($.fn.DataTable.isDataTable('#dataTable')) $('#dataTable').DataTable().destroy();
+      $('#dataTable').DataTable({
+        scrollX: true,
+        autoWidth: true,
+        responsive: true,
+        order: [[2, "desc"]],
+        initComplete: () => $('.dataTables_scrollHead, .dataTables_scrollBody').css('width', '100%')
+      });
+    }
+
+    document.getElementById("filterForm").addEventListener("submit", async e => {
       e.preventDefault();
       const ext = document.getElementById("ext").value;
-      const startDate = document.getElementById("startDate").value;
-      const endDate = document.getElementById("endDate").value;
-    
-      if (startDate && endDate && endDate < startDate) {
-        alert("⚠️ End Date cannot be earlier than Start Date!");
-        return;
-      }
-    
-      let params = `?ext=${encodeURIComponent(ext)}`;
-      if (startDate) params += `&start_date=${encodeURIComponent(startDate)}`;
-      if (endDate) params += `&end_date=${encodeURIComponent(endDate)}`;
-    
-      // ✅ Tambahkan overlay sama seperti showMetadata
-      document.getElementById("progressOverlay").style.display = "flex";
-      try {
-        await loadSites(params);   // tetap panggil /api/sites (bukan metadata)
-      } catch (err) {
-        document.getElementById("content").innerHTML = `<p style="color:red;">Error loading sites: ${err}</p>`;
-      } finally {
-        document.getElementById("progressOverlay").style.display = "none";
-      }
+      const start = document.getElementById("startDate").value;
+      const end = document.getElementById("endDate").value;
+      let params = `?ext=${ext}`;
+      if (start) params += `&start_date=${start}`;
+      if (end) params += `&end_date=${end}`;
+      await loadSites(params);
     });
 
-
-    // Initial load
     loadSites("?ext={{ selected_ext }}");
   </script>
 </body>

@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-import os, re
+import os, re, io, configparser
 import json
 import ftplib
 import subprocess
@@ -578,6 +578,51 @@ def api_latest_status():
     # Urutkan biar tampil konsisten (misal abjad)
     summary = sorted(summary, key=lambda x: x["site"])[:6]
     return jsonify(summary)
+
+@app.route("/api/status")
+@login_required
+def api_status():
+    """
+    Membaca status balon dari file status.ini di FTP tiap site.
+    Mengembalikan JSON: site, status, dan waktu update terakhir.
+    """
+    cfg = CONFIG["ftp"]
+    sites = ["aceh", "tarakan", "sorong", "cilacap", "pangkalanbun", "ranai"]
+    results = []
+
+    
+    #print("start FTP")
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            #print("connected")
+            for site in sites:
+                status = "offline"
+                update = "-"
+                try:
+                    # ⚙️ Jangan pakai .lower(), karena nama folder FTP case-sensitive
+                    ftp.cwd(f"{cfg['base_path']}/{site}")
+                    f = io.BytesIO()
+                    ftp.retrbinary("RETR status.ini", f.write)
+                    f.seek(0)
+                    parser = configparser.ConfigParser()
+                    parser.read_string("[root]\n" + f.read().decode())
+                    status = parser.get("root", "status", fallback="offline")
+                    update_str = parser.get("root", "update", fallback="-")
+                    if update_str.isdigit() and len(update_str) == 14:
+                        dt = datetime.strptime(update_str, "%Y%m%d%H%M%S")
+                        update = dt.strftime("%Y-%m-%d %H:%M UTC")
+                    else:
+                        update = update_str
+                except Exception as e:
+                    print(f"⚠️ Gagal baca {site}: {e}")
+                #print({"site": site, "status": status, "update": update})
+                results.append({"site": site, "status": status, "update": update})
+    except Exception as e:
+        print("❌ FTP connection error:", e)
+
+    return jsonify(results)
 
 def download_and_process(site, filename):
     """Fetch BUFR from FTP and save into THIS user's store."""
@@ -1181,17 +1226,34 @@ def raob_analysis(site, filename):
         skewt_img = base64.b64encode(buf1.read()).decode("utf-8")
         plt.close(fig1)
 
-        # --- Hodograph (Cartesian style) ---
+        # --- Hodograph (Cartesian style + compass labels) ---
         if (u is not None) and (v is not None):
             fig2, ax = plt.subplots(figsize=(6, 6))
             hodo = Hodograph(ax, component_range=60.0)
             hodo.add_grid(increment=10)
-            hodo.plot(u.to("m/s"), v.to("m/s"), color="#007bff", linewidth=2, label="Wind profile")
+        
+            # 🔄 Rotasi 180° (berlawanan arah jarum jam)
+            u_rot = -u.to("m/s")
+            v_rot = -v.to("m/s")
+        
+            # Plot garis utama
+            hodo.plot(u_rot, v_rot, color="#007bff", linewidth=2, label="Wind profile")
+        
+            # Scatter dengan warna tinggi
             if hgt is not None:
                 mask = ~np.isnan(hgt.m)
-                ax.scatter(u[mask].to('m/s'), v[mask].to('m/s'),
-                           c=hgt[mask].m/1000.0, cmap="viridis", s=30,
-                           edgecolors='black', linewidths=0.3, label="Height (km)")
+                ax.scatter(
+                    u_rot[mask].to("m/s"),
+                    v_rot[mask].to("m/s"),
+                    c=hgt[mask].m / 1000.0,
+                    cmap="viridis",
+                    s=30,
+                    edgecolors="black",
+                    linewidths=0.3,
+                    label="Height (km)"
+                )
+        
+            # Background & grid
             ax.set_facecolor("#f9f9f9")
             ax.grid(True, linestyle="--", color="gray", alpha=0.5)
             ax.axhline(0, color="black", linewidth=0.8)
@@ -1201,6 +1263,16 @@ def raob_analysis(site, filename):
             ax.set_ylabel("V wind (m/s)")
             ax.set_title("Hodograph", fontsize=10, fontweight="bold", color="#004085")
             ax.legend(fontsize=8, loc="upper left")
+        
+            # 🔠 Tambahkan label arah mata angin
+            lim = 60  # disesuaikan dengan component_range
+            offset = lim * 0.9
+            ax.text(0,  offset, "N", fontsize=10, fontweight="bold", ha="center", va="bottom", color="#222")
+            ax.text(0, -offset, "S", fontsize=10, fontweight="bold", ha="center", va="top", color="#222")
+            ax.text( offset, 0, "E", fontsize=10, fontweight="bold", ha="left", va="center", color="#222")
+            ax.text(-offset, 0, "W", fontsize=10, fontweight="bold", ha="right", va="center", color="#222")
+        
+            # Simpan ke buffer
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", bbox_inches="tight")
             buf2.seek(0)
@@ -1208,6 +1280,8 @@ def raob_analysis(site, filename):
             plt.close(fig2)
         else:
             hodo_img = None
+        
+        
 
         # --- Indices table ---
         def scalar_str(x, fmt=".1f"):
@@ -1534,4 +1608,4 @@ def raob_doc():
 
     
 if __name__ == "__main__":
-    app.run(host="0.0.0.0",port=8080,debug=True)
+    app.run(host="0.0.0.0",port=8082,debug=True)

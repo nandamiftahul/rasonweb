@@ -14,19 +14,61 @@
       padding: 40px;
     }
     h1 { text-align: center; }
+
     table {
-      width: 80%; margin: 20px auto; border-collapse: collapse;
-      background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;
+      width: 80%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: hidden;
     }
-    th, td { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.2); }
-    th { background: rgba(255,255,255,0.2); }
-    td { text-align: center; }
+    th, td {
+      padding: 10px 15px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      text-align: center;
+    }
+    th {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+
     input, button {
-      padding: 8px 12px; border-radius: 6px; border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
     }
-    input { width: 150px; }
-    button { background: #38bdf8; color: white; cursor: pointer; }
-    button:hover { background: #0284c7; }
+    input {
+      width: 150px;
+    }
+    button {
+      background: #38bdf8;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0284c7;
+    }
+
+    .btn-edit {
+      background: #0d6efd;
+    }
+    .btn-edit:hover {
+      background: #0b5ed7;
+    }
+    .btn-del {
+      background: #dc3545;
+    }
+    .btn-del:hover {
+      background: #b02a37;
+    }
+
+    .add-section {
+      text-align: center;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
@@ -34,12 +76,16 @@
 
   <table id="userTable">
     <thead>
-      <tr><th>Username</th><th>Password</th><th>Action</th></tr>
+      <tr>
+        <th>Username</th>
+        <th>Password</th>
+        <th>Action</th>
+      </tr>
     </thead>
     <tbody></tbody>
   </table>
 
-  <div style="text-align:center;margin-top:20px;">
+  <div class="add-section">
     <input type="text" id="newUser" placeholder="New username">
     <input type="password" id="newPass" placeholder="Password">
     <button onclick="addUser()">Add User</button>
@@ -51,13 +97,18 @@
       const users = await res.json();
       const tbody = document.querySelector("#userTable tbody");
       tbody.innerHTML = "";
+
       Object.entries(users).forEach(([u, p]) => {
         tbody.innerHTML += `
           <tr>
             <td>${u}</td>
-            <td>${p}</td>
-            <td>${u === "admin" ? "—" :
-              `<button onclick="deleteUser('${u}')">Delete</button>`}</td>
+            <td>${"****"}</td>
+            <td>
+              ${u === "admin" ? "—" : `
+                <button class="btn-edit" onclick="editUser('${u}')">Ubah</button>
+                <button class="btn-del" onclick="deleteUser('${u}')">Delete</button>
+              `}
+            </td>
           </tr>`;
       });
     }
@@ -65,27 +116,46 @@
     async function addUser() {
       const username = document.getElementById("newUser").value.trim();
       const password = document.getElementById("newPass").value.trim();
-      if (!username || !password) return alert("Fill username and password");
+      if (!username || !password) return alert("Please fill username and password.");
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({username, password})
       });
       const json = await res.json();
-      if (json.success) loadUsers();
-      else alert(json.error || "Failed to add user");
+      if (json.success) {
+        alert("User added successfully.");
+        loadUsers();
+      } else alert(json.error || "Failed to add user");
     }
 
     async function deleteUser(username) {
-      if (!confirm(`Delete user ${username}?`)) return;
+      if (!confirm(`Are you sure you want to delete user "${username}"?`)) return;
       const res = await fetch('/api/users', {
         method: 'DELETE',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({username})
       });
       const json = await res.json();
-      if (json.success) loadUsers();
-      else alert(json.error || "Failed to delete user");
+      if (json.success) {
+        alert("User deleted successfully.");
+        loadUsers();
+      } else alert(json.error || "Failed to delete user");
+    }
+
+    async function editUser(username) {
+      const newPass = prompt(`Enter new password for user "${username}":`);
+      if (!newPass) return;
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password: newPass})
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert("Password updated successfully.");
+        loadUsers();
+      } else alert(json.error || "Failed to update password");
     }
 
     loadUsers();

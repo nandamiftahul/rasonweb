@@ -7,22 +7,115 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: "Inter", sans-serif;
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
       background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
       color: white;
-      min-height: 100vh;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 230px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,0.15);
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px;
+      padding: 20px 10px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 10;
+      transition: transform 0.3s ease;
     }
 
-    .header { text-align: center; margin-bottom: 20px; }
-    .header h1 { font-size: 28px; margin-bottom: 8px; }
-    .header p { font-size: 15px; color: #dbeafe; }
+    .sidebar.hidden { transform: translateX(-240px); }
 
+    .sidebar h2 { font-size: 18px; margin-bottom: 30px; color: #dbeafe; text-align: center; }
+    .sidebar a {
+      display: block; text-decoration: none; color: white;
+      width: 100%; padding: 12px 15px; border-radius: 8px;
+      text-align: left; margin: 8px 0; transition: background 0.3s;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.15); }
+    .logout { margin-top: auto; font-size: 14px; padding: 8px 14px; background: rgba(255,255,255,0.1); border-radius: 6px; color: #fca5a5; text-decoration: none; }
+    .logout:hover { background: rgba(255,255,255,0.2); }
+
+    /* Tombol toggle */
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .toggle-btn:hover { background: rgba(255,255,255,0.4); }
+    .toggle-btn.hidden-position { left: 10px; }
+
+    /* Main */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      margin-left: 230px;
+      transition: margin-left 0.3s ease;
+    }
+
+    .main.expanded { margin-left: 0; }
+
+    /* Header box (same style as main.html) */
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 35px;
+    }
+
+    .header-icon {
+      width: 50px; height: 50px; background: rgba(255,255,255,0.15);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: #dbeafe;
+    }
+
+    .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px; }
+    .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
+
+    .header-logos { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 12px; align-items: center; }
+    .header-logos img { height: 36px; opacity: 0.9; }
+
+    /* Chart + controls */
     .selector {
       margin-bottom: 30px;
       display: flex;
@@ -53,35 +146,113 @@
     canvas { width: 100% !important; height: 500px !important; }
     .loading { font-size: 15px; color: #dbeafe; margin-top: 20px; }
     .summary { margin-top: 20px; font-size: 14px; color: #e0e7ff; text-align: center; }
+
+    /* Footer */
+    .footer {
+      background: #ffffff;
+      padding: 25px 0;
+      margin-top: 40px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid #e5e7eb;
+      border-radius: 0 0 10px 10px;
+    }
+
+    .footer span {
+      color: #222;
+      font-weight: 600;
+      margin-right: 10px;
+      font-size: 15px;
+    }
+
+    .footer img {
+      height: 60px;
+      opacity: 0.95;
+      margin: 0 10px;
+    }
   </style>
 </head>
 
 <body>
-  <div class="header">
-    <h1>🎈 Height Reach Graph</h1>
-    <p>Maximum altitude reached by balloon (current month)</p>
+
+  <!-- Tombol toggle -->
+  <button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <h2>Radiosonde Monitoring</h2>
+    <a href="{{ url_for('dashboard') }}" target="_blank">📊 Data Resume</a>
+    <a href="{{ url_for('index') }}" target="_blank">🗺️ Map</a>
+    <a href="{{ url_for('time_accuracy') }}" target="_blank">⏱️ Time Accuracy</a>
+    <a href="{{ url_for('height_reach') }}" target="_blank" style="background: rgba(255,255,255,0.15);">📈 Height Reach Graph</a>
+    <a href="{{ url_for('settings_page') }}" target="_blank">⚙️ Settings</a>
+    <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
   </div>
 
-  <div class="selector">
-    <label for="siteSelect">Site:</label>
-    <select id="siteSelect"></select>
+  <!-- Main -->
+  <div class="main" id="mainContent">
 
-    <label for="timeSelect">Launch Time:</label>
-    <select id="timeSelect">
-      <option value="ALL" selected>All</option>
-      <option value="00Z">00Z</option>
-      <option value="12Z">12Z</option>
-    </select>
+    <!-- Header -->
+    <div class="header-box">
+      <div class="header-icon">🎈</div>
+      <div class="header-text">
+        <h1>Height Reach Graph</h1>
+        <p>Maximum altitude reached by balloon (current month)</p>
+      </div>
+      <div class="header-logos">
+        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="selector">
+      <label for="siteSelect">Site:</label>
+      <select id="siteSelect"></select>
+
+      <label for="timeSelect">Launch Time:</label>
+      <select id="timeSelect">
+        <option value="ALL" selected>All</option>
+        <option value="00Z">00Z</option>
+        <option value="12Z">12Z</option>
+      </select>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-box">
+      <canvas id="heightChart"></canvas>
+      <div id="loadingMsg" class="loading">Loading data...</div>
+    </div>
+
+    <div id="summary" class="summary"></div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Powered by</span>
+      <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+      <img src="{{ url_for('static', filename='images/terrindofull.png') }}" alt="Terrindo Logo">
+    </div>
   </div>
-
-  <div class="chart-box">
-    <canvas id="heightChart"></canvas>
-    <div id="loadingMsg" class="loading">Loading data...</div>
-  </div>
-
-  <div id="summary" class="summary"></div>
 
   <script>
+    // Sidebar toggle
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      const main = document.getElementById("mainContent");
+      const btn = document.getElementById("toggleBtn");
+      sidebar.classList.toggle("hidden");
+      main.classList.toggle("expanded");
+      if (sidebar.classList.contains("hidden")) {
+        btn.textContent = "☰";
+        btn.classList.add("hidden-position");
+      } else {
+        btn.textContent = "❮";
+        btn.classList.remove("hidden-position");
+      }
+    }
+
+    // Chart logic
     const ctx = document.getElementById("heightChart").getContext("2d");
     const loadingMsg = document.getElementById("loadingMsg");
     const summaryDiv = document.getElementById("summary");
@@ -92,12 +263,10 @@
 
     async function loadSites() {
       loadingMsg.textContent = "Loading sites...";
-
       const now = new Date();
       const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const end   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+      const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
       const toYMD = d => d.toISOString().slice(0,10);
-
       try {
         const res = await fetch(`/api/sites?ext=.bfr&start_date=${toYMD(start)}&end_date=${toYMD(end)}`);
         const siteMap = await res.json();
@@ -106,7 +275,6 @@
           siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
           return;
         }
-
         siteSelect.innerHTML = "";
         sites.forEach(s => {
           const opt = document.createElement("option");
@@ -140,11 +308,9 @@
       const year = now.getUTCFullYear();
       const month = now.getUTCMonth();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
-
       const labels = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString().padStart(2, "0"));
       const map = {};
       allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
-
       const data00 = labels.map(day => {
         const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_00Z`];
         return entry ? entry.max_height : null;
@@ -153,9 +319,7 @@
         const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_12Z`];
         return entry ? entry.max_height : null;
       });
-
       loadingMsg.style.display = "none";
-
       const datasets = [];
       if (filterTime === "ALL" || filterTime === "00Z") {
         datasets.push({
@@ -181,7 +345,6 @@
           pointHoverRadius: 6
         });
       }
-
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
         type: "line",
@@ -211,15 +374,10 @@
               color: "#fff",
               font: { size: 18 }
             },
-            tooltip: {
-              callbacks: {
-                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} m`
-              }
-            }
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} m` } }
           }
         }
       });
-
       const allVals = [...data00, ...data12].filter(v => v != null);
       const avg = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(0) : "-";
       summaryDiv.textContent = `Average maximum height: ${avg} m`;

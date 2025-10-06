@@ -3,148 +3,224 @@
 <head>
   <meta charset="utf-8">
   <title>RAOB Analysis Algorithm Documentation</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter.css') }}">
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+
   <style>
     body {
+      margin: 0;
       font-family: "Inter", sans-serif;
-      margin: 0; padding: 0;
-      background: #f4f6fb; color: #333;
-    }
-    header {
-      background: #0d6efd;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
       color: white;
-      padding: 12px 25px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- Header --- */
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      margin: 30px 40px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      gap: 18px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
     }
-    .header-left { display: flex; align-items: center; gap: 15px; }
-    .header-left img { height: 40px; background: white; border-radius: 8px; padding: 4px; }
-    .header-title { font-size: 18px; font-weight: 600; }
-    .logout a {
-      background: white; color: #0d6efd; padding: 6px 16px;
-      border-radius: 999px; text-decoration: none; font-weight: 500;
+
+    .header-icon {
+      width: 50px; height: 50px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: #dbeafe;
     }
+
+    .header-text h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 0.5px; }
+    .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
+
+    .header-logos {
+      position: absolute;
+      right: 20px; top: 50%;
+      transform: translateY(-50%);
+      display: flex; gap: 12px; align-items: center;
+    }
+    .header-logos img { height: 36px; opacity: 0.9; }
+
+    /* --- Main Content --- */
     main {
-      max-width: 1000px; margin: 25px auto; padding: 20px;
-      background: white; border-radius: 12px;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+      flex: 1;
+      padding: 0 40px 40px;
+      display: flex;
+      justify-content: center;
     }
-    h1 { color: #0d6efd; font-size: 22px; margin-top: 0; }
-    h2 { color: #0d6efd; border-bottom: 2px solid #0d6efd33; padding-bottom: 4px; }
-    ul, p { line-height: 1.6; }
+
+    .doc-card {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 30px 40px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      max-width: 1000px;
+      width: 100%;
+      color: #f8fafc;
+    }
+
+    h1 { color: #fff; font-size: 24px; margin-top: 0; }
+    h2 { color: #fff; border-bottom: 2px solid rgba(255,255,255,0.2); padding-bottom: 4px; }
+    ul, p { line-height: 1.6; color: #e0e7ff; }
+
     code {
-      background: #f8f9fa;
-      padding: 2px 5px;
+      background: rgba(255,255,255,0.1);
+      padding: 3px 6px;
       border-radius: 4px;
-      color: #0d6efd;
+      color: #60a5fa;
     }
-    footer {
-      text-align: center;
-      padding: 20px;
-      background: #fff;
-      border-top: 1px solid #eaeaea;
-      margin-top: 30px;
+
+    .btn-back {
+      display: inline-block;
+      background: #2563eb;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      margin-bottom: 20px;
+      transition: background 0.3s;
+    }
+    .btn-back:hover { background: #1e40af; }
+
+    /* --- Footer --- */
+    .footer {
+      background: #ffffff;
+      padding: 25px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid #e5e7eb;
+      border-radius: 0 0 10px 10px;
+    }
+
+    .footer span {
+      color: #222;
+      font-weight: 600;
+      margin-right: 10px;
+      font-size: 15px;
+    }
+
+    .footer img {
+      height: 60px;
+      opacity: 0.95;
+      margin: 0 10px;
     }
   </style>
 </head>
 
 <body>
-  <header>
-    <div class="header-left">
-      <img src="/static/images/TBR2.png" alt="Terrindo">
-      <img src="/static/images/bmkg.png" alt="BMKG">
-      <span class="header-title">RAOB Analysis Algorithm</span>
+  <!-- Header -->
+  <div class="header-box">
+    <div class="header-icon">📘</div>
+    <div class="header-text">
+      <h1>RAOB Analysis Algorithm Documentation</h1>
+      <p>Scientific logic and computation reference for radiosonde indices</p>
     </div>
-    <div class="logout">
-      <a href="{{ url_for('main_page') }}">⬅ Back to Main Page</a>
+    <div class="header-logos">
+      <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
     </div>
-  </header>
+  </div>
 
   <main>
-    <h1>Algorithm Reference and Verification</h1>
-    <p>
-      This page documents the scientific and computational logic used to produce the 
-      <b>Weather Analysis</b> section in the RAOB module.  
-      The analysis follows standard thermodynamic and dynamic indices widely used in 
-      operational meteorology (e.g., WMO, NOAA SPC, MetPy).
-    </p>
+    <div class="doc-card">
+      <a href="{{ url_for('main_page') }}" class="btn-back">⬅ Back to Main Page</a>
 
-    <h2>1. CAPE (Convective Available Potential Energy)</h2>
-    <p>
-      <b>Formula:</b>  
-      <code>CAPE = ∫ (T_parcel - T_env) / T_env * g * dz</code>  
-      Computed via MetPy: <code>mpcalc.cape_cin()</code><br>
-      <b>Interpretation:</b>
-      <ul>
-        <li>0–1000 J/kg → Weak instability</li>
-        <li>1000–2500 J/kg → Moderate thunderstorms possible</li>
-        <li>2500–4000 J/kg → Strong convection, severe storms likely</li>
-        <li>>4000 J/kg → Extreme instability</li>
-      </ul>
-    </p>
+      <h1>Algorithm Reference and Verification</h1>
+      <p>
+        This document describes the analytical logic used in the <b>RAOB Analysis</b> module.
+        It follows established meteorological computation standards used by
+        <b>WMO</b>, <b>NOAA/SPC</b>, and <b>MetPy</b>.
+      </p>
 
-    <h2>2. CIN (Convective Inhibition)</h2>
-    <p>
-      <b>Formula:</b> <code>CIN = ∫ (T_env - T_parcel) / T_env * g * dz</code>  
-      Large CIN (>100 J/kg) inhibits convection, small CIN (<50 J/kg) allows storm initiation.
-    </p>
+      <h2>1. CAPE (Convective Available Potential Energy)</h2>
+      <p>
+        <b>Formula:</b>  
+        <code>CAPE = ∫ (T_parcel - T_env) / T_env × g × dz</code><br>
+        Computed via <code>mpcalc.cape_cin()</code>.<br>
+        <b>Interpretation:</b>
+        <ul>
+          <li>0–1000 J/kg → Weak instability</li>
+          <li>1000–2500 J/kg → Moderate thunderstorms possible</li>
+          <li>2500–4000 J/kg → Strong convection, severe storms likely</li>
+          <li>>4000 J/kg → Extreme instability</li>
+        </ul>
+      </p>
 
-    <h2>3. Lifted Index (LI)</h2>
-    <p>
-      <code>LI = T_env(500hPa) - T_parcel(500hPa)</code>  
-      <ul>
-        <li>LI &gt; 0 → Stable</li>
-        <li>-3 ≤ LI &lt; 0 → Slightly unstable</li>
-        <li>-6 ≤ LI &lt; -3 → Moderate instability</li>
-        <li>LI &lt; -6 → Severe instability</li>
-      </ul>
-    </p>
+      <h2>2. CIN (Convective Inhibition)</h2>
+      <p>
+        <code>CIN = ∫ (T_env - T_parcel) / T_env × g × dz</code><br>
+        Large CIN (>100 J/kg) suppresses convection, while <50 J/kg supports storm initiation.
+      </p>
 
-    <h2>4. K Index (KI)</h2>
-    <p>
-      <code>KI = (T850 - T500) + Td850 - (T700 - Td700)</code>  
-      Indicates thunderstorm potential:
-      <ul>
-        <li>KI &lt; 20 → No storms</li>
-        <li>20–25 → Isolated storms</li>
-        <li>26–30 → Scattered storms</li>
-        <li>&gt;30 → Numerous storms likely</li>
-      </ul>
-    </p>
+      <h2>3. Lifted Index (LI)</h2>
+      <p>
+        <code>LI = T_env(500 hPa) - T_parcel(500 hPa)</code><br>
+        <ul>
+          <li>LI &gt; 0 → Stable</li>
+          <li>-3 ≤ LI &lt; 0 → Slightly unstable</li>
+          <li>-6 ≤ LI &lt; -3 → Moderately unstable</li>
+          <li>LI &lt; -6 → Severe instability</li>
+        </ul>
+      </p>
 
-    <h2>5. Bulk Wind Shear</h2>
-    <p>
-      <b>Computed by:</b> <code>mpcalc.bulk_shear()</code>  
-      <ul>
-        <li>0–1 km shear: near-surface rotation potential</li>
-        <li>0–6 km shear: organization of storms</li>
-      </ul>
-      Thresholds:
-      <ul>
-        <li>&lt; 20 kt → Weak shear</li>
-        <li>20–40 kt → Strong</li>
-        <li>&gt; 40 kt → Severe convection support</li>
-      </ul>
-    </p>
+      <h2>4. K Index (KI)</h2>
+      <p>
+        <code>KI = (T850 - T500) + Td850 - (T700 - Td700)</code><br>
+        <ul>
+          <li>&lt; 20 → No storms</li>
+          <li>20–25 → Isolated storms</li>
+          <li>26–30 → Scattered storms</li>
+          <li>&gt; 30 → Numerous storms likely</li>
+        </ul>
+      </p>
 
-    <h2>6. SRH (Storm Relative Helicity)</h2>
-    <p>
-      <b>Computed via:</b> <code>mpcalc.storm_relative_helicity()</code><br>
-      Indicates rotational potential in the lower atmosphere.
-      <ul>
-        <li>SRH &lt; 100 → Weak rotation</li>
-        <li>100–200 → Moderate rotation</li>
-        <li>&gt; 200 → Supercell/tornado potential</li>
-      </ul>
-    </p>
+      <h2>5. Bulk Wind Shear</h2>
+      <p>
+        <b>Computed via:</b> <code>mpcalc.bulk_shear()</code><br>
+        Indicates storm organization and rotation potential.
+        <ul>
+          <li>&lt; 20 kt → Weak shear</li>
+          <li>20–40 kt → Strong</li>
+          <li>&gt; 40 kt → Severe convection support</li>
+        </ul>
+      </p>
 
-    <h2>7. Freezing Level & Tropopause</h2>
-    <p>
-      <b>Freezing Level:</b> pressure at which temperature crosses 0°C.<br>
-      <b>Tropopause:</b> first layer where lapse rate ≤ 2°C/km for ≥ 2 km depth.
-    </p>
+      <h2>6. SRH (Storm Relative Helicity)</h2>
+      <p>
+        <b>Computed with:</b> <code>mpcalc.storm_relative_helicity()</code><br>
+        Indicates low-level rotation potential.
+        <ul>
+          <li>&lt; 100 → Weak rotation</li>
+          <li>100–200 → Moderate rotation</li>
+          <li>&gt; 200 → Tornadic/supercell potential</li>
+        </ul>
+      </p>
 
-    <h2>8. Visual Elements</h2>
-    <ul
+      <h2>7. Freezing Level & Tropopause</h2>
+      <p>
+        <b>Freezing Level:</b> pressure where temperature crosses 0°C.<br>
+        <b>Tropopause:</b> level where lapse rate ≤ 2°C/km over ≥ 2 km depth.
+      </p>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+    <img src="{{ url_for('static', filename='images/terrindofull.png') }}" alt="Terrindo Logo">
+  </div>
+</body>
+</html>

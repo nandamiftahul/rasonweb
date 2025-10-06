@@ -24,6 +24,7 @@
       background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
       color: white;
       overflow-y: auto;
+      transition: all 0.3s ease;
     }
 
     /* Sidebar */
@@ -36,9 +37,16 @@
       flex-direction: column;
       align-items: center;
       padding: 20px 10px;
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 0;
       height: 100vh;
+      z-index: 10;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar.hidden {
+      transform: translateX(-240px);
     }
 
     .sidebar h2 { font-size: 18px; margin-bottom: 30px; color: #dbeafe; text-align: center; }
@@ -51,8 +59,49 @@
     .logout { margin-top: auto; font-size: 14px; padding: 8px 14px; background: rgba(255,255,255,0.1); border-radius: 6px; color: #fca5a5; text-decoration: none; }
     .logout:hover { background: rgba(255,255,255,0.2); }
 
+    /* Tombol toggle terpisah dari sidebar */
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+
+    .toggle-btn:hover {
+      background: rgba(255,255,255,0.4);
+    }
+
+    .toggle-btn.hidden-position {
+      left: 10px;
+    }
+
     /* Main area */
-    .main { flex: 1; display: flex; flex-direction: column; padding: 40px; }
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      margin-left: 230px;
+      transition: margin-left 0.3s ease;
+    }
+
+    .main.expanded {
+      margin-left: 0;
+    }
 
     .header-box {
       position: relative;
@@ -108,6 +157,7 @@
       margin-bottom: 30px;
     }
 
+    /* Footer */
     .footer {
       background: #ffffff;
       padding: 25px 0;
@@ -118,12 +168,27 @@
       border-radius: 0 0 10px 10px;
     }
 
-    .footer img { height: 60px; opacity: 0.95; }
+    .footer span {
+      color: #222;
+      font-weight: 600;
+      margin-right: 10px;
+      font-size: 15px;
+    }
+
+    .footer img {
+      height: 60px;
+      opacity: 0.95;
+      margin: 0 10px;
+    }
   </style>
 </head>
 
 <body>
-  <div class="sidebar">
+
+  <!-- Tombol toggle terpisah -->
+  <button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
+
+  <div class="sidebar" id="sidebar">
     <h2>Radiosonde Monitoring</h2>
     <a href="{{ url_for('dashboard') }}" target="_blank">📊 Data Resume</a>
     <a href="{{ url_for('index') }}" target="_blank">🗺️ Map</a>
@@ -133,7 +198,7 @@
     <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
   </div>
 
-  <div class="main">
+  <div class="main" id="mainContent">
     <!-- Header -->
     <div class="header-box">
       <div class="header-icon">🎈</div>
@@ -142,26 +207,44 @@
         <p>Real-time upper-air observation and analysis dashboard</p>
       </div>
       <div class="header-logos">
-        <img src="{{ url_for('static', filename='images/terrindo.png') }}" alt="Terrindo">
         <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
       </div>
     </div>
+
+    <!-- Map -->
+    <div id="indoMap"></div>
 
     <!-- Dynamic Site Status -->
     <div id="statusGrid" class="card-grid">
       <p>Loading latest site status...</p>
     </div>
 
-    <!-- Map -->
-    <div id="indoMap"></div>
-
     <!-- Footer -->
     <div class="footer">
+      <span>Powered by</span>
       <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+      <img src="{{ url_for('static', filename='images/terrindofull.png') }}" alt="Terrindo Logo">
     </div>
   </div>
 
   <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      const main = document.getElementById("mainContent");
+      const btn = document.getElementById("toggleBtn");
+
+      sidebar.classList.toggle("hidden");
+      main.classList.toggle("expanded");
+
+      if (sidebar.classList.contains("hidden")) {
+        btn.textContent = "☰";
+        btn.classList.add("hidden-position");
+      } else {
+        btn.textContent = "❮";
+        btn.classList.remove("hidden-position");
+      }
+    }
+
     // Load status dari API
     async function loadLatestStatus() {
       try {
@@ -192,24 +275,172 @@
       }
     }
 
-    // Jalankan pertama kali
     loadLatestStatus();
-
-    // Refresh otomatis tiap 10 menit
     setInterval(loadLatestStatus, 10 * 60 * 1000);
 
     // Leaflet Map
     var map = L.map('indoMap').setView([-2, 118], 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-
+    
+    // --- Panes & z-index (marker di atas provinsi) ---
+    map.createPane('provincePane');
+    map.createPane('markerPane');
+    map.getPane('provincePane').style.zIndex = 400;
+    map.getPane('markerPane').style.zIndex = 650;
+    
+    // --- Base layer ---
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // --- Layer provinsi (lebih transparan supaya marker jelas) ---
     fetch("{{ url_for('static', filename='geojson/indonesia-provinces.geojson') }}")
       .then(res => res.json())
       .then(data => {
         L.geoJSON(data, {
-          style: { fillColor: "#3388ff", weight: 1, color: "white", fillOpacity: 0.5 },
-          onEachFeature: (f, layer) => layer.bindPopup(f.properties.Propinsi)
+          pane: 'provincePane',
+          style: {
+            fillColor: "#3388ff",
+            weight: 1,
+            color: "white",
+            fillOpacity: 0.25
+          },
+          onEachFeature: (feature, layer) => {
+            layer.on({
+              mouseover: e => e.target.setStyle({ fillOpacity: 0.4 }),
+              mouseout:  e => e.target.setStyle({ fillOpacity: 0.25 })
+            });
+          }
         }).addTo(map);
       });
+    
+    // --- Titik site (koordinat tetap di sini) ---
+    const sites = [
+      { name: "Aceh",         lat: 5.52256,   lon: 95.41685 },
+      { name: "Tarakan",      lat: 3.32708,   lon: 117.57052 },
+      { name: "Sorong",       lat: -0.89059,  lon: 131.28581 },
+      { name: "Cilacap",      lat: -7.71897,  lon: 109.01487 },
+      { name: "Pangkalanbun", lat: -2.70508,  lon: 111.66573 },
+      { name: "Ranai",        lat: 3.95929,   lon: 108.38576 }
+    ];
+    
+    // --- Map status → warna ---
+    function getColorByStatus(status) {
+      switch (String(status || '').toLowerCase()) {
+        case "online":    return "limegreen";
+        case "inflight":  return "#007bff";
+        case "preparing": return "orange";
+        case "offline":   return "red";
+        default:          return "gray";
+      }
+    }
+    
+    // --- LayerGroup khusus marker ---
+    const siteMarkers = L.layerGroup({ pane: 'markerPane' }).addTo(map);
+    
+    // --- Normalisasi nama untuk pencocokan robust ---
+    function norm(s) {
+      return String(s || '')
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    }
+    
+    // --- Gambar marker offline sebagai fallback awal ---
+    function drawStaticMarkers() {
+      siteMarkers.clearLayers();
+      sites.forEach(site => {
+        const color = getColorByStatus('offline');
+        const m = L.circleMarker([site.lat, site.lon], {
+          pane: 'markerPane',
+          radius: 10,
+          fillColor: color,
+          color: "#fff",
+          weight: 2,
+          fillOpacity: 0.9
+        }).addTo(siteMarkers);
+        m.bindTooltip(
+          `<b>${site.name}</b><br>
+           Status: <span style="color:${color};font-weight:bold">offline</span><br>
+           <small>Last update: -</small>`,
+          { direction: "top", offset: [0, -5] }
+        );
+      });
+    }
+    drawStaticMarkers(); // tampil duluan biar nggak “kosong”
+    
+    // --- Ambil status nyata dari backend (bawa cookie login!) ---
+    async function updateSiteStatus() {
+      try {
+        const res = await fetch("/api/status", { credentials: 'same-origin' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+        const statuses = await res.json();
+        // Index by normalized name
+        const byName = new Map(statuses.map(st => [norm(st.site), st]));
+    
+        siteMarkers.clearLayers();
+        sites.forEach(site => {
+          const st = byName.get(norm(site.name)) || { status: 'offline', update: '-' };
+          const color = getColorByStatus(st.status);
+    
+          const m = L.circleMarker([site.lat, site.lon], {
+            pane: 'markerPane',
+            radius: 10,
+            fillColor: color,
+            color: "#fff",
+            weight: 2,
+            fillOpacity: 0.9
+          }).addTo(siteMarkers);
+    
+          m.bindTooltip(
+            `<b>${site.name}</b><br>
+             Status: <span style="color:${color};font-weight:bold">${st.status}</span><br>
+             <small>Last update: ${st.update || "-"}</small>`,
+            { direction: "top", offset: [0, -5] }
+          );
+        });
+      } catch (err) {
+        console.error("⚠️ Gagal update status dari /api/status:", err);
+        // Biarkan fallback statis yang sudah tergambar
+      }
+    }
+    
+    // --- Legend (pojok kanan bawah) ---
+    const legend = L.control({ position: "bottomright" });
+    legend.onAdd = function () {
+      const div = L.DomUtil.create("div", "info legend");
+      const statuses = [
+        { color: "red",       label: "Offline"   },
+        { color: "limegreen", label: "Online"    },
+        { color: "orange",    label: "Preparing" },
+        { color: "#007bff",   label: "Inflight"  }
+      ];
+      Object.assign(div.style, {
+        background: "rgba(255,255,255,0.9)",
+        padding: "10px 12px",
+        borderRadius: "8px",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+        fontSize: "13px",
+        color: "#111"
+      });
+      div.innerHTML = "<b>Status Legend</b><br>";
+      statuses.forEach(s => {
+        div.innerHTML += `
+          <div style="display:flex;align-items:center;margin-top:4px;">
+            <span style="width:14px;height:14px;border-radius:50%;background:${s.color};margin-right:8px;"></span>
+            ${s.label}
+          </div>`;
+      });
+      return div;
+    };
+    legend.addTo(map);
+    
+    // --- Jalankan update berkala ---
+    updateSiteStatus();                  // tarik data pertama kali
+    setInterval(updateSiteStatus, 5 * 60 * 1000); // tiap 5 menit
+    
+
+
   </script>
 </body>
 </html>
