@@ -249,6 +249,11 @@
           <div class="analysis-box" id="analysisBox">
             <b>Weather Analysis:</b><br>
             {{ analysis_text|safe }}
+            <hr>
+            <div id="quickSummary"></div>
+            <div style="text-align:center; margin-top:10px;">
+              <a href="{{ url_for('raob_doc') }}" target="_blank" class="btn">📘 View Analysis Algorithm</a>
+            </div>
           </div>
         </div>
       </div>

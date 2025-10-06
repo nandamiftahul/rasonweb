@@ -1043,6 +1043,9 @@ def raob_analysis(site, filename):
         if df_levels.empty:
             return "No levels found", 500
 
+        # --- Metadata harus diambil lebih awal ---
+        meta = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+
         # --- Clean profile ---
         df = df_levels.dropna(subset=["pressure_hPa"]).copy()
         df = df.sort_values("pressure_hPa", ascending=False)
@@ -1074,11 +1077,10 @@ def raob_analysis(site, filename):
             u = v = p_w = hgt = None
         else:
             p_w = wind["pressure_hPa"].values * units.hPa
-            ws = wind["wind_speed_mps"].values * (units.meter/units.second)
+            ws = wind["wind_speed_mps"].values * (units.meter / units.second)
             wdir = wind["wind_dir_deg"].values * units.degree
             u, v = mpcalc.wind_components(ws, wdir)
 
-            # Heights
             if "height_m" in wind:
                 hgt = wind["height_m"].values * units.meter
             elif "height_m" in df:
@@ -1113,22 +1115,16 @@ def raob_analysis(site, filename):
                 hgt_sorted = hgt[sort_idx]
                 u_sorted = u[sort_idx]
                 v_sorted = v[sort_idx]
-
-                rmotion, lmotion, mean_wind = mpcalc.bunkers_storm_motion(
-                    p_w, u_sorted, v_sorted, hgt_sorted
-                )
+                rmotion, _, _ = mpcalc.bunkers_storm_motion(p_w, u_sorted, v_sorted, hgt_sorted)
                 storm_u, storm_v = rmotion
-
                 srh_0_1km, _, _ = mpcalc.storm_relative_helicity(
                     hgt_sorted, u_sorted, v_sorted,
                     depth=1000*units.m, bottom=0*units.m,
-                    storm_u=storm_u, storm_v=storm_v
-                )
+                    storm_u=storm_u, storm_v=storm_v)
                 srh_0_3km, _, _ = mpcalc.storm_relative_helicity(
                     hgt_sorted, u_sorted, v_sorted,
                     depth=3000*units.m, bottom=0*units.m,
-                    storm_u=storm_u, storm_v=storm_v
-                )
+                    storm_u=storm_u, storm_v=storm_v)
             except Exception as e:
                 print("SRH calculation failed:", e)
 
@@ -1148,52 +1144,63 @@ def raob_analysis(site, filename):
                 T_vals = thermo["temp_C"].values
                 Z_vals = thermo["height_m"].values
                 P_vals = thermo["pressure_hPa"].values
-
                 mask = P_vals < 500
-                T_vals = T_vals[mask]
-                Z_vals = Z_vals[mask]
-                P_vals = P_vals[mask]
-
+                T_vals, Z_vals, P_vals = T_vals[mask], Z_vals[mask], P_vals[mask]
                 if len(T_vals) > 5:
                     lapse_rate = np.gradient(T_vals, Z_vals) * 1000.0
                     for i in range(len(Z_vals)):
                         if lapse_rate[i] <= 2.0:
                             z_top = Z_vals[i] + 2000.0
                             mask2 = (Z_vals >= Z_vals[i]) & (Z_vals <= z_top)
-                            if np.any(mask2):
-                                mean_lapse = np.mean(lapse_rate[mask2])
-                                if mean_lapse <= 2.0:
-                                    tropopause_level = f"{P_vals[i]:.0f} hPa"
-                                    break
+                            if np.any(mask2) and np.mean(lapse_rate[mask2]) <= 2.0:
+                                tropopause_level = f"{P_vals[i]:.0f} hPa"
+                                break
         except Exception as e:
             print("Tropopause calc failed:", e)
 
         # --- Skew-T plot ---
-        fig1 = plt.figure(figsize=(6, 6))
+        fig1 = plt.figure(figsize=(7, 7))
         skew = SkewT(fig1, rotation=45)
-        skew.plot(p, T, "r")
-        skew.plot(p, Td, "g")
+        skew.ax.set_facecolor("#fff9ef")
+        skew.ax.grid(True, linestyle="--", linewidth=0.5, color="gray", alpha=0.5)
+        skew.plot(p, T, color="red", linewidth=2, label="Temperature")
+        skew.plot(p, Td, color="blue", linewidth=2, label="Dew Point")
+        skew.plot(p, parcel_prof, color="black", linestyle="--", label="Parcel Path")
         if (u is not None) and (v is not None):
-            skew.plot_barbs(p_w, u.to("m/s"), v.to("m/s"))
-        skew.plot(p, parcel_prof, "k")
+            skew.plot_barbs(p_w, u.to("m/s"), v.to("m/s"), xloc=1.05)
         skew.ax.set_ylim(1050, 100)
         skew.ax.set_xlim(-40, 40)
-        skew.ax.set_title(f"Skew-T  {df_meta.iloc[0].get('launch_time', '')}")
+        skew.ax.legend(fontsize=8, loc="best")
+        skew.ax.set_xlabel("Temperature (°C)")
+        skew.ax.set_ylabel("Pressure (hPa)")
+        skew.ax.set_title(f"{meta.get('wmo_station','')}  {meta.get('launch_time','')}",
+                          fontsize=10, fontweight="bold", color="#222")
         buf1 = BytesIO()
         plt.savefig(buf1, format="png", bbox_inches="tight")
         buf1.seek(0)
         skewt_img = base64.b64encode(buf1.read()).decode("utf-8")
         plt.close(fig1)
 
-        # --- Hodograph ---
+        # --- Hodograph (Cartesian style) ---
         if (u is not None) and (v is not None):
-            fig2 = plt.figure(figsize=(6, 6))
-            ax = fig2.add_subplot(1, 1, 1)
+            fig2, ax = plt.subplots(figsize=(6, 6))
             hodo = Hodograph(ax, component_range=60.0)
-            hodo.add_grid(increment=20)
-            hodo.plot((-u).to("m/s"), (-v).to("m/s"), color="b")
-            ax.set_aspect('equal', adjustable='box')
-            ax.set_title("Hodograph")
+            hodo.add_grid(increment=10)
+            hodo.plot(u.to("m/s"), v.to("m/s"), color="#007bff", linewidth=2, label="Wind profile")
+            if hgt is not None:
+                mask = ~np.isnan(hgt.m)
+                ax.scatter(u[mask].to('m/s'), v[mask].to('m/s'),
+                           c=hgt[mask].m/1000.0, cmap="viridis", s=30,
+                           edgecolors='black', linewidths=0.3, label="Height (km)")
+            ax.set_facecolor("#f9f9f9")
+            ax.grid(True, linestyle="--", color="gray", alpha=0.5)
+            ax.axhline(0, color="black", linewidth=0.8)
+            ax.axvline(0, color="black", linewidth=0.8)
+            ax.set_aspect("equal", adjustable="box")
+            ax.set_xlabel("U wind (m/s)")
+            ax.set_ylabel("V wind (m/s)")
+            ax.set_title("Hodograph", fontsize=10, fontweight="bold", color="#004085")
+            ax.legend(fontsize=8, loc="upper left")
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", bbox_inches="tight")
             buf2.seek(0)
@@ -1202,7 +1209,7 @@ def raob_analysis(site, filename):
         else:
             hodo_img = None
 
-        # --- Helper for clean indices ---
+        # --- Indices table ---
         def scalar_str(x, fmt=".1f"):
             try:
                 val = np.atleast_1d(x.m)[0]
@@ -1210,7 +1217,6 @@ def raob_analysis(site, filename):
             except Exception:
                 return "-"
 
-        # --- Indices table ---
         indices = {
             "LCL Pressure (hPa)": scalar_str(lcl_pressure),
             "CAPE (J/kg)": scalar_str(cape),
@@ -1225,16 +1231,7 @@ def raob_analysis(site, filename):
             "Tropopause": tropopause_level,
         }
 
-        # --- Metadata formatting ---
-        meta = df_meta.to_dict("records")[0]
-        if "reason_for_termination" in meta:
-            try:
-                code = int(meta["reason_for_termination"])
-                meta["reason_for_termination"] = f"{code} – {REASON_MAP.get(code, 'Unknown')}"
-            except Exception:
-                pass
-
-        # --- 🔍 Auto Weather Analysis ---
+        # --- Auto Weather Analysis ---
         analysis_text = generate_weather_analysis(df)
 
         # --- Render Template ---
@@ -1530,6 +1527,10 @@ def manage_users():
         print(f"🗑️ Deleted user: {username}")
         return jsonify({"success": True, "users": VALID_USERS})
 
+@app.route("/raob_doc")
+@login_required
+def raob_doc():
+    return render_template("raob_doc.html")
 
     
 if __name__ == "__main__":
