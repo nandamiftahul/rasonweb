@@ -2,38 +2,87 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>RAOB Analysis</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radiosonde RAOB Analysis</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter.css') }}">
+
   <style>
     body {
-      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      font-family: "Inter", sans-serif;
       margin: 0; padding: 0;
-      background: #f8fafc;
-      color: #222;
+      background: #f4f6fb;
+      color: #333;
     }
+
+    /* === HEADER (copy from dashboard) === */
     header {
       background: #0d6efd;
-      color: white;
-      padding: 15px;
-      text-align: center;
+      color: #fff;
+      padding: 12px 25px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      position: relative;
     }
+    .header-left { display: flex; align-items: center; gap: 15px; }
+    .header-left img {
+      height: 40px;
+      background: white;
+      border-radius: 8px;
+      padding: 4px;
+    }
+    .header-title { font-size: 18px; font-weight: 600; letter-spacing: 0.4px; }
+    .logout { display: flex; align-items: center; gap: 10px; }
+    .logout a {
+      background: white;
+      color: #0d6efd;
+      padding: 6px 16px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .logout a:hover { background: #e9ecef; transform: scale(1.03); }
+    #darkToggle {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: none;
+      font-size: 18px;
+      border-radius: 50%;
+      width: 36px; height: 36px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+    #darkToggle:hover { background: rgba(255,255,255,0.35); transform: scale(1.1); }
+
     main {
-      max-width: 1200px;
-      margin: 20px auto;
+      max-width: 1400px;
+      margin: 25px auto;
       padding: 0 20px;
     }
+
     .grid {
       display: grid;
       grid-template-columns: 2fr 1fr;
       gap: 20px;
     }
+
     .card {
       background: white;
-      border-radius: 8px;
-      padding: 15px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.05);
       margin-bottom: 20px;
     }
+
+    h2 {
+      margin-top: 0;
+      color: #0d6efd;
+      font-weight: 600;
+      border-bottom: 2px solid #0d6efd33;
+      padding-bottom: 6px;
+    }
+
     .headline {
       font-size: 15px;
       margin-bottom: 10px;
@@ -43,43 +92,17 @@
       font-weight: bold;
       text-align: center;
     }
-    .plots img {
-      width: 100%;
-      border-radius: 6px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-    }
-    .indices-table, .meta-table {
+
+    .meta-table, .indices-table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 10px;
+      font-size: 14px;
     }
-    .indices-table th, .indices-table td,
-    .meta-table th, .meta-table td {
-      padding: 6px 10px;
-      border: 1px solid #ddd;
-    }
-    .indices-table th, .meta-table th {
-      background: #f0f2f5;
-      text-align: left;
-    }
+    th, td { border: 1px solid #ddd; padding: 6px 10px; }
+    th { background: #f1f3f5; text-align: left; }
     .val { font-weight: bold; }
-    .legend {
-      display: flex;
-      justify-content: space-around;
-      flex-wrap: wrap;
-      gap: 15px;
-      margin-top: 10px;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .legend span {
-      display: inline-block;
-      width: 16px; height: 16px;
-      border-radius: 3px;
-    }
+
     .btn {
       display: inline-block;
       background: #0d6efd;
@@ -88,22 +111,75 @@
       border-radius: 6px;
       text-decoration: none;
       font-size: 14px;
-      margin-top: 6px;
+      margin-top: 8px;
+      transition: background 0.3s;
     }
     .btn:hover { background: #0b5ed7; }
-    @media (max-width: 768px) {
-      .grid { grid-template-columns: 1fr; }
+
+    .legend {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 10px;
     }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend span {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border-radius: 3px;
+    }
+
+    .analysis-box {
+      background: #eef5ff;
+      border-left: 5px solid #0d6efd;
+      padding: 10px 15px;
+      border-radius: 6px;
+      line-height: 1.5;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    /* === FOOTER === */
+    footer {
+      text-align: center;
+      padding: 25px 10px;
+      background: #ffffff;
+      border-top: 1px solid #e5e7eb;
+      margin-top: 30px;
+    }
+    footer img {
+      height: 55px;
+      opacity: 0.9;
+      transition: opacity 0.3s;
+    }
+    footer img:hover { opacity: 1; }
+
+    /* === DARK MODE === */
+    body.dark { background: #121212; color: #f1f1f1; }
+    body.dark .card { background: #1e1e1e; color: #f1f1f1; }
+    body.dark th { background: #222; }
+    body.dark .analysis-box { background: #1e2733; border-left-color: #66b2ff; }
+    body.dark h2 { color: #66b2ff; border-color: #66b2ff33; }
+    body.dark footer { background: rgba(30,30,30,0.8); border-top-color: #333; }
   </style>
 </head>
 <body>
   <header>
-    <h1>RAOB Analysis – {{ meta.get("launch_time", "-") }}</h1>
+    <div class="header-left">
+      <img src="/static/images/TBR2.png" alt="Terrindo">
+      <img src="/static/images/bmkg.png" alt="BMKG">
+      <span class="header-title">Radiosonde RAOB Analysis</span>
+    </div>
+    <div class="logout">
+      <button id="darkToggle" title="Toggle Dark Mode">🌙</button>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
   </header>
 
   <main>
     <div class="grid">
-      <!-- Left column: Skew-T + Metadata -->
+      <!-- LEFT -->
       <div>
         <div class="card">
           <h2>Skew-T Log-P</h2>
@@ -123,37 +199,15 @@
           <h2>Metadata</h2>
           <table class="meta-table">
             <tbody>
-              {% set labels = {
-                "radiosonde_serial_number": "Serial Number",
-                "radiosonde_operating_frequency": "Frequency",
-                "reason_for_termination": "Reason for Termination",
-                "type_of_pressure_sensor": "Pressure Sensor",
-                "type_of_temperature_sensor": "Temperature Sensor",
-                "type_of_humidity_sensor": "Humidity Sensor",
-                "type_of_balloon": "Balloon Type",
-                "type_of_gas_used_in_balloon": "Balloon Gas",
-                "software_version": "Software",
-                "station_lat": "Station Lat",
-                "station_lon": "Station Lon",
-                "station_height_m": "Station Height",
-                "end_time": "End Time",
-                "end_pressure": "End Pressure",
-                "max_height": "Max Height",
-                "end_distance": "End Distance",
-                "avg_ascent_rate": "Avg Ascent Rate"
-              } %}
               {% for k, v in meta.items() %}
-                <tr>
-                  <th>{{ labels.get(k, k) }}</th>
-                  <td>{{ v }}</td>
-                </tr>
+                <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Right column: Hodograph + Indices -->
+      <!-- RIGHT -->
       <div>
         <div class="card">
           <h2>Hodograph</h2>
@@ -178,10 +232,7 @@
           <table id="indicesTable" class="indices-table">
             <tbody>
               {% for k, v in indices.items() %}
-                <tr>
-                  <th>{{ k }}</th>
-                  <td class="val">{{ v }}</td>
-                </tr>
+                <tr><th>{{ k }}</th><td class="val">{{ v }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -194,12 +245,56 @@
             <div class="legend-item"><span style="background:green;"></span> Moderate</div>
             <div class="legend-item"><span style="background:black;"></span> Neutral</div>
           </div>
+
+          <div class="analysis-box" id="analysisBox">
+            <b>Weather Analysis:</b><br>
+            {{ analysis_text|safe }}
+          </div>
         </div>
       </div>
     </div>
   </main>
 
+  <footer>
+    <img src="/static/images/Meteomodem.png" alt="Meteomodem Logo">
+  </footer>
+
   <script>
+    // === DARK MODE ===
+    const toggleBtn = document.getElementById("darkToggle");
+    toggleBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+      toggleBtn.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
+    });
+
+    // === CSV DOWNLOAD ===
+    function downloadCSV() {
+      const rows = document.querySelectorAll("#indicesTable tr");
+      let csvContent = "data:text/csv;charset=utf-8,Parameter,Value\n";
+      rows.forEach(row => {
+        const cols = row.querySelectorAll("th, td");
+        csvContent += Array.from(cols).map(c => c.innerText).join(",") + "\n";
+      });
+      const link = document.createElement("a");
+      link.href = encodeURI(csvContent);
+      link.download = "raob_indices.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // === IMAGE DOWNLOAD ===
+    function downloadPlot(imgId, filename) {
+      const img = document.getElementById(imgId);
+      const a = document.createElement("a");
+      a.href = img.src;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // === COLOR LOGIC (applied to both headline and table) ===
     function colorCell(cell, label, val) {
       if (label.includes("CAPE") && !isNaN(val)) {
         if (val > 2000) cell.style.color = "red";
@@ -231,43 +326,16 @@
         colorCell(cell, label, val);
       });
 
-      // Headline coloring
-      [["capeVal","CAPE"], ["cinVal","CIN"], ["liVal","Lifted Index"], ["kiVal","K Index"],
-       ["shear1","0–1 km Bulk Shear"], ["shear6","0–6 km Bulk Shear"],
-       ["srh1","SRH"], ["srh3","SRH"]].forEach(([id,label]) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const val = parseFloat(el.innerText);
-        colorCell(el, label, val);
+      // Headline coloring (top CAPE, CIN, LI, KI)
+      [["capeVal","CAPE"],["cinVal","CIN"],["liVal","Lifted Index"],["kiVal","K Index"],
+       ["shear1","Shear"],["shear6","Shear"],["srh1","SRH"],["srh3","SRH"]]
+       .forEach(([id,label])=>{
+        const el=document.getElementById(id);
+        if(!el)return;
+        const val=parseFloat(el.innerText);
+        colorCell(el,label,val);
       });
     });
-
-    function downloadCSV() {
-      const rows = document.querySelectorAll("#indicesTable tr");
-      let csvContent = "data:text/csv;charset=utf-8,Parameter,Value\n";
-      rows.forEach(row => {
-        const cols = row.querySelectorAll("th, td");
-        const line = Array.from(cols).map(col => col.innerText).join(",");
-        csvContent += line + "\n";
-      });
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.href = encodedUri;
-      link.download = "raob_indices.csv";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    function downloadPlot(imgId, filename) {
-      const img = document.getElementById(imgId);
-      const a = document.createElement("a");
-      a.href = img.src;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
   </script>
 </body>
 </html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Height Reach Graph - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+    }
+
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header p { font-size: 15px; color: #dbeafe; }
+
+    .selector {
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    select {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      background: rgba(255,255,255,0.9);
+      color: #003366;
+    }
+
+    .chart-box {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 25px 30px;
+      width: 95%;
+      max-width: 1300px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    canvas { width: 100% !important; height: 500px !important; }
+    .loading { font-size: 15px; color: #dbeafe; margin-top: 20px; }
+    .summary { margin-top: 20px; font-size: 14px; color: #e0e7ff; text-align: center; }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <h1>🎈 Height Reach Graph</h1>
+    <p>Maximum altitude reached by balloon (current month)</p>
+  </div>
+
+  <div class="selector">
+    <label for="siteSelect">Site:</label>
+    <select id="siteSelect"></select>
+
+    <label for="timeSelect">Launch Time:</label>
+    <select id="timeSelect">
+      <option value="ALL" selected>All</option>
+      <option value="00Z">00Z</option>
+      <option value="12Z">12Z</option>
+    </select>
+  </div>
+
+  <div class="chart-box">
+    <canvas id="heightChart"></canvas>
+    <div id="loadingMsg" class="loading">Loading data...</div>
+  </div>
+
+  <div id="summary" class="summary"></div>
+
+  <script>
+    const ctx = document.getElementById("heightChart").getContext("2d");
+    const loadingMsg = document.getElementById("loadingMsg");
+    const summaryDiv = document.getElementById("summary");
+    const siteSelect = document.getElementById("siteSelect");
+    const timeSelect = document.getElementById("timeSelect");
+    let chart = null;
+    let allData = [];
+
+    async function loadSites() {
+      loadingMsg.textContent = "Loading sites...";
+
+      const now = new Date();
+      const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const end   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+      const toYMD = d => d.toISOString().slice(0,10);
+
+      try {
+        const res = await fetch(`/api/sites?ext=.bfr&start_date=${toYMD(start)}&end_date=${toYMD(end)}`);
+        const siteMap = await res.json();
+        let sites = Object.keys(siteMap).sort();
+        if (sites.length === 0) {
+          siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
+          return;
+        }
+
+        siteSelect.innerHTML = "";
+        sites.forEach(s => {
+          const opt = document.createElement("option");
+          opt.value = s;
+          opt.textContent = s;
+          siteSelect.appendChild(opt);
+        });
+        siteSelect.value = sites[0];
+        loadHeightReach(sites[0]);
+      } catch (err) {
+        loadingMsg.textContent = "Failed to load sites.";
+      }
+    }
+
+    async function loadHeightReach(site) {
+      loadingMsg.textContent = `Fetching data for ${site}...`;
+      summaryDiv.textContent = "";
+      try {
+        const res = await fetch(`/api/height_reach/${site}`);
+        const json = await res.json();
+        allData = json.data || [];
+        renderChart();
+      } catch (err) {
+        loadingMsg.textContent = "Failed to load data.";
+      }
+    }
+
+    function renderChart() {
+      const filterTime = timeSelect.value;
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = now.getUTCMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      const labels = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString().padStart(2, "0"));
+      const map = {};
+      allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+      const data00 = labels.map(day => {
+        const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_00Z`];
+        return entry ? entry.max_height : null;
+      });
+      const data12 = labels.map(day => {
+        const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_12Z`];
+        return entry ? entry.max_height : null;
+      });
+
+      loadingMsg.style.display = "none";
+
+      const datasets = [];
+      if (filterTime === "ALL" || filterTime === "00Z") {
+        datasets.push({
+          label: "00Z",
+          data: data00,
+          borderColor: "rgba(59,130,246,0.9)",
+          backgroundColor: "rgba(59,130,246,0.3)",
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        });
+      }
+      if (filterTime === "ALL" || filterTime === "12Z") {
+        datasets.push({
+          label: "12Z",
+          data: data12,
+          borderColor: "rgba(239,68,68,0.9)",
+          backgroundColor: "rgba(239,68,68,0.3)",
+          tension: 0.3,
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        });
+      }
+
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: {
+              title: { display: true, text: "Tanggal (UTC)", color: "#fff" },
+              ticks: { color: "#fff" },
+              grid: { color: "rgba(255,255,255,0.1)" }
+            },
+            y: {
+              title: { display: true, text: "Ketinggian maksimum (m)", color: "#fff" },
+              ticks: { color: "#fff" },
+              grid: { color: "rgba(255,255,255,0.1)" },
+              beginAtZero: true,
+              max: 40000
+            }
+          },
+          plugins: {
+            legend: { labels: { color: "#fff" } },
+            title: {
+              display: true,
+              text: `Height Reach - ${siteSelect.value} (${filterTime})`,
+              color: "#fff",
+              font: { size: 18 }
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} m`
+              }
+            }
+          }
+        }
+      });
+
+      const allVals = [...data00, ...data12].filter(v => v != null);
+      const avg = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(0) : "-";
+      summaryDiv.textContent = `Average maximum height: ${avg} m`;
+    }
+
+    siteSelect.addEventListener("change", () => loadHeightReach(siteSelect.value));
+    timeSelect.addEventListener("change", renderChart);
+    loadSites();
+  </script>
+</body>
+</html>

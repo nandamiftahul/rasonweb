@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Settings - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      padding: 40px;
+    }
+    h1 { text-align: center; }
+    table {
+      width: 80%; margin: 20px auto; border-collapse: collapse;
+      background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;
+    }
+    th, td { padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.2); }
+    th { background: rgba(255,255,255,0.2); }
+    td { text-align: center; }
+    input, button {
+      padding: 8px 12px; border-radius: 6px; border: none;
+    }
+    input { width: 150px; }
+    button { background: #38bdf8; color: white; cursor: pointer; }
+    button:hover { background: #0284c7; }
+  </style>
+</head>
+<body>
+  <h1>⚙️ User Settings (Admin Only)</h1>
+
+  <table id="userTable">
+    <thead>
+      <tr><th>Username</th><th>Password</th><th>Action</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div style="text-align:center;margin-top:20px;">
+    <input type="text" id="newUser" placeholder="New username">
+    <input type="password" id="newPass" placeholder="Password">
+    <button onclick="addUser()">Add User</button>
+  </div>
+
+  <script>
+    async function loadUsers() {
+      const res = await fetch('/api/users');
+      const users = await res.json();
+      const tbody = document.querySelector("#userTable tbody");
+      tbody.innerHTML = "";
+      Object.entries(users).forEach(([u, p]) => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${u}</td>
+            <td>${p}</td>
+            <td>${u === "admin" ? "—" :
+              `<button onclick="deleteUser('${u}')">Delete</button>`}</td>
+          </tr>`;
+      });
+    }
+
+    async function addUser() {
+      const username = document.getElementById("newUser").value.trim();
+      const password = document.getElementById("newPass").value.trim();
+      if (!username || !password) return alert("Fill username and password");
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+      });
+      const json = await res.json();
+      if (json.success) loadUsers();
+      else alert(json.error || "Failed to add user");
+    }
+
+    async function deleteUser(username) {
+      if (!confirm(`Delete user ${username}?`)) return;
+      const res = await fetch('/api/users', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username})
+      });
+      const json = await res.json();
+      if (json.success) loadUsers();
+      else alert(json.error || "Failed to delete user");
+    }
+
+    loadUsers();
+  </script>
+</body>
+</html>

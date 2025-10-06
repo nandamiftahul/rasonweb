@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Time Accuracy - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+    }
+
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header p { font-size: 15px; color: #dbeafe; }
+
+    .selector {
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    select {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      background: rgba(255,255,255,0.9);
+      color: #003366;
+    }
+
+    .chart-box {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 25px 30px;
+      width: 95%;
+      max-width: 1300px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    canvas { width: 100% !important; height: 500px !important; }
+    .loading { font-size: 15px; color: #dbeafe; margin-top: 20px; }
+    .summary { margin-top: 20px; font-size: 14px; color: #e0e7ff; text-align: center; }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <h1>⏱️ Time Accuracy Monitoring</h1>
+    <p>Balloon time to reach 100 hPa (blue) and 30 hPa (red) — current month</p>
+  </div>
+
+  <div class="selector">
+    <label for="siteSelect">Site:</label>
+    <select id="siteSelect"></select>
+
+    <label for="timeSelect">Launch Time:</label>
+    <select id="timeSelect">
+      <option value="ALL" selected>All</option>
+      <option value="00Z">00Z</option>
+      <option value="12Z">12Z</option>
+    </select>
+  </div>
+
+  <div class="chart-box">
+    <canvas id="timeAccuracyChart"></canvas>
+    <div id="loadingMsg" class="loading">Loading data...</div>
+  </div>
+
+  <div id="summary" class="summary"></div>
+
+  <script>
+    const ctx = document.getElementById("timeAccuracyChart").getContext("2d");
+    const loadingMsg = document.getElementById("loadingMsg");
+    const summaryDiv = document.getElementById("summary");
+    const siteSelect = document.getElementById("siteSelect");
+    const timeSelect = document.getElementById("timeSelect");
+    let chart = null;
+    let allData = [];
+
+    async function loadSites() {
+      loadingMsg.textContent = "Loading sites...";
+
+      const now = new Date();
+      const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const end   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+      const toYMD = d => d.toISOString().slice(0,10);
+
+      try {
+        const res = await fetch(`/api/sites?ext=.bfr&start_date=${toYMD(start)}&end_date=${toYMD(end)}`);
+        const siteMap = await res.json();
+        let sites = Object.keys(siteMap).sort();
+        if (sites.length === 0) {
+          siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
+          return;
+        }
+
+        siteSelect.innerHTML = "";
+        sites.forEach(s => {
+          const opt = document.createElement("option");
+          opt.value = s;
+          opt.textContent = s;
+          siteSelect.appendChild(opt);
+        });
+        siteSelect.value = sites[0];
+        loadTimeAccuracy(sites[0]);
+      } catch (err) {
+        loadingMsg.textContent = "Failed to load sites.";
+      }
+    }
+
+    async function loadTimeAccuracy(site) {
+      loadingMsg.textContent = `Fetching data for ${site}...`;
+      summaryDiv.textContent = "";
+      try {
+        const res = await fetch(`/api/time_accuracy/${site}`);
+        const json = await res.json();
+        allData = json.data || [];
+        renderChart();
+      } catch (err) {
+        loadingMsg.textContent = "Failed to load data.";
+      }
+    }
+
+    function renderChart() {
+      const filterTime = timeSelect.value;
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = now.getUTCMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      let labels = [];
+      let AB = [];
+      let CD = [];
+
+      // --- Buat label X dan isi data ---
+      if (filterTime === "ALL") {
+        // dua bar per tanggal: (00Z) dan (12Z)
+        for (let d = 1; d <= daysInMonth; d++) {
+          const day = d.toString().padStart(2, "0");
+          labels.push(`${day} (00Z)`);
+          labels.push(`${day} (12Z)`);
+        }
+
+        const map = {};
+        allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+        AB = labels.map(lbl => {
+          const [day, tag] = lbl.split(" ");
+          const h = tag.replace(/[()]/g, "");
+          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
+          return entry ? entry.AB : null;
+        });
+        CD = labels.map(lbl => {
+          const [day, tag] = lbl.split(" ");
+          const h = tag.replace(/[()]/g, "");
+          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
+          return entry ? entry.CD : null;
+        });
+      } else {
+        // satu bar per tanggal (00Z atau 12Z)
+        for (let d = 1; d <= daysInMonth; d++) {
+          const day = d.toString().padStart(2, "0");
+          labels.push(day);
+        }
+
+        const map = {};
+        allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+        AB = labels.map(day => {
+          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
+          return entry ? entry.AB : null;
+        });
+        CD = labels.map(day => {
+          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
+          return entry ? entry.CD : null;
+        });
+      }
+
+      loadingMsg.style.display = "none";
+
+      const validAB = AB.filter(v => v !== null);
+      const validCD = CD.filter(v => v !== null);
+      const avgAB = validAB.length ? (validAB.reduce((a,b)=>a+b,0)/validAB.length).toFixed(1) : "-";
+      const avgCD = validCD.length ? (validCD.reduce((a,b)=>a+b,0)/validCD.length).toFixed(1) : "-";
+      summaryDiv.textContent = `Average A–B: ${avgAB} min | Average C–D: ${avgCD} min`;
+
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "A–B (100 hPa)", data: AB, backgroundColor: "rgba(59,130,246,0.85)", stack: "stack1" },
+            { label: "C–D (30 hPa)", data: CD, backgroundColor: "rgba(239,68,68,0.85)", stack: "stack1" }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: "index", intersect: false },
+          scales: {
+            x: {
+              title: { display: true, text: "Tanggal (UTC)", color: "#fff" },
+              ticks: {
+                color: "#fff",
+                callback: (value, index) => {
+                  if (filterTime === "ALL") {
+                    // tampilkan tanggal hanya sekali per dua bar
+                    return labels[index].includes("(00Z)") ? labels[index].slice(0, 2) : "";
+                  }
+                  return labels[index];
+                }
+              },
+              grid: { color: "rgba(255,255,255,0.1)" },
+              stacked: true
+            },
+            y: {
+              title: { display: true, text: "Waktu (menit)", color: "#fff" },
+              ticks: { color: "#fff" },
+              grid: { color: "rgba(255,255,255,0.1)" },
+              beginAtZero: true,
+              max: 180
+            }
+          },
+          plugins: {
+            legend: { labels: { color: "#fff" } },
+            title: {
+              display: true,
+              text: `Time Accuracy - ${siteSelect.value} (${filterTime})`,
+              color: "#fff",
+              font: { size: 18 }
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} menit`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    siteSelect.addEventListener("change", () => loadTimeAccuracy(siteSelect.value));
+    timeSelect.addEventListener("change", renderChart);
+    loadSites();
+  </script>
+</body>
+</html>

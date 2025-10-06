@@ -63,6 +63,30 @@ def clear_user_store():
     if user in USER_STATE:
         del USER_STATE[user]
 
+USER_FILE = "users.json"
+
+def load_users():
+    """Load user data from JSON file or fallback to default."""
+    global VALID_USERS
+    if os.path.exists(USER_FILE):
+        try:
+            with open(USER_FILE, "r") as f:
+                VALID_USERS = json.load(f)
+        except Exception as e:
+            print("⚠️ Failed to read users.json:", e)
+    else:
+        # Default admin user
+        VALID_USERS = {"admin": "admin123"}
+        save_users()
+
+def save_users():
+    """Save user data to JSON file."""
+    try:
+        with open(USER_FILE, "w") as f:
+            json.dump(VALID_USERS, f, indent=2)
+    except Exception as e:
+        print("⚠️ Failed to save users.json:", e)
+
 # --- Authentication ---
 VALID_USERS = {
     "admin": "meteomodem",
@@ -525,6 +549,36 @@ def api_sites_with_meta():
     )
     return jsonify(sites)
 
+@app.route("/api/latest_status")
+@login_required
+def api_latest_status():
+    """
+    Ambil status terakhir dari setiap site radiosonde.
+    Mengembalikan 6 site terbaru dengan kolom:
+    Site, Launch Time, End Time, Status, Termination,
+    End Pressure, Max Height, End Distance, Ascent Rate.
+    """
+    sites = fetch_all_sites(with_meta=True, limit=1)
+    summary = []
+    for site, files in sites.items():
+        if not files:
+            continue
+        f = files[0]
+        summary.append({
+            "site": site,
+            "launch_time": f.get("launch_time", "-"),
+            "end_time": f.get("end_time", "-"),
+            "status": "✅ OK" if f.get("flight_issues") == ["OK"] else "⚠️ Check",
+            "termination": f.get("reason_for_termination", "-"),
+            "end_pressure": f.get("end_pressure", "-"),
+            "max_height": f.get("max_height", "-"),
+            "end_distance": f.get("end_distance", "-"),
+            "ascent_rate": f.get("avg_ascent_rate", "-")
+        })
+    # Urutkan biar tampil konsisten (misal abjad)
+    summary = sorted(summary, key=lambda x: x["site"])[:6]
+    return jsonify(summary)
+
 def download_and_process(site, filename):
     """Fetch BUFR from FTP and save into THIS user's store."""
     cfg = CONFIG["ftp"]
@@ -786,6 +840,40 @@ def generate_wmo_temp(df_meta, df_levels):
     lines.append("NNNN")
     return "\n".join(lines)
 
+def generate_weather_analysis(df):
+    text = []
+    # --- Cloud layers ---
+    clouds = df[df['rh_percent'] > 90]
+    if not clouds.empty:
+        base = clouds['height_m'].min()/1000
+        top = clouds['height_m'].max()/1000
+        text.append(f"Cloud layer detected between {base:.1f}–{top:.1f} km (RH > 90%).")
+
+    # --- Freezing level ---
+    df['temp_shift'] = df['temperature_C'].shift()
+    zero_cross = df[(df['temperature_C'] * df['temp_shift']) < 0]
+    if not zero_cross.empty:
+        zf = zero_cross['height_m'].iloc[0]/1000
+        text.append(f"Freezing level around {zf:.1f} km.")
+
+    # --- Instability zones ---
+    df['lapse_rate'] = -df['temperature_C'].diff() / (df['height_m'].diff()/1000)
+    unstable = df[df['lapse_rate'] > 7]
+    if not unstable.empty:
+        minz, maxz = unstable['height_m'].min()/1000, unstable['height_m'].max()/1000
+        text.append(f"Unstable layer (lapse rate > 7°C/km) from {minz:.1f}–{maxz:.1f} km.")
+
+    # --- Wind shear ---
+    df['wind_speed_diff'] = df['wind_speed_mps'].diff()
+    df['shear_rate'] = df['wind_speed_diff'] / (df['height_m'].diff()/1000)
+    strong_shear = df[df['shear_rate'] > 10]
+    if not strong_shear.empty:
+        minz, maxz = strong_shear['height_m'].min()/1000, strong_shear['height_m'].max()/1000
+        text.append(f"Strong wind shear zone ({minz:.1f}–{maxz:.1f} km). Turbulence risk.")
+
+    return "<br>".join(text) if text else "Atmospheric profile indicates generally stable conditions."
+
+
 def download_from_ftp(site, filename):
     """Fetch file from FTP and return local path only (no processing)."""
     cfg = CONFIG["ftp"]
@@ -990,7 +1078,7 @@ def raob_analysis(site, filename):
             wdir = wind["wind_dir_deg"].values * units.degree
             u, v = mpcalc.wind_components(ws, wdir)
 
-            # Heights: use BUFR height if present, otherwise estimate
+            # Heights
             if "height_m" in wind:
                 hgt = wind["height_m"].values * units.meter
             elif "height_m" in df:
@@ -1139,45 +1227,68 @@ def raob_analysis(site, filename):
 
         # --- Metadata formatting ---
         meta = df_meta.to_dict("records")[0]
-
-        # Reason for termination
-        if "reason_for_termination" in meta and meta["reason_for_termination"] not in (None, ""):
+        if "reason_for_termination" in meta:
             try:
                 code = int(meta["reason_for_termination"])
                 meta["reason_for_termination"] = f"{code} – {REASON_MAP.get(code, 'Unknown')}"
             except Exception:
                 pass
 
-        # Sensor & balloon codes
-        alias_groups = {
-            "pressure": ["pressure_sensor_type", "type_of_pressure_sensor"],
-            "temperature": ["temperature_sensor_type", "type_of_temperature_sensor"],
-            "humidity": ["humidity_sensor_type", "type_of_humidity_sensor"],
-            "balloon": ["balloon_type", "type_of_balloon"],
-            "balloon_gas": ["balloon_gas_type", "type_of_gas_used_in_balloon"],
-            "balloon_manufacturer": ["balloon_manufacturer"],
-        }
-        for group, keys in alias_groups.items():
-            mapping = SENSOR_MAPS[group]
-            for k in keys:
-                if k in meta and meta[k] not in (None, ""):
-                    try:
-                        code = int(meta[k])
-                        meta[k] = f"{code} – {mapping.get(code, 'Unknown')}"
-                    except Exception:
-                        pass
+        # --- 🔍 Auto Weather Analysis ---
+        analysis_text = generate_weather_analysis(df)
 
-        # --- Render ---
+        # --- Render Template ---
         return render_template(
             "raob.html",
             meta=meta,
             indices=indices,
             skewt_img=skewt_img,
-            hodo_img=hodo_img
+            hodo_img=hodo_img,
+            analysis_text=analysis_text
         )
 
     except Exception as e:
         return f"RAOB error: {e}", 500
+
+# ==============================
+# 🔍 AUTO WEATHER ANALYSIS LOGIC
+# ==============================
+def generate_weather_analysis(df):
+    text = []
+
+    if "rh_percent" in df:
+        clouds = df[df["rh_percent"] > 90]
+        if not clouds.empty:
+            base = clouds["height_m"].min() / 1000
+            top = clouds["height_m"].max() / 1000
+            text.append(f"☁️ Cloud layer detected between {base:.1f}–{top:.1f} km (RH > 90%).")
+
+    if "temp_C" in df:
+        cross = df[df["temp_C"].diff().abs() > 0]
+        if not cross.empty:
+            freezing = df.loc[(df["temp_C"].shift() >= 0) & (df["temp_C"] <= 0)]
+            if not freezing.empty:
+                zf = freezing["height_m"].iloc[0] / 1000
+                text.append(f"❄️ Freezing level around {zf:.1f} km.")
+
+    if {"temp_C", "height_m"} <= set(df.columns):
+        df["lapse_rate"] = -df["temp_C"].diff() / (df["height_m"].diff() / 1000)
+        unstable = df[df["lapse_rate"] > 7]
+        if not unstable.empty:
+            zmin, zmax = unstable["height_m"].min()/1000, unstable["height_m"].max()/1000
+            text.append(f"⚠️ Unstable layer (lapse rate > 7°C/km) from {zmin:.1f}–{zmax:.1f} km.")
+
+    if {"wind_speed_mps", "height_m"} <= set(df.columns):
+        df["shear_rate"] = df["wind_speed_mps"].diff() / (df["height_m"].diff()/1000)
+        strong = df[df["shear_rate"].abs() > 10]
+        if not strong.empty:
+            zmin, zmax = strong["height_m"].min()/1000, strong["height_m"].max()/1000
+            text.append(f"💨 Strong wind shear zone ({zmin:.1f}–{zmax:.1f} km). Turbulence possible.")
+
+    if not text:
+        text.append("✅ Atmosphere mostly stable, no significant weather hazards detected.")
+
+    return "<br>".join(text)
 
 @app.route("/main")
 @login_required
@@ -1194,5 +1305,232 @@ def map():
 def under_development():
     return render_template("under_development.html")
 
+@app.route("/time_accuracy")
+@login_required
+def time_accuracy():
+    """
+    Halaman grafik time accuracy (Launch→100hPa dan Launch→30hPa)
+    """
+    return render_template("time_accuracy.html")
+    
+@app.route("/api/time_accuracy/<site>")
+@login_required
+def api_time_accuracy(site):
+    """
+    Ambil data time accuracy dari file .bfr bulan berjalan untuk site tertentu.
+    - Patokan waktu: dari nama file (bukan metadata)
+    - Jika hanya 100 hPa tercapai, tetap disertakan
+    - Jam disimpan sebagai '00Z' atau '12Z'
+    """
+    from datetime import datetime, timedelta
+    import pandas as pd
+    import re
+
+    now = datetime.utcnow()
+    start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end_date = (start_date + timedelta(days=32)).replace(day=1)
+
+    def extract_datetime_from_filename(fname: str):
+        """
+        Contoh nama: T2097502A202510050000.BFR -> datetime(2025,10,5,0,0)
+        """
+        match = re.search(r"(\d{10,14})", fname)
+        if not match:
+            return None
+        dt_str = match.group(1)
+        try:
+            if len(dt_str) == 10:
+                return datetime.strptime(dt_str, "%Y%m%d%H")
+            elif len(dt_str) == 12:
+                return datetime.strptime(dt_str, "%Y%m%d%H%M")
+            elif len(dt_str) == 14:
+                return datetime.strptime(dt_str, "%Y%m%d%H%M%S")
+        except Exception:
+            return None
+        return None
+
+    data = []
+    try:
+        all_sites = fetch_all_sites(
+            ext_filter=[".bfr"],
+            with_meta=False,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        site_keys = {s.lower(): s for s in all_sites.keys()}
+        site_key = site.lower()
+
+        if site_key not in site_keys:
+            print(f"⚠️ Site {site} not found in FTP")
+            return jsonify({"site": site, "data": []})
+
+        true_site = site_keys[site_key]
+        for f in all_sites[true_site]:
+            fname = f["name"]
+            try:
+                # --- Ambil waktu dari nama file (bukan metadata) ---
+                file_dt = extract_datetime_from_filename(fname)
+                if not file_dt:
+                    print(f"⚠️ Skip (no datetime): {fname}")
+                    continue
+
+                date_str = file_dt.strftime("%Y-%m-%d")
+                hour_label = f"{file_dt.hour:02d}Z"
+                if hour_label not in ["00Z", "12Z"]:
+                    # Pastikan hanya dua siklus utama
+                    hour_label = "00Z" if file_dt.hour < 6 else "12Z"
+
+                # --- Baca isi BUFR ---
+                local_path = download_from_ftp(true_site, fname)
+                decoded = decode_bufr(local_path)
+                df_meta, df_levels = parse_bufr(decoded)
+                if df_levels.empty:
+                    continue
+
+                # --- Cari waktu ke 100 dan 30 hPa ---
+                t100 = df_levels.loc[df_levels["pressure_hPa"] <= 100, "time_s"].min()
+                t30  = df_levels.loc[df_levels["pressure_hPa"] <= 30,  "time_s"].min()
+
+                # --- Simpan meskipun cuma 100 hPa ---
+                if pd.notna(t100):
+                    data.append({
+                        "filename": fname,
+                        "date": date_str,
+                        "hour": hour_label,
+                        "AB": round(t100 / 60.0, 1),
+                        "CD": round(t30 / 60.0, 1) if pd.notna(t30) else None
+                    })
+
+            except Exception as e:
+                print(f"⚠️ Error parsing {fname}:", e)
+
+    except Exception as e:
+        print("❌ Time accuracy fetch failed:", e)
+
+    # --- Urutkan: tanggal + jam (00Z dulu, baru 12Z) ---
+    def sort_key(x):
+        return (x["date"], 0 if x["hour"] == "00Z" else 1)
+
+    data = sorted(data, key=sort_key)
+    return jsonify({"site": site, "data": data})
+
+@app.route("/height_reach")
+@login_required
+def height_reach():
+    return render_template("height_reach.html")
+
+
+@app.route("/api/height_reach/<site>")
+@login_required
+def api_height_reach(site):
+    """Ambil data ketinggian maksimum balon (.bfr) per hari untuk satu bulan berjalan."""
+    from datetime import datetime, timedelta
+    import pandas as pd, re
+
+    now = datetime.utcnow()
+    start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end_date = (start_date + timedelta(days=32)).replace(day=1)
+
+    def extract_datetime_from_filename(fname):
+        """Ambil waktu dari nama file (contoh: T2097502A202510050000.BFR)."""
+        m = re.search(r"(\d{10,14})", fname)
+        if not m: return None
+        s = m.group(1)
+        for fmt in ["%Y%m%d%H%M%S", "%Y%m%d%H%M", "%Y%m%d%H"]:
+            try: return datetime.strptime(s, fmt)
+            except: pass
+        return None
+
+    data = []
+    try:
+        all_sites = fetch_all_sites(ext_filter=[".bfr"], with_meta=False,
+                                    start_date=start_date, end_date=end_date)
+        site_keys = {s.lower(): s for s in all_sites.keys()}
+        if site.lower() not in site_keys:
+            return jsonify({"site": site, "data": []})
+        true_site = site_keys[site.lower()]
+
+        for f in all_sites[true_site]:
+            fname = f["name"]
+            dt = extract_datetime_from_filename(fname)
+            if not dt:
+                continue
+            hour_label = "00Z" if dt.hour < 6 else "12Z"
+
+            try:
+                local_path = download_from_ftp(true_site, fname)
+                decoded = decode_bufr(local_path)
+                _, df_levels = parse_bufr(decoded)
+                if df_levels.empty or "height_m" not in df_levels.columns:
+                    continue
+
+                max_height = df_levels["height_m"].max()
+                if pd.notna(max_height) and max_height > 0:
+                    data.append({
+                        "filename": fname,
+                        "date": dt.strftime("%Y-%m-%d"),
+                        "hour": hour_label,
+                        "max_height": round(float(max_height), 0)
+                    })
+            except Exception as e:
+                print("⚠️ Skip file:", fname, e)
+
+    except Exception as e:
+        print("❌ Height reach fetch failed:", e)
+
+    data = sorted(data, key=lambda x: (x["date"], 0 if x["hour"] == "00Z" else 1))
+    return jsonify({"site": site, "data": data})
+
+@app.route("/settings")
+@login_required
+def settings_page():
+    # Hanya admin
+    if session.get("user") != "admin":
+        return "Access denied. Admin only.", 403
+    return render_template("settings.html", users=VALID_USERS)
+
+
+@app.route("/api/users", methods=["GET", "POST", "DELETE"])
+@login_required
+def manage_users():
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    # --- GET: return all users
+    if request.method == "GET":
+        return jsonify(VALID_USERS)
+
+    # --- POST: add new user
+    if request.method == "POST":
+        data = request.get_json()
+        username = data.get("username")
+        password = data.get("password")
+        if not username or not password:
+            return jsonify({"error": "Missing fields"}), 400
+        if username in VALID_USERS:
+            return jsonify({"error": "User already exists"}), 400
+
+        VALID_USERS[username] = password
+        save_users()
+        print(f"✅ Added new user: {username}")
+        return jsonify({"success": True, "users": VALID_USERS})
+
+    # --- DELETE: remove user
+    if request.method == "DELETE":
+        data = request.get_json()
+        username = data.get("username")
+        if username not in VALID_USERS:
+            return jsonify({"error": "User not found"}), 404
+        if username == "admin":
+            return jsonify({"error": "Cannot delete admin"}), 400
+
+        del VALID_USERS[username]
+        save_users()
+        print(f"🗑️ Deleted user: {username}")
+        return jsonify({"success": True, "users": VALID_USERS})
+
+
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0",port=8080,debug=True)
