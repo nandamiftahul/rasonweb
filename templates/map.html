@@ -164,9 +164,36 @@
     // --- Map ---
     const map = L.map('map', { zoomControl: false }).setView([0,0], 3);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom:19, attribution:'© OpenStreetMap'
-    }).addTo(map);
+    
+    // --- Base maps ---
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    });
+    
+    const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS'
+    });
+    
+    const esriTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 13, attribution: 'Tiles © Esri — Source: Esri, USGS, NOAA'
+    });
+    
+    const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      maxZoom: 20, attribution: '© Google Maps Hybrid'
+    });
+    
+    // --- Default layer ---
+    osm.addTo(map);
+    
+    // --- Layer control menu ---
+    const baseMaps = {
+      "🗺️ OpenStreetMap": osm,
+      "🛰️ Satellite (Esri)": esriSat,
+      "🌍 Terrain (Esri)": esriTerrain,
+      "🧭 Hybrid (Google)": googleHybrid
+    };
+    L.control.layers(baseMaps, {}, { position: 'bottomleft', collapsed: true }).addTo(map);
+    
 
     // --- State ---
     let frame = 0, total = 0, playing = false, timer = null;
