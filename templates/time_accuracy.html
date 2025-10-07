@@ -145,32 +145,33 @@
 
     canvas { width: 100% !important; height: 500px !important; }
     .loading { font-size: 15px; color: #dbeafe; margin-top: 20px; }
-    .summary { margin-top: 20px; font-size: 14px; color: #e0e7ff; text-align: center; }
+    .summary { margin-top: 20px; margin-bottom: 40px;  font-size: 14px; color: #e0e7ff; text-align: center; }
 
     /* Footer */
     .footer {
       background: #ffffff;
-      padding: 25px 0;
-      margin-top: 40px;
-      width: 100%;
+      padding: 4px 0;                     /* 🔽 sangat tipis */
       display: flex;
       justify-content: center;
       align-items: center;
-      border-top: 1px solid #e5e7eb;
-      border-radius: 0 0 10px 10px;
+      border-top: 1px solid #d1d5db;      /* garis abu muda */
+      border-radius: 0 0 8px 8px;
+      height: 38px;                       /* 🔽 batasi tinggi maksimum */
     }
-
+    
     .footer span {
-      color: #222;
-      font-weight: 600;
-      margin-right: 10px;
-      font-size: 15px;
+      color: #333;
+      font-weight: 500;
+      margin-right: 6px;
+      font-size: 12px;                    /* 🔽 kecil dan elegan */
+      opacity: 0.8;
     }
-
+    
     .footer img {
-      height: 60px;
-      opacity: 0.95;
-      margin: 0 10px;
+      height: 28px;                       /* 🔽 kecilkan logo */
+      opacity: 0.85;
+      margin: 0 6px;
+      filter: saturate(90%);
     }
   </style>
 </head>

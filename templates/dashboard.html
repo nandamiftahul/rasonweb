@@ -164,16 +164,30 @@
     /* Footer */
     .footer {
       background: #ffffff;
-      padding: 25px 0;
+      padding: 4px 0;                     /* 🔽 sangat tipis */
       display: flex;
       justify-content: center;
       align-items: center;
-      border-top: 1px solid #e5e7eb;
-      border-radius: 0 0 10px 10px;
-      margin-top: 40px;
+      border-top: 1px solid #d1d5db;      /* garis abu muda */
+      border-radius: 0 0 8px 8px;
+      height: 38px;                       /* 🔽 batasi tinggi maksimum */
+      margin-top: 80px;
     }
-    .footer span { color: #222; font-weight: 600; margin-right: 10px; font-size: 15px; }
-    .footer img { height: 60px; opacity: 0.95; margin: 0 10px; }
+    
+    .footer span {
+      color: #333;
+      font-weight: 500;
+      margin-right: 6px;
+      font-size: 12px;                    /* 🔽 kecil dan elegan */
+      opacity: 0.8;
+    }
+    
+    .footer img {
+      height: 28px;                       /* 🔽 kecilkan logo */
+      opacity: 0.85;
+      margin: 0 6px;
+      filter: saturate(90%);
+    }
 
     /* ✅ Loading Overlay */
     #progressOverlay {
@@ -212,7 +226,7 @@
       max-width: 220px; /* sesuaikan kalau ingin kolom lebih lebar */
       vertical-align: top;
     }
-    
+
   </style>
 </head>
 
