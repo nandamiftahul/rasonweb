@@ -58,6 +58,21 @@ wget -q -O static/libs/bootstrap/bootstrap.bundle.min.js https://cdn.jsdelivr.ne
 echo "[6/6] Downloading Bootstrap Icons..."
 wget -q -O static/libs/bootstrap-icons/bootstrap-icons.css https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css
 
+# -----------------------------------------------------------------------------
+# Leaflet JS dan CSS (v1.9.4)
+# -----------------------------------------------------------------------------
+echo "📦 Mengunduh Leaflet 1.9.4 ..."
+mkdir -p static/libs/leaflet
+curl -L -o static/libs/leaflet/leaflet.js  https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
+curl -L -o static/libs/leaflet/leaflet.css https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+
+# -----------------------------------------------------------------------------
+# Chart.js (v4.4.0)
+# -----------------------------------------------------------------------------
+echo "📦 Mengunduh Chart.js 4.4.0 ..."
+mkdir -p static/libs/chartjs
+curl -L -o static/libs/chartjs/chart.min.js https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js
+
 # Extract URLs to fonts and download locally
 grep -o 'https://[^)]*\.woff2' static/libs/bootstrap-icons/bootstrap-icons.css | while read -r url; do
     fname=$(basename "$url")
