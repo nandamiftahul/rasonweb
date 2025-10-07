@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Radiosonde 3D Trajectory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js"></script>
+
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: "Inter", sans-serif;
+  background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+  color: #fff;
+}
+#map { position: absolute; inset: 0; }
+
+/* Shared panel style */
+.panel, #levelPanel {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-family: "Inter", sans-serif;
+}
+.panel h3, #levelPanel h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #fff;
+  font-size: 17px;
+  text-align: center;
+}
+label, select, input, button {
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+}
+select,
+input[type="file"],
+input[type="range"],
+input[type="date"],
+input[type="text"] {
+  width: 100%;
+  margin: 3px 0 10px;
+  border-radius: 6px;
+  border: none;
+  padding: 7px 8px;
+  height: 34px;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+button {
+  background: linear-gradient(90deg, #0078d7, #0d6efd);
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+button:hover { background: linear-gradient(90deg, #0d6efd, #1a89ff); }
+.row { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
+.label { font-size: 13px; color: #fff; }
+.val { font-weight: 600; font-size: 13px; }
+#upload-status { font-size: 12px; min-height: 16px; color: #ddd; }
+hr { border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 12px 0; }
+
+/* Layout */
+.panel { position: absolute; top: 20px; left: 20px; width: 320px; }
+#levelPanel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 260px;
+  display: none;
+}
+#levelContent { font-size: 13px; }
+#levelContent .row {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 2px;
+}
+#levelContent .label { color: #eee; }
+#levelContent .val { font-weight: 600; color: #0dcaf0; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<!-- LEFT PANEL -->
+<div class="panel">
+  <h3>🎈 Radiosonde 3D Trajectory</h3>
+
+  <label>Filter Radiosonde</label>
+  <label>Site</label>
+  <select id="siteSelect">
+    <option value="">-- Pilih Site --</option>
+    <option value="aceh">Aceh</option>
+    <option value="tarakan">Tarakan</option>
+    <option value="sorong">Sorong</option>
+    <option value="cilacap">Cilacap</option>
+    <option value="pangkalanbun">Pangkalanbun</option>
+    <option value="ranai">Ranai</option>
+  </select>
+
+  <label>Tanggal</label>
+  <input type="date" id="dateSelect">
+  <label>Jam</label>
+  <select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
+  <label>Tipe File</label>
+  <select id="typeSelect">
+    <option value=".bfr">.bfr</option><option value=".bufr">.bufr</option>
+    <option value=".bfh">.bfh</option><option value=".bin">.bin</option>
+  </select>
+
+  <button id="applyFilter">🔍 Apply Filter</button>
+  <hr>
+
+  <label>Pilih File Radiosonde</label>
+  <input id="file-input" type="file" accept=".bufr,.bfr,.bfh,.bin" />
+  <button id="upload-btn">⬆️ Upload & Decode</button>
+  <div id="upload-status"></div>
+  <hr>
+
+  <label>Basemap</label>
+  <select id="basemapSelect">
+    <option value="osm">OpenStreetMap</option>
+    <option value="esri" selected>Esri Satellite</option>
+    <option value="google">Google Hybrid</option>
+  </select>
+  <hr>
+
+  <div id="info-panel" style="display:none;">
+    <div class="row"><div class="label">Station</div><div class="val" id="st-name">-</div></div>
+    <div class="row"><div class="label">Launch</div><div class="val" id="st-launch">-</div></div>
+    <div class="row"><div class="label">Max Height</div><div class="val" id="st-maxz">-</div></div>
+    <div class="row"><div class="label">Elapsed</div><div class="val" id="st-elap">0 s</div></div>
+
+    <div class="row" style="justify-content:center;gap:10px;">
+      <button id="btn-play">▶️ Play</button>
+      <button id="btn-pause" disabled>⏸ Pause</button>
+    </div>
+
+    <div class="row">
+      <div class="label">Speed</div>
+      <input id="speed" type="range" min="0.1" max="1000" step="0.1" value="1" />
+      <div class="val" id="sp-val">1×</div>
+    </div>
+
+    <div class="row">
+      <div class="label">Progress</div>
+      <input id="prog" type="range" min="0" max="100" step="0.1" value="0" />
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div id="levelPanel">
+  <h3>📊 Level Info</h3>
+  <div id="levelContent">No data</div>
+</div>
+
+<script>
+let allLevels=[];
+document.getElementById("upload-btn").addEventListener("click",()=>{
+  const f=document.getElementById("file-input").files[0];
+  if(!f){alert("Pilih file radiosonde terlebih dahulu.");return;}
+  uploadFile(f);
+});
+
+async function uploadFile(f){
+  const fd=new FormData();fd.append("file",f);
+  const st=document.getElementById("upload-status");st.textContent="Uploading...";
+  try{
+    const r=await fetch("/upload_bufr",{method:"POST",body:fd});
+    const js=await r.json();
+    if(js.success){st.textContent="✅ Uploaded successfully!";await loadTrajectory();}
+    else st.textContent="❌ Decode error: "+(js.error||"unknown");
+  }catch(e){st.textContent="❌ Upload error: "+e.message;}
+}
+
+document.getElementById("applyFilter").addEventListener("click",async()=>{
+  const site=document.getElementById("siteSelect").value;
+  const date=document.getElementById("dateSelect").value;
+  const hour=document.getElementById("hourSelect").value;
+  const ftype=document.getElementById("typeSelect").value;
+  const st=document.getElementById("upload-status");
+  if(!site||!date||!hour||!ftype){alert("⚠️ Mohon isi semua filter.");return;}
+  st.textContent="🔎 Mencari file di server...";
+  try{
+    const body=new URLSearchParams({site,date,hour,ftype});
+    const res=await fetch("/api/filter",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+    const data=await res.json();
+    if(!data.files||!data.files.length){st.textContent="⚠️ Tidak ditemukan file cocok.";return;}
+    const chosen=data.files.sort().slice(-1)[0];
+    st.textContent="📦 Mengambil dan decode "+chosen+"...";
+    const fd=new FormData();fd.append("remote_site",site);fd.append("remote_file",chosen);
+    const res2=await fetch("/upload_bufr",{method:"POST",body:fd});
+    const js=await res2.json();
+    if(js.success){st.textContent="✅ File berhasil diambil dan didecode: "+chosen;await loadTrajectory();}
+    else{st.textContent="❌ Decode error: "+(js.error||"unknown");}
+  }catch(e){st.textContent="❌ Gagal ambil data: "+e.message;}
+});
+
+async function loadTrajectory(){
+  const st=document.getElementById("upload-status");
+  try{
+    const [trajRes, levelRes] = await Promise.all([fetch("/api/trajectory3d"), fetch("/all_levels")]);
+    const d=await trajRes.json();
+    allLevels=await levelRes.json();
+    if(!d||d.error){st.textContent="⚠️ Tidak ada data trajectory.";return;}
+    st.textContent="✅ Data trajectory berhasil dimuat.";
+    document.getElementById("info-panel").style.display="block";
+    document.getElementById("levelPanel").style.display="block";
+    document.getElementById("st-name").textContent=d.station.name||"Unknown";
+    document.getElementById("st-launch").textContent=d.meta.launch_time||"-";
+    document.getElementById("st-maxz").textContent=d.meta.max_height_m?Math.round(d.meta.max_height_m)+" m":"-";
+    start3DMap(d);
+  }catch(e){st.textContent="❌ Gagal load trajectory: "+e.message;}
+}
+
+function start3DMap(d){
+  const {TripsLayer,IconLayer,LineLayer,MapboxOverlay}=deck;
+  const t0=Math.min(...d.trip.timestamps),ts=d.trip.timestamps.map(t=>t-t0);
+  const path=d.trip.path,dur=Math.max(...ts),stn=d.station;
+  const map=new maplibregl.Map({
+    container:"map",
+    style:{version:8,sources:{
+      osm:{type:"raster",tiles:["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256},
+      esri:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256},
+      google:{type:"raster",tiles:["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"],tileSize:256}},
+      layers:[
+        {id:"esri",type:"raster",source:"esri",layout:{visibility:"visible"}}, // ✅ default visible
+        {id:"osm",type:"raster",source:"osm",layout:{visibility:"none"}},
+        {id:"google",type:"raster",source:"google",layout:{visibility:"none"}}
+      ]},
+    center:[stn.lon,stn.lat],zoom:8,pitch:60,bearing:20,antialias:true});
+
+  const baseSel=document.getElementById("basemapSelect");
+  baseSel.onchange=()=>{["osm","esri","google"].forEach(id=>{
+    const vis=id===baseSel.value?"visible":"none";
+    if(map.getLayer(id))map.setLayoutProperty(id,"visibility",vis);
+    else map.addLayer({id,type:"raster",source:id});
+  });};
+
+  const minZ=Math.min(...path.map(p=>p[2])),maxZ=Math.max(...path.map(p=>p[2]));
+  const color=h=>[Math.min(255,255*(h-minZ)/(maxZ-minZ)),50,255*(1-(h-minZ)/(maxZ-minZ))];
+  const allLines=[];let mark=0;
+  for(let i=1;i<path.length;i++){const z=path[i][2];if(z-mark>=200){mark=z;allLines.push({source:[path[i][0],path[i][1],0],target:[path[i][0],path[i][1],z]});}}
+
+  let cur=0,play=false,spd=1,pos={lon:path[0][0],lat:path[0][1],alt:path[0][2]};
+  const getPos=t=>{
+    if(t<=0)return{lon:path[0][0],lat:path[0][1],alt:path[0][2]};
+    if(t>=dur)return{lon:path.at(-1)[0],lat:path.at(-1)[1],alt:path.at(-1)[2]};
+    for(let i=1;i<ts.length;i++)if(ts[i]>=t){
+      const r=(t-ts[i-1])/(ts[i]-ts[i-1]);
+      return{lon:path[i-1][0]+r*(path[i][0]-path[i-1][0]),
+             lat:path[i-1][1]+r*(path[i][1]-path[i-1][1]),
+             alt:path[i-1][2]+r*(path[i][2]-path[i-1][2])};
+    }
+  };
+
+  function updateLevelInfo(t){
+    if(!allLevels.length)return;
+    const idx=Math.min(Math.floor((t/dur)*allLevels.length),allLevels.length-1);
+    const lv=allLevels[idx];
+    let html="";
+    for(const [k,v] of Object.entries(lv)){
+      if(v==null)continue;
+      html+=`<div class="row"><div class="label">${k}</div><div class="val">${typeof v==="number"?v.toFixed(2):v}</div></div>`;
+    }
+    document.getElementById("levelContent").innerHTML=html||"No data";
+  }
+
+  function makeLayers(){
+    const visLines=allLines.filter(l=>l.target[2]<=pos.alt);
+    return [
+      new TripsLayer({id:"trip",data:[{path,timestamps:ts}],
+        getPath:d=>d.path,getTimestamps:d=>d.timestamps,
+        getColor:d=>d.path.map(p=>color(p[2])),
+        widthMinPixels:5,trailLength:dur,currentTime:cur}),
+      new LineLayer({id:"lines",data:visLines,getSourcePosition:d=>d.source,
+        getTargetPosition:d=>d.target,getColor:[0,122,255],getWidth:1.5}),
+      new LineLayer({id:"dyn",data:[{source:[pos.lon,pos.lat,0],target:[pos.lon,pos.lat,pos.alt]}],
+        getSourcePosition:d=>d.source,getTargetPosition:d=>d.target,getColor:[0,122,255],getWidth:2}),
+      new IconLayer({
+        id:"icon",
+        data:[pos],
+        getIcon:()=>({
+          url:"/static/images/balloon.png",
+          width:64,height:64,anchorY:64
+        }),
+        getPosition:d=>[d.lon,d.lat,d.alt],
+        sizeScale:15,billboard:true,getSize:4
+      })
+    ];
+  }
+
+  map.on("load",()=>{
+    const overlay=new MapboxOverlay({layers:makeLayers(),interleaved:true});
+    map.addControl(overlay);
+    const deckgl=overlay._deck;
+    const el=document.getElementById("st-elap"),
+          pl=document.getElementById("btn-play"),
+          pa=document.getElementById("btn-pause"),
+          spdR=document.getElementById("speed"),
+          spv=document.getElementById("sp-val"),
+          prog=document.getElementById("prog");
+    spdR.oninput=e=>{spd=parseFloat(e.target.value);spv.textContent=(spd>=10?Math.round(spd):spd.toFixed(1))+"×";};
+    pl.onclick=()=>{play=true;pl.disabled=true;pa.disabled=false;};
+    pa.onclick=()=>{play=false;pl.disabled=false;pa.disabled=true;};
+    prog.oninput=e=>{cur=parseFloat(e.target.value)/100*dur;pos=getPos(cur);
+      el.textContent=Math.round(cur)+" s";updateLevelInfo(cur);deckgl.setProps({layers:makeLayers()});};
+    let last=performance.now();
+    (function tick(now){
+      const dt=(now-last)/1000;last=now;
+      if(play){
+        cur+=dt*spd;
+        if(cur>=dur){              // ✅ stop di akhir, no loop
+          cur=dur; play=false;
+          pl.disabled=false; pa.disabled=true;
+        }
+        pos=getPos(cur);
+        el.textContent=Math.round(cur)+" s";
+        prog.value=(cur/dur)*100;
+        updateLevelInfo(cur);
+        deckgl.setProps({layers:makeLayers()});
+      }
+      requestAnimationFrame(tick);
+    })(last);
+    updateLevelInfo(0);
+  });
+}
+</script>
+</body>
+</html>

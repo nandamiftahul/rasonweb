@@ -235,13 +235,32 @@
 
   <div class="sidebar" id="sidebar">
     <h2>Radiosonde Monitoring</h2>
-    <a href="{{ url_for('dashboard') }}" style="background: rgba(255,255,255,0.15);">📊 Data Resume</a>
+  
+    <!-- 🏠 Main Page -->
+    <a href="{{ url_for('main_page') }}">🏠 Main Page</a>
+  
+    <!-- 📊 Data Resume -->
+    <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
+  
+    <!-- 🗺️ Map (new tab) -->
     <a href="{{ url_for('index') }}" target="_blank">🗺️ Map</a>
-    <a href="{{ url_for('time_accuracy') }}" target="_blank">⏱️ Time Accuracy</a>
-    <a href="{{ url_for('height_reach') }}" target="_blank">📈 Height Reach Graph</a>
-    <a href="{{ url_for('settings_page') }}" target="_blank">⚙️ Settings</a>
+  
+    <!-- 🌐 3D Trajectory (new tab) -->
+    <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
+  
+    <!-- ⏱️ Time Accuracy -->
+    <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
+  
+    <!-- 📈 Height Reach -->
+    <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
+  
+    <!-- ⚙️ Settings -->
+    <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
+  
+    <!-- 🚪 Logout -->
     <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
   </div>
+
 
   <div class="main" id="mainContent">
     <div class="header-box">

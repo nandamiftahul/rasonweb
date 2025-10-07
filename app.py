@@ -529,7 +529,6 @@ def api_sites():
     )
     return jsonify(sites)
 
-
 @app.route("/api/sites_with_meta")
 @login_required
 def api_sites_with_meta():
@@ -1542,7 +1541,6 @@ def api_time_accuracy(site):
 def height_reach():
     return render_template("height_reach.html")
 
-
 @app.route("/api/height_reach/<site>")
 @login_required
 def api_height_reach(site):
@@ -1612,7 +1610,6 @@ def settings_page():
         return "Access denied. Admin only.", 403
     return render_template("settings.html", users=VALID_USERS)
 
-
 @app.route("/api/users", methods=["GET", "POST", "DELETE"])
 @login_required
 def manage_users():
@@ -1657,6 +1654,167 @@ def manage_users():
 def raob_doc():
     return render_template("raob_doc.html")
 
-    
+@app.route("/api/trajectory3d")
+@login_required
+def api_trajectory3d():
+    """
+    Keluarkan path radiosonde untuk visualisasi 3D:
+    - path: [[lon, lat, alt_m], ...] urut waktu
+    - timestamps: [detik sejak launch], untuk animasi
+    - station: lon/lat stasiun
+    - meta: info waktu, site, dsb (jika ada)
+    """
+    store = get_user_store()
+    levels = store.get("levels", [])
+    meta = store.get("metadata", {})
+
+    if not levels:
+        return jsonify({"error": "No radiosonde loaded"}), 404
+
+    # Ambil kolom yang ada saja (aman terhadap NaN)
+    lons, lats, hgts, ts = [], [], [], []
+    for row in levels:
+        lon = row.get("longitude")
+        lat = row.get("latitude")
+        h  = row.get("height_m")
+        t  = row.get("time_s")
+        if lon is None or lat is None or h is None or t is None:
+            continue
+        lons.append(float(lon))
+        lats.append(float(lat))
+        hgts.append(float(h))
+        ts.append(float(t))
+
+    if not lons:
+        return jsonify({"error": "No lon/lat/height/time data"}), 400
+
+    # Susun data untuk TripsLayer (1 trip)
+    path = [[lo, la, hi] for lo, la, hi in zip(lons, lats, hgts)]
+    timestamps = ts  # detik sejak launch
+    station = {
+        "lon": float(meta.get("station_lon")) if meta.get("station_lon") is not None else float(lons[0]),
+        "lat": float(meta.get("station_lat")) if meta.get("station_lat") is not None else float(lats[0]),
+        "name": f"{int(meta.get('wmo_block', 0)):02d}{int(meta.get('wmo_station', 0)):03d}" if meta else ""
+    }
+
+    # Durasi total animasi (detik)
+    total_t = float(max(timestamps) - min(timestamps)) if len(timestamps) > 1 else 0.0
+
+    return jsonify({
+        "trip": {"path": path, "timestamps": timestamps},
+        "station": station,
+        "meta": {
+            "launch_time": meta.get("launch_time", "-"),
+            "max_height_m": max(hgts),
+            "duration_s": total_t
+        }
+    })
+
+@app.route("/trajectory3d")
+@login_required
+def trajectory3d_page():
+    return render_template("trajectory3d.html")
+
+@app.route("/upload_bufr", methods=["POST"])
+@login_required
+def upload_bufr():
+    """
+    Upload file radiosonde (.bufr, .bfr, .bfh, .bin) dari web
+    atau ambil dari FTP berdasarkan site + nama file.
+    Semua file akan disimpan ke uploads/ lalu didecode seperti biasa.
+    """
+    try:
+        uploads_dir = app.config.get("UPLOAD_FOLDER", "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+
+        # === MODE 1: dari FTP ===
+        remote_site = request.form.get("remote_site")
+        remote_file = request.form.get("remote_file")
+
+        if remote_site and remote_file:
+            cfg = CONFIG.get("ftp", {})
+            ftp_host = cfg.get("host")
+            ftp_user = cfg.get("user")
+            ftp_pass = cfg.get("password")
+            base_path = cfg.get("base_path", "/")
+
+            local_dir = os.path.join(uploads_dir, remote_site)
+            os.makedirs(local_dir, exist_ok=True)
+            local_path = os.path.join(local_dir, remote_file)
+
+            # --- Download dari FTP ke uploads_dir ---
+            with ftplib.FTP() as ftp:
+                ftp.connect(ftp_host, cfg.get("port", 21))
+                ftp.login(ftp_user, ftp_pass)
+                ftp.cwd(f"{base_path}/{remote_site}")
+                with open(local_path, "wb") as f:
+                    ftp.retrbinary(f"RETR {remote_file}", f.write)
+            print(f"[FTP] ✅ File downloaded to {local_path}")
+
+            # Lanjut ke proses decode biasa
+            filepath = local_path
+
+        # === MODE 2: Upload manual ===
+        else:
+            file = request.files.get("file")
+            if not file or not file.filename:
+                return jsonify({"success": False, "error": "No file uploaded"}), 400
+
+            filepath = os.path.join(uploads_dir, file.filename)
+            file.save(filepath)
+            print(f"[UPLOAD] ✅ File saved to {filepath}")
+
+        # --- Decode ---
+        decoded = decode_bufr(filepath)
+        df_meta, df_levels = parse_bufr(decoded)
+        issues = analyze_flight(df_meta, df_levels)
+
+        df_meta = df_meta.replace({np.nan: None})
+        df_levels = df_levels.replace({np.nan: None})
+
+        # --- Simpan hasil ke store user ---
+        store = get_user_store()
+        store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        store["metadata"]["flight_issues"] = issues
+        store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
+
+        # --- Bangun data trajectory agar 3D viewer langsung bisa baca ---
+        if not df_levels.empty:
+            lon_col = next((c for c in df_levels.columns if "lon" in c.lower()), None)
+            lat_col = next((c for c in df_levels.columns if "lat" in c.lower()), None)
+            hgt_col = next((c for c in df_levels.columns if "height" in c.lower() or "alt" in c.lower()), None)
+            time_col = next((c for c in df_levels.columns if "time" in c.lower()), None)
+
+            if lon_col and lat_col and hgt_col:
+                path = df_levels[[lon_col, lat_col, hgt_col]].dropna().values.tolist()
+                timestamps = (df_levels[time_col] - df_levels[time_col].iloc[0]).fillna(0).tolist() \
+                    if time_col else list(range(len(path)))
+
+                station = {
+                    "lon": float(store["metadata"].get("station_lon", df_levels[lon_col].iloc[0])),
+                    "lat": float(store["metadata"].get("station_lat", df_levels[lat_col].iloc[0])),
+                    "name": store["metadata"].get("station_name", remote_site or "Unknown")
+                }
+                meta_info = {
+                    "launch_time": store["metadata"].get("launch_time", "-"),
+                    "max_height_m": float(df_levels[hgt_col].max()),
+                }
+
+                store["trajectory"] = {
+                    "trip": {"path": path, "timestamps": timestamps},
+                    "station": station,
+                    "meta": meta_info
+                }
+                print(f"[UPLOAD_BUFR] ✅ Trajectory stored ({len(path)} points)")
+            else:
+                print("[UPLOAD_BUFR] ⚠️ df_levels tidak punya kolom lon/lat/height")
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print("[UPLOAD_BUFR] ❌ Exception:", e)
+        return jsonify({"success": False, "error": str(e)})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0",port=8082,debug=True)
