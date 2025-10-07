@@ -91,11 +91,43 @@ hr { border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 12px 0; 
 }
 #levelContent .label { color: #eee; }
 #levelContent .val { font-weight: 600; color: #0dcaf0; }
+/* === Compass North Only === */
+#northArrow {
+  position: absolute;
+  bottom: 25px;
+  right: 25px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  text-align: center;
+  font-weight: 600;
+  color: #fff;
+  font-family: "Inter", sans-serif;
+  pointer-events: none;
+}
+#northArrow::before {
+  content: "▲";
+  display: block;
+  font-size: 20px;
+  color: #ff4c4c;        /* merah agar mudah dikenali */
+  transform-origin: center;
+  transition: transform 0.1s linear;
+  margin-top: 8px;
+}
+#northArrow span {
+  display: block;
+  font-size: 13px;
+  margin-top: -2px;
+  color: #fff;
+}
 </style>
 </head>
 <body>
 <div id="map"></div>
-
+<div id="northArrow"><span>N</span></div>
 <!-- LEFT PANEL -->
 <div class="panel">
   <h3>🎈 Radiosonde 3D Trajectory</h3>
@@ -334,10 +366,17 @@ function start3DMap(d){
         prog.value=(cur/dur)*100;
         updateLevelInfo(cur);
         deckgl.setProps({layers:makeLayers()});
+        deckgl.setProps({layers:makeLayers()});
       }
       requestAnimationFrame(tick);
     })(last);
     updateLevelInfo(0);
+  });
+  // === Arah Utara indikator sederhana ===
+  const northArrow = document.getElementById("northArrow");
+  map.on("rotate", () => {
+    const bearing = map.getBearing(); // derajat rotasi
+    northArrow.style.transform = `rotate(${-bearing}deg)`; // jarum tetap menunjuk utara
   });
 }
 </script>
