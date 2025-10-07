@@ -239,38 +239,6 @@
       maxZoom: 20, attribution: '© Google Maps Hybrid'
     });
 
-    const himawariTrueColor = L.tileLayer(
-      "https://himawari8.nict.go.jp/himawari8/himawari-8-bands/TC/{z}/{x}/{y}.png",
-      {
-        maxZoom: 8,
-        attribution: "© NICT Himawari-8 True Color (demo tiles)",
-        opacity: 0.7,
-      }
-    );
-    
-    const himawariIR = L.tileLayer(
-      "https://himawari8.nict.go.jp/himawari8/himawari-8-bands/IR/{z}/{x}/{y}.png",
-      {
-        maxZoom: 8,
-        attribution: "© NICT Himawari-8 Infrared (demo tiles)",
-        opacity: 0.7,
-      }
-    );
-
-    // === Himawari (WMS, time-aware) dari NASA GIBS ===
-    // Catatan: ini layer IR Band 13. Bisa diganti ke layer GIBS lain kalau perlu.
-    const himawariWMS = L.tileLayer.wms(
-      "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
-      {
-        layers: "Himawari_AHI_Band13_Clean_Infrared",
-        format: "image/png",
-        transparent: true,
-        opacity: 0.6,
-        tileSize: 512,   // WMS GIBS umumnya 512 px tiles
-        time: null       // akan kita set dinamis nanti
-      }
-    );
-
     // === HIMA GIBS (Band 13 Clean IR) ===
     const himawariLayer = L.tileLayer.wms(
       "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi",
@@ -281,25 +249,10 @@
         opacity: 0.7,
         tileSize: 512,
         version: "1.3.0",
-        time: "2025-10-06T12:00:00Z",
+        //time: "2025-10-06T12:00:00Z",
         attribution: "NASA GIBS / Himawari-8 AHI Band13"
       }
     );
-
-    // === Fungsi untuk update waktu Himawari ===
-    function setHimawariTime(dateUTC) {
-      // Bulatkan ke kelipatan 10 menit (slot GIBS)
-      const rounded = new Date(Math.floor(dateUTC.getTime() / (10 * 60 * 1000)) * (10 * 60 * 1000));
-      const iso = rounded.toISOString().split('.')[0] + "Z";
-      console.log("[Himawari] Update time:", iso);
-      himawariLayer.setParams({ time: iso });
-      if (!map.hasLayer(himawariLayer)) {
-        map.addLayer(himawariLayer);
-      }
-    }
-
-    // Tambahkan langsung untuk tes awal
-    // himawariLayer.addTo(map);
     
     // --- Default layer ---
     osm.addTo(map);
@@ -817,10 +770,25 @@
       const chosen = data.files.sort().slice(-1)[0];
       // update Himawari ke waktu radiosonde
       const selectedDateTime = new Date(`${date}T${hour}:00:00Z`);
-      setHimawariTime(selectedDateTime);
-      if (!map.hasLayer(himawariLayer)) himawariLayer.addTo(map);
+      // hanya update waktu jika overlay sedang aktif
+      if (map.hasLayer(himawariLayer)) {
+        setHimawariTime(selectedDateTime);
+      }
+      //if (!map.hasLayer(himawariLayer)) himawariLayer.addTo(map);
       // redirect ke loader → backend download/parse → redirect balik ke /
       window.location.href = `/load_from_ftp/${encodeURIComponent(site)}/${encodeURIComponent(chosen)}`;
+    }
+
+    // === Fungsi untuk update waktu Himawari ===
+    function setHimawariTime(dateUTC) {
+      // Bulatkan ke kelipatan 10 menit (slot GIBS)
+      const rounded = new Date(Math.floor(dateUTC.getTime() / (10 * 60 * 1000)) * (10 * 60 * 1000));
+      const iso = rounded.toISOString().split('.')[0] + "Z";
+      console.log("[Himawari] Update time:", iso);
+      himawariLayer.setParams({ time: iso });
+      if (map.hasLayer(himawariLayer)) {
+        map.addLayer(himawariLayer);
+      }
     }
 
   </script>
