@@ -8,28 +8,87 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter.css') }}">
 
   <style>
+    * { box-sizing: border-box; }
+
     body, html {
       margin:0; padding:0; height:100%;
-      display:flex; align-items:center; justify-content:center;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
       font-family:"Inter", sans-serif;
-      background: radial-gradient(circle at 80% 15%, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 20%, transparent 60%),
-                  linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+
+      /* 🌊 Animated blue gradient background */
+      background: linear-gradient(-45deg, #001f3f, #004aad, #0078d7, #00b4ff);
+      background-size: 400% 400%;
       background-repeat: no-repeat;
       background-attachment: fixed;
-      background-size: cover;
-      overflow:hidden;
+      animation: blueFlow 18s ease infinite;
+      will-change: background-position;
+
       color:white;
+      overflow:hidden;
     }
 
+    @keyframes blueFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* 🌐 Header Area (Logo + Title) */
+    .header-area {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header-area img {
+      display: block;
+      margin: 0 auto 10px auto;
+      height: 85px;
+      width: auto;
+      opacity: 0.95;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.35));
+    }
+
+    .header-title {
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #eaf6ff;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      font-family: "Inter", "Segoe UI", sans-serif;
+      background: linear-gradient(to right, #cde8ff, #ffffff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      position: relative;
+      display: inline-block;
+    }
+
+    .header-title::after {
+      content: "";
+      display: block;
+      width: 80%;
+      height: 2px;
+      margin: 8px auto 0;
+      background: rgba(255,255,255,0.3);
+      border-radius: 2px;
+    }
+
+    /* 🔷 Login box */
     .login-box {
       background: rgba(255,255,255,0.08);
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 12px;
-      padding: 35px 25px;
+      padding: 35px 25px 28px;
       width: 280px;
       text-align: center;
       box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      transition: transform 0.3s ease;
+    }
+
+    .login-box:hover {
+      transform: translateY(-3px);
     }
 
     .login-box h2 {
@@ -72,12 +131,13 @@
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.4s;
     }
 
     .login-box button:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      background: linear-gradient(to right, #29abe2, #004aad);
     }
 
     .error {
@@ -94,12 +154,48 @@
     }
 
     .powered span {
-      color: #dbeafe;
+      color: #cce7ff;
       font-weight: 500;
+    }
+
+    /* ✨ Light reflection (subtle shimmer) */
+    .reflection {
+      position: absolute;
+      top: -100px;
+      left: -100px;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.12), transparent 60%);
+      mix-blend-mode: overlay;
+      animation: shimmer 20s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-30%) translateY(-30%) rotate(0deg); }
+      50% { transform: translateX(30%) translateY(30%) rotate(180deg); }
+      100% { transform: translateX(-30%) translateY(-30%) rotate(360deg); }
+    }
+
+    /* 📱 Responsive tweak */
+    @media (max-width: 400px) {
+      .header-area img { height: 65px; }
+      .header-title { font-size: 22px; }
+      .login-box { width: 90%; padding: 25px 15px; }
     }
   </style>
 </head>
+
 <body>
+  <div class="reflection"></div>
+
+  <!-- Header section (centered logo + title) -->
+  <div class="header-area">
+    <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+    <div class="header-title">Radiosonde Monitoring</div>
+  </div>
+
+  <!-- Login box -->
   <div class="login-box">
     <h2>LOGIN</h2>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
@@ -109,19 +205,10 @@
       <button type="submit">Login</button>
     </form>
     <div class="powered">
-      Powered by <span>Terrindo</span> · <span>BMKG</span> · <span>Meteomodem</span>
+      Powered by <span>Meteomodem</span> · <span>Terrindo</span>
     </div>
   </div>
 
-  <!-- jQuery Lokal -->
   <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
-
-  <!-- DataTables Lokal -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='libs/datatables/datatables.min.css') }}">
-  <script src="{{ url_for('static', filename='libs/datatables/datatables.min.js') }}"></script>
-
-  <!-- Leaflet Lokal -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='libs/leaflet/leaflet.css') }}">
-  <script src="{{ url_for('static', filename='libs/leaflet/leaflet.js') }}"></script>
 </body>
 </html>
