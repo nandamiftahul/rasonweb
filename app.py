@@ -39,7 +39,7 @@ CONFIG = {
         "password": os.getenv("FTP_PASS", ""),
         "base_path": os.getenv("FTP_BASE_PATH", "/UA"),
         "file_ext": os.getenv("FTP_FILE_EXT", ".bufr,.bfh,.bfr,.bin").split(","),
-        "limit": int(os.getenv("FTP_LIMIT", "10"))
+        "limit": int(os.getenv("FTP_LIMIT", "30"))
     }
 }
 UPLOAD_FOLDER = "uploads"
@@ -371,6 +371,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                 try:
                     ftp.cwd(f"{cfg['base_path']}/{site}")
                     all_files = ftp.nlst()
+                    print(f"[DEBUG] {site}: total files returned by FTP = {len(all_files)}")
                     selected = [f for f in all_files if any(f.lower().endswith(ext) for ext in exts)]
                     # Attach parsed date to each file
                     items = []
@@ -393,7 +394,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                     items.sort(key=lambda x: x[1], reverse=True)
                     
                     # Only keep the last N (limit)
-                    items = items[: (limit or cfg.get("limit", 10))]
+                    if limit: items = items[:limit]
                     
                     # Build back list of names
                     selected = [fname for fname, dt in items]
