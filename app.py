@@ -624,6 +624,56 @@ def api_status():
 
     return jsonify(results)
 
+@app.route("/api/filter", methods=["POST"])
+@login_required
+def api_filter():
+    """
+    Mengambil file radiosonde dari FTP berdasarkan filter:
+    - site: nama folder
+    - date: YYYY-MM-DD
+    - hour: 00 atau 12
+    - ftype: ekstensi file (.bfr/.bufr/.bfh/.bin)
+    """
+    cfg = CONFIG["ftp"]
+    site = request.form.get("site")
+    date = request.form.get("date")
+    hour = request.form.get("hour")
+    ftype = request.form.get("ftype", "").lower()
+
+    if not site or not date or not hour or not ftype:
+        return jsonify({"error": "Missing site/date/hour/ftype"}), 400
+
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(f"{cfg['base_path']}/{site}")
+
+            all_files = ftp.nlst()
+            target_files = []
+
+            date_str = datetime.strptime(date, "%Y-%m-%d").strftime("%Y%m%d")
+            pattern = f"{date_str}{hour}"
+
+            for fname in all_files:
+                if pattern in fname and fname.lower().endswith(ftype):
+                    target_files.append(fname)
+
+            if not target_files:
+                return jsonify({
+                    "status": "no_files",
+                    "message": f"Tidak ditemukan file {ftype} untuk {site} {pattern}"
+                })
+
+            return jsonify({
+                "status": "ok",
+                "files": target_files
+            })
+
+    except Exception as e:
+        print("❌ FTP filter error:", e)
+        return jsonify({"status": "error", "message": str(e)})
+
 def download_and_process(site, filename):
     """Fetch BUFR from FTP and save into THIS user's store."""
     cfg = CONFIG["ftp"]
