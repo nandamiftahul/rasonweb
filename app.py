@@ -1815,6 +1815,104 @@ def upload_bufr():
         print("[UPLOAD_BUFR] ❌ Exception:", e)
         return jsonify({"success": False, "error": str(e)})
 
+@app.route("/data_availability")
+@login_required
+def data_availability_page():
+    return render_template("data_availability.html")
+
+@app.route("/api/data_availability")
+@login_required
+def api_data_availability():
+    """
+    Scan ketersediaan data radiosonde per hari dalam 1 bulan.
+    File dicek: .bfr, .bin, T*.X, P*.X
+    Format:
+      - bfr/bin biasa mengandung tanggal di nama
+      - T/P file: TxxxxxxAYYYYmmddHHMM.X  (seperti T2096011A202510080000.X)
+    Output:
+      {
+        "year": 2025,
+        "month": 10,
+        "sites": [
+          {
+            "site": "aceh",
+            "days": {
+              1: {"00": {"color": "red","tooltip":"..."}, "12": {...}},
+              ...
+            }
+          }
+        ]
+      }
+    """
+    from datetime import datetime
+    import calendar, re
+
+    month = int(request.args.get("month", datetime.utcnow().month))
+    year = int(request.args.get("year", datetime.utcnow().year))
+
+    start_date = datetime(year, month, 1)
+    end_day = calendar.monthrange(year, month)[1]
+
+    sites = ["aceh", "tarakan", "sorong", "cilacap", "pangkalanbun", "ranai"]
+    results = []
+
+    try:
+        cfg = CONFIG["ftp"]
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(cfg["base_path"])
+
+            for site in sites:
+                ftp.cwd(f"{cfg['base_path']}/{site}")
+                try:
+                    files = ftp.nlst()
+                except Exception:
+                    files = []
+                day_data = {}
+
+                for day in range(1, end_day + 1):
+                    date_prefix = f"{year}{month:02d}{day:02d}"
+                    entry = {}
+                    for hour in ["00", "12"]:
+                        # cari semua file yang cocok dengan tanggal dan jam
+                        matched = [f for f in files if re.search(fr"{date_prefix}{hour}", f)]
+
+                        # --- deteksi setiap jenis file ---
+                        has_bfr = any(f.lower().endswith(".bfr") for f in matched)
+                        has_bin = any(f.lower().endswith(".bin") for f in matched)
+
+                        # format TxxxxxxAYYYYmmddHHMM.X dan PxxxxxxAYYYYmmddHHMM.X
+                        has_tx = any(re.search(r"T\d+[A-Z].*?(\d{12})\.[xX]$", f) for f in matched)
+                        has_px = any(re.search(r"P\d+[A-Z].*?(\d{12})\.[xX]$", f) for f in matched)
+
+                        available = {"bfr": has_bfr, "bin": has_bin, "T": has_tx, "P": has_px}
+                        total = sum(available.values())
+
+                        # --- status warna ---
+                        if total == 0:
+                            color = "red"
+                            tooltip = "no data"
+                        elif total < 4:
+                            color = "yellow"
+                            missing = [k for k, v in available.items() if not v]
+                            tooltip = f"missing: {', '.join(missing)}"
+                        else:
+                            color = "green"
+                            tooltip = "bfr, bin, T, P available"
+
+                        entry[hour] = {"color": color, "tooltip": tooltip}
+
+                    day_data[day] = entry
+
+                results.append({"site": site, "days": day_data})
+                ftp.cwd(cfg["base_path"])
+
+    except Exception as e:
+        print("❌ FTP error in data_availability:", e)
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"year": year, "month": month, "sites": results})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0",port=8082,debug=True)
