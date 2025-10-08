@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Data Availability - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+
+    /* Sidebar & header style sama dengan main.html */
+    .sidebar {
+      width: 230px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 10px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 10;
+      transition: transform 0.3s ease;
+    }
+    .sidebar.hidden { transform: translateX(-240px); }
+    .sidebar h2 { font-size: 18px; margin-bottom: 30px; color: #dbeafe; text-align: center; }
+    .sidebar a {
+      display: block; text-decoration: none; color: white;
+      width: 100%; padding: 12px 15px; border-radius: 8px;
+      text-align: left; margin: 8px 0; transition: background 0.3s;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.15); }
+    .logout { margin-top: auto; font-size: 14px; padding: 8px 14px; background: rgba(255,255,255,0.1); border-radius: 6px; color: #fca5a5; text-decoration: none; }
+    .logout:hover { background: rgba(255,255,255,0.2); }
+
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+    .toggle-btn:hover { background: rgba(255,255,255,0.4); }
+    .toggle-btn.hidden-position { left: 10px; }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 40px;
+      margin-left: 230px;
+      transition: margin-left 0.3s ease;
+    }
+    .main.expanded { margin-left: 0; }
+
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 35px;
+    }
+    .header-icon { width: 50px; height: 50px; background: rgba(255,255,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; color: #dbeafe; }
+    .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px; }
+    .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
+    .header-logos { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 12px; align-items: center; }
+    .header-logos img { height: 36px; opacity: 0.9; }
+
+    /* Table style */
+    .controls { text-align: center; margin-bottom: 20px; }
+    select, button {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      margin: 0 5px;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      border: 1px solid rgba(255,255,255,0.2);
+      text-align: center;
+      padding: 6px;
+      font-size: 13px;
+      color: #dbeafe;
+      vertical-align: middle;
+    }
+    th { background: rgba(255,255,255,0.2); }
+
+    .circle {
+      width: 14px; height: 14px; border-radius: 50%; display: inline-block;
+    }
+    .circle.red { background: #e11d48; }
+    .circle.yellow { background: #facc15; }
+    .circle.green { background: #22c55e; }
+
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: max-content;
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      text-align: left;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      position: absolute;
+      z-index: 10;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      white-space: nowrap;
+    }
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+    .sidebar h2 {
+      font-size: 20px;
+      margin-bottom: 30px;
+      color: #e0f2fe;                 /* biru muda lembut */
+      text-align: center;
+      font-weight: 700;               /* lebih tebal */
+      letter-spacing: 1.2px;          /* sedikit renggang */
+      text-transform: uppercase;      /* tampil tegas */
+      text-shadow: 0 0 6px rgba(255,255,255,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding-bottom: 8px;
+    }
+    
+  </style>
+</head>
+<body>
+
+<!-- Toggle -->
+<button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <h2>RASON PANEL</h2>
+  <a href="{{ url_for('main_page') }}">🏠 Main Page</a>
+  <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
+  <a href="{{ url_for('index') }}" target="_blank">🗺️ Map</a>
+  <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
+  <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
+  <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
+  <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
+  <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
+  <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
+</div>
+
+<!-- Main -->
+<div class="main" id="mainContent">
+  <div class="header-box">
+    <div class="header-icon">🎈</div>
+    <div class="header-text">
+      <h1>Data Availability per Month</h1>
+      <p>Monitor .bfr, .bin, T*.X, and P*.X completeness for each site & day</p>
+    </div>
+    <div class="header-logos">
+      <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+    </div>
+  </div>
+
+  <div class="controls">
+    <select id="monthSelect"></select>
+    <select id="yearSelect"></select>
+    <select id="hourSelect">
+      <option value="00" selected>00Z</option>
+      <option value="12">12Z</option>
+    </select>
+    <button id="loadBtn">🔍 Load</button>
+  </div>
+
+  <div id="tableContainer"><p style="text-align:center;">Please select filters to load data.</p></div>
+</div>
+
+<script>
+  function toggleSidebar() {
+    const s=document.getElementById("sidebar"),m=document.getElementById("mainContent"),b=document.getElementById("toggleBtn");
+    s.classList.toggle("hidden"); m.classList.toggle("expanded");
+    if(s.classList.contains("hidden")){b.textContent="☰";b.classList.add("hidden-position");}
+    else{b.textContent="❮";b.classList.remove("hidden-position");}
+  }
+
+  const months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const now=new Date();
+  for(let m=0;m<12;m++) $("#monthSelect").append(`<option value="${m+1}" ${m===now.getMonth()?'selected':''}>${months[m]}</option>`);
+  for(let y=2023;y<=now.getFullYear();y++) $("#yearSelect").append(`<option value="${y}" ${y===now.getFullYear()?'selected':''}>${y}</option>`);
+
+  $("#loadBtn").click(loadData);
+
+  async function loadData(){
+    const m=$("#monthSelect").val(), y=$("#yearSelect").val();
+    $("#tableContainer").html("<p style='text-align:center;'>⏳ Loading...</p>");
+    try{
+      const res=await fetch(`/api/data_availability?month=${m}&year=${y}`);
+      const data=await res.json();
+      if(!data.sites) throw new Error("No data");
+      renderTable(data);
+    }catch(e){
+      $("#tableContainer").html(`<p style='text-align:center;color:#f87171;'>Error: ${e}</p>`);
+    }
+  }
+
+  function renderTable(data){
+    const endDay=new Date(data.year,data.month,0).getDate();
+    const selectedHour=$("#hourSelect").val();
+    let html="<table><tr><th>Site</th>";
+    for(let d=1;d<=endDay;d++) html+=`<th>${String(d).padStart(2,'0')}</th>`;
+    html+="</tr>";
+
+    data.sites.forEach(site=>{
+      html+=`<tr><td>${site.site}</td>`;
+      for(let d=1;d<=endDay;d++){
+        const info=site.days[d]?.[selectedHour] || {color:"red",tooltip:"no data"};
+        html+=`<td><div class='tooltip'><span class='circle ${info.color}'></span><span class='tooltiptext'>${selectedHour}Z - ${info.tooltip}</span></div></td>`;
+      }
+      html+="</tr>";
+    });
+    html+="</table>";
+    $("#tableContainer").html(html);
+  }
+
+  loadData();
+</script>
+</body>
+</html>

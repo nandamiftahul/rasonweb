@@ -173,6 +173,18 @@
       margin: 0 6px;
       filter: saturate(90%);
     }
+    .sidebar h2 {
+      font-size: 20px;
+      margin-bottom: 30px;
+      color: #e0f2fe;                 /* biru muda lembut */
+      text-align: center;
+      font-weight: 700;               /* lebih tebal */
+      letter-spacing: 1.2px;          /* sedikit renggang */
+      text-transform: uppercase;      /* tampil tegas */
+      text-shadow: 0 0 6px rgba(255,255,255,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding-bottom: 8px;
+    }
   </style>
 </head>
 
@@ -183,32 +195,18 @@
 
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
-    <h2>Radiosonde Monitoring</h2>
-  
-    <!-- 🏠 Main Page -->
+    <h2>RASON PANEL</h2>
     <a href="{{ url_for('main_page') }}">🏠 Main Page</a>
-  
-    <!-- 📊 Data Resume -->
     <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
-  
-    <!-- 🗺️ Map (new tab) -->
     <a href="{{ url_for('index') }}" target="_blank">🗺️ Map</a>
-  
-    <!-- 🌐 3D Trajectory (new tab) -->
     <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
-  
-    <!-- ⏱️ Time Accuracy -->
     <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
-  
-    <!-- 📈 Height Reach -->
     <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
-  
-    <!-- ⚙️ Settings -->
+    <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
     <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
-  
-    <!-- 🚪 Logout -->
     <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
   </div>
+
 
 
   <!-- Main -->
