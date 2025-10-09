@@ -321,7 +321,7 @@ REASON_MAP = {
     4: "Telemetry interrupted",
     5: "Manual termination",
     6: "Other",
-    11: "Bad temperature",
+    11: "Temperature KO",
 }
 
 SENSOR_MAPS = {
@@ -584,42 +584,120 @@ def api_latest_status():
 @login_required
 def api_status():
     """
-    Membaca status balon dari file status.ini di FTP tiap site.
-    Mengembalikan JSON: site, status, dan waktu update terakhir.
+    Membaca status balon dari file EOSCAN*.log di FTP tiap site.
+    Status diambil dari pesan terakhir yang mengandung kata kunci tertentu.
+    Jika waktu 'preparing' (Sonde ON) ditemukan di jam di luar 00Z/12Z,
+    dianggap log menggunakan waktu lokal dan dikonversi ke UTC.
     """
+    import ftplib, io, re
+    from datetime import datetime, timedelta
+
     cfg = CONFIG["ftp"]
     sites = ["aceh", "tarakan", "sorong", "cilacap", "pangkalanbun", "ranai"]
     results = []
 
-    
-    #print("start FTP")
+    # Offset per site
+    site_utc_offset = {
+        "aceh": 7,
+        "cilacap": 7,
+        "pangkalanbun": 7,
+        "tarakan": 8,
+        "sorong": 9,
+        "ranai": 7
+    }
+
+    status_patterns = {
+        "offline": ["station off", "eoscan manual close"],
+        "inflight": ["start sounding"],
+        "preparing": ["sonde on"],
+        "online": ["station ok", "running eoscan", "sounding over"],
+    }
+
     try:
         with ftplib.FTP() as ftp:
             ftp.connect(cfg["host"], cfg.get("port", 21))
             ftp.login(cfg["user"], cfg["password"])
-            #print("connected")
+
             for site in sites:
                 status = "offline"
                 update = "-"
                 try:
-                    # ⚙️ Jangan pakai .lower(), karena nama folder FTP case-sensitive
                     ftp.cwd(f"{cfg['base_path']}/{site}")
+                    files = ftp.nlst()
+                    log_files = [f for f in files if re.match(r"EOSCAN.*\.log$", f, re.IGNORECASE)]
+                    if not log_files:
+                        raise FileNotFoundError("Tidak ada file EOSCAN*.log")
+
+                    log_files.sort(reverse=True)
+                    latest_log = log_files[0]
+
+                    # Ambil tanggal dari nama file
+                    date_match = re.search(r"(\d{1,2}) ([A-Za-z]{3}) (\d{2})", latest_log)
+                    file_date = None
+                    if date_match:
+                        day, mon, yy = date_match.groups()
+                        try:
+                            file_date = datetime.strptime(f"{day} {mon} 20{yy}", "%d %b %Y")
+                        except:
+                            pass
+
+                    # Unduh isi file log
                     f = io.BytesIO()
-                    ftp.retrbinary("RETR status.ini", f.write)
+                    ftp.retrbinary(f"RETR " + latest_log, f.write)
                     f.seek(0)
-                    parser = configparser.ConfigParser()
-                    parser.read_string("[root]\n" + f.read().decode())
-                    status = parser.get("root", "status", fallback="offline")
-                    update_str = parser.get("root", "update", fallback="-")
-                    if update_str.isdigit() and len(update_str) == 14:
-                        dt = datetime.strptime(update_str, "%Y%m%d%H%M%S")
-                        update = dt.strftime("%Y-%m-%d %H:%M UTC")
+                    lines = f.read().decode(errors="ignore").splitlines()
+
+                    candidates = []
+                    for line in lines:
+                        m = re.match(r"(\d{2}:\d{2}:\d{2})\s+\d+\s+(.*)", line.strip())
+                        if not m:
+                            continue
+                        time_str, msg = m.groups()
+                        msg_lower = msg.lower()
+
+                        for s, keys in status_patterns.items():
+                            if any(k in msg_lower for k in keys):
+                                candidates.append((time_str, s))
+                                break
+
+                    if not candidates:
+                        results.append({"site": site, "status": "unknown", "update": file_date.strftime("%Y-%m-%d") if file_date else "-"})
+                        continue
+
+                    # Ambil status terakhir
+                    last_time, last_status = candidates[-1]
+                    status = last_status
+                    time_dt = None
+
+                    if file_date:
+                        try:
+                            time_dt = datetime.strptime(f"{file_date.strftime('%Y-%m-%d')} {last_time}", "%Y-%m-%d %H:%M:%S")
+                        except:
+                            pass
+
+                    # Jika status "preparing" (Sonde ON) dan jamnya bukan sekitar 00Z/12Z, konversi lokal → UTC
+                    if status == "preparing" and time_dt:
+                        if not (23 <= time_dt.hour or time_dt.hour <= 1 or 11 <= time_dt.hour <= 13):
+                            offset = site_utc_offset.get(site, 7)
+                            time_dt_utc = time_dt - timedelta(hours=offset)
+                            update = time_dt_utc.strftime("%Y-%m-%d %H:%M UTC")
+                        else:
+                            update = time_dt.strftime("%Y-%m-%d %H:%M UTC")
+                    elif time_dt:
+                        update = time_dt.strftime("%Y-%m-%d %H:%M UTC")
                     else:
-                        update = update_str
+                        update = f"{file_date.strftime('%Y-%m-%d')} {last_time} UTC" if file_date else last_time
+
                 except Exception as e:
                     print(f"⚠️ Gagal baca {site}: {e}")
-                #print({"site": site, "status": status, "update": update})
-                results.append({"site": site, "status": status, "update": update})
+                    status = "offline"
+
+                results.append({
+                    "site": site,
+                    "status": status,
+                    "update": update
+                })
+
     except Exception as e:
         print("❌ FTP connection error:", e)
 
@@ -720,7 +798,7 @@ def download_and_process(site, filename):
                     4: "Telemetry interrupted",
                     5: "Manual termination",
                     6: "Other",
-                    11: "Bad temperature",
+                    11: "Temperature KO",
                 }
                 meta["reason_for_termination"] = f"{code} – {reason_map.get(code, 'Unknown')}"
             except Exception:
