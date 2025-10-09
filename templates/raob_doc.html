@@ -97,25 +97,25 @@
     /* --- Footer --- */
     .footer {
       background: #ffffff;
-      padding: 4px 0;                     /* 🔽 sangat tipis */
+      padding: 4px 0;
       display: flex;
       justify-content: center;
       align-items: center;
-      border-top: 1px solid #d1d5db;      /* garis abu muda */
+      border-top: 1px solid #d1d5db;
       border-radius: 0 0 8px 8px;
-      height: 38px;                       /* 🔽 batasi tinggi maksimum */
+      height: 38px;
     }
     
     .footer span {
       color: #333;
       font-weight: 500;
       margin-right: 6px;
-      font-size: 12px;                    /* 🔽 kecil dan elegan */
+      font-size: 12px;
       opacity: 0.8;
     }
     
     .footer img {
-      height: 28px;                       /* 🔽 kecilkan logo */
+      height: 28px;
       opacity: 0.85;
       margin: 0 6px;
       filter: saturate(90%);
@@ -140,50 +140,64 @@
     <div class="doc-card">
       <a href="{{ url_for('main_page') }}" class="btn-back">⬅ Back to Main Page</a>
 
-      <h1>Algorithm Reference and Verification</h1>
+      <h1>Algorithm Reference and Physical Interpretation</h1>
       <p>
-        This document describes the analytical logic used in the <b>Radiosonde Analysis</b> module.
-        It follows established meteorological computation standards used by
-        <b>WMO</b>, <b>NOAA/SPC</b>, and <b>MetPy</b>.
+        This document details the <b>meteorological indices and formulas</b> used in the
+        <b>Radiosonde Analysis</b> module. Each parameter follows
+        <b>WMO</b> and <b>NOAA/SPC</b> standards as implemented in <code>MetPy</code>.
+        It explains both the <b>mathematical</b> and <b>physical meaning</b> of each variable.
       </p>
 
       <h2>1. CAPE (Convective Available Potential Energy)</h2>
       <p>
-        <b>Formula:</b>  
-        <code>CAPE = ∫ (T_parcel - T_env) / T_env × g × dz</code><br>
-        Computed via <code>mpcalc.cape_cin()</code>.<br>
+        <b>Formula (WMO standard):</b><br>
+        <code>CAPE = ∫<sub>z<sub>LFC</sub></sub><sup>z<sub>EL</sub></sup> g × (T<sub>v,parcel</sub> - T<sub>v,env</sub>) / T<sub>v,env</sub> × dz</code><br>
+        Computed via <code>mpcalc.cape_cin()</code>.<br><br>
+        <b>Physical meaning:</b><br>
+        CAPE represents the <i>positive buoyant energy</i> available to a rising air parcel.  
+        It quantifies the potential for vertical acceleration — higher CAPE means stronger updrafts and
+        more intense thunderstorms.<br><br>
         <b>Interpretation:</b>
         <ul>
-          <li>0–1000 J/kg → Weak instability</li>
-          <li>1000–2500 J/kg → Moderate thunderstorms possible</li>
+          <li>0–1000 J/kg → Weak instability, fair weather cumulus</li>
+          <li>1000–2500 J/kg → Moderate instability, thunderstorms possible</li>
           <li>2500–4000 J/kg → Strong convection, severe storms likely</li>
-          <li>>4000 J/kg → Extreme instability</li>
+          <li>&gt;4000 J/kg → Extreme instability, violent updrafts</li>
         </ul>
       </p>
 
       <h2>2. CIN (Convective Inhibition)</h2>
       <p>
-        <code>CIN = ∫ (T_env - T_parcel) / T_env × g × dz</code><br>
-        Large CIN (>100 J/kg) suppresses convection, while <50 J/kg supports storm initiation.
+        <code>CIN = ∫ (T<sub>v,env</sub> - T<sub>v,parcel</sub>) / T<sub>v,env</sub> × g × dz</code><br>
+        <b>Physical meaning:</b><br>
+        CIN measures the <i>negative buoyant energy</i> that suppresses convection.  
+        It represents the energy barrier preventing an air parcel from freely rising.  
+        Large CIN (&gt;100 J/kg) stabilizes the atmosphere, while CIN &lt;50 J/kg allows storm initiation.
       </p>
 
       <h2>3. Lifted Index (LI)</h2>
       <p>
-        <code>LI = T_env(500 hPa) - T_parcel(500 hPa)</code><br>
+        <code>LI = T<sub>env,500hPa</sub> - T<sub>parcel,500hPa</sub></code><br>
+        <b>Physical meaning:</b><br>
+        LI measures the temperature difference between the environment and a lifted parcel at 500 hPa.  
+        A more negative LI means the parcel is warmer and more buoyant — indicating stronger instability.<br>
         <ul>
           <li>LI &gt; 0 → Stable</li>
           <li>-3 ≤ LI &lt; 0 → Slightly unstable</li>
           <li>-6 ≤ LI &lt; -3 → Moderately unstable</li>
-          <li>LI &lt; -6 → Severe instability</li>
+          <li>LI &lt; -6 → Very unstable (severe convection)</li>
         </ul>
       </p>
 
       <h2>4. K Index (KI)</h2>
       <p>
-        <code>KI = (T850 - T500) + Td850 - (T700 - Td700)</code><br>
+        <code>KI = (T<sub>850</sub> - T<sub>500</sub>) + Td<sub>850</sub> - (T<sub>700</sub> - Td<sub>700</sub>)</code><br>
+        <b>Physical meaning:</b><br>
+        KI estimates thunderstorm potential by combining mid-level lapse rate and lower-tropospheric moisture.  
+        It reflects both temperature gradient and humidity distribution in the 850–500 hPa layer.<br>
         <ul>
-          <li>&lt; 20 → No storms</li>
-          <li>20–25 → Isolated storms</li>
+          <li>&lt; 20 → Stable, no storms</li>
+          <li>20–25 → Isolated thunderstorms</li>
           <li>26–30 → Scattered storms</li>
           <li>&gt; 30 → Numerous storms likely</li>
         </ul>
@@ -192,29 +206,38 @@
       <h2>5. Bulk Wind Shear</h2>
       <p>
         <b>Computed via:</b> <code>mpcalc.bulk_shear()</code><br>
-        Indicates storm organization and rotation potential.
+        <b>Physical meaning:</b><br>
+        Wind shear is the change of wind vector (speed and direction) with height.  
+        Strong shear supports storm organization, rotation, and longevity.  
+        It determines the type of convection: pulse storms, multicells, or supercells.<br>
         <ul>
-          <li>&lt; 20 kt → Weak shear</li>
-          <li>20–40 kt → Strong</li>
-          <li>&gt; 40 kt → Severe convection support</li>
+          <li>&lt; 20 kt → Weak shear (single-cell convection)</li>
+          <li>20–40 kt → Moderate shear (multicell storms)</li>
+          <li>&gt; 40 kt → Strong shear (supercells possible)</li>
         </ul>
       </p>
 
       <h2>6. SRH (Storm Relative Helicity)</h2>
       <p>
-        <b>Computed with:</b> <code>mpcalc.storm_relative_helicity()</code><br>
-        Indicates low-level rotation potential.
+        <b>Computed via:</b> <code>mpcalc.storm_relative_helicity()</code><br>
+        <b>Physical meaning:</b><br>
+        SRH quantifies the potential for cyclonic updraft rotation by measuring how  
+        horizontal wind shear and storm motion align in the lower troposphere.  
+        High SRH indicates strong low-level rotation and tornado potential.<br>
         <ul>
-          <li>&lt; 100 → Weak rotation</li>
-          <li>100–200 → Moderate rotation</li>
-          <li>&gt; 200 → Tornadic/supercell potential</li>
+          <li>&lt; 100 m²/s² → Weak rotation</li>
+          <li>100–200 m²/s² → Moderate rotation (rotating storms possible)</li>
+          <li>&gt; 200 m²/s² → Strong rotation (supercell/tornado potential)</li>
         </ul>
       </p>
 
       <h2>7. Freezing Level & Tropopause</h2>
       <p>
-        <b>Freezing Level:</b> pressure where temperature crosses 0°C.<br>
-        <b>Tropopause:</b> level where lapse rate ≤ 2°C/km over ≥ 2 km depth.
+        <b>Freezing Level:</b> The altitude where temperature crosses 0°C.  
+        It indicates the melting/freezing layer critical for precipitation type and aircraft icing.<br><br>
+        <b>Tropopause:</b> The boundary between the troposphere and stratosphere,  
+        defined where the lapse rate ≤ 2°C/km over at least 2 km thickness.  
+        It marks the upper limit of most weather systems and deep convection.
       </p>
     </div>
   </main>
