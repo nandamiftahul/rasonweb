@@ -317,10 +317,11 @@ REASON_MAP = {
     0: "Not specified",
     1: "Balloon burst",
     2: "Battery exhausted",
-    3: "Receiver failure",
+    3: "Ascent Stop",
     4: "Telemetry interrupted",
     5: "Manual termination",
     6: "Other",
+    11: "Bad temperature",
 }
 
 SENSOR_MAPS = {
@@ -715,10 +716,11 @@ def download_and_process(site, filename):
                     0: "Not specified",
                     1: "Balloon burst",
                     2: "Battery exhausted",
-                    3: "Receiver failure",
+                    3: "Ascent Stop",
                     4: "Telemetry interrupted",
                     5: "Manual termination",
                     6: "Other",
+                    11: "Bad temperature",
                 }
                 meta["reason_for_termination"] = f"{code} – {reason_map.get(code, 'Unknown')}"
             except Exception:
@@ -935,6 +937,56 @@ def generate_wmo_temp(df_meta, df_levels):
     lines.append("NNNN")
     return "\n".join(lines)
 
+def combine_t_p_files(site, base_name):
+    """
+    Cari file T*.X dan P*.X dari FTP dengan timestamp sama (contoh: 2025100900).
+    Gabungkan konten keduanya jadi satu TXT file sementara untuk proses WMO.
+    """
+    cfg = CONFIG["ftp"]
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    combined_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{base_name}_TP.txt")
+
+    pattern = re.search(r"(\d{10})", base_name)
+    if not pattern:
+        raise ValueError("No valid timestamp found in filename")
+    timestamp = pattern.group(1)
+
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(f"{cfg['base_path']}/{site}")
+            all_files = ftp.nlst()
+
+            # Cari file T dan P yang cocok
+            t_files = [f for f in all_files if re.search(fr"T\d+.*{timestamp}.*\.[xX]$", f)]
+            p_files = [f for f in all_files if re.search(fr"P\d+.*{timestamp}.*\.[xX]$", f)]
+
+            if not t_files or not p_files:
+                raise FileNotFoundError(f"T or P file not found for timestamp {timestamp}")
+
+            t_file = t_files[0]
+            p_file = p_files[0]
+
+            # Unduh dua file
+            t_data = io.BytesIO()
+            ftp.retrbinary(f"RETR {t_file}", t_data.write)
+            p_data = io.BytesIO()
+            ftp.retrbinary(f"RETR {p_file}", p_data.write)
+
+            # Gabungkan kontennya
+            with open(combined_path, "wb") as out:
+                out.write(t_data.getvalue())
+                out.write(b"\n")
+                out.write(p_data.getvalue())
+
+            print(f"✅ Combined {t_file} + {p_file} → {combined_path}")
+            return combined_path
+
+    except Exception as e:
+        print("❌ combine_t_p_files failed:", e)
+        raise
+
 def generate_weather_analysis(df):
     text = []
     # --- Cloud layers ---
@@ -967,7 +1019,6 @@ def generate_weather_analysis(df):
         text.append(f"Strong wind shear zone ({minz:.1f}–{maxz:.1f} km). Turbulence risk.")
 
     return "<br>".join(text) if text else "Atmospheric profile indicates generally stable conditions."
-
 
 def download_from_ftp(site, filename):
     """Fetch file from FTP and return local path only (no processing)."""
@@ -1112,18 +1163,139 @@ def all_levels_route():
 @app.route("/download_wmo/<site>/<filename>")
 @login_required
 def download_wmo(site, filename):
+    """
+    Download combined WMO message.
+    - Jika ada file T*.X dan P*.X di FTP → gabungkan isi mentah (tanpa header tambahan)
+    - Jika tidak ada → generate TTAA–TTDD + PPAA–PPDD lengkap dengan header sandi Meteomodem,
+      dimana kode ID (misal IUKG51 WITT) diambil otomatis dari nama file BUFR.
+    """
+    cfg = CONFIG["ftp"]
     try:
+        ts_match = re.search(r"(\d{10,12})", filename)
+        timestamp = ts_match.group(1) if ts_match else None
+        combined_txt = ""
+
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(f"{cfg['base_path']}/{site}")
+            all_files = ftp.nlst()
+
+            # --- Cari file T dan P di FTP ---
+            t_files = [f for f in all_files if re.search(fr"T\d+[A-Z].*{timestamp}.*\.[xX]$", f)] if timestamp else []
+            p_files = [f for f in all_files if re.search(fr"P\d+[A-Z].*{timestamp}.*\.[xX]$", f)] if timestamp else []
+
+            # === CASE 1: Jika ada T/P file ===
+            if t_files and p_files:
+                t_buf, p_buf = io.BytesIO(), io.BytesIO()
+                ftp.retrbinary(f"RETR {t_files[0]}", t_buf.write)
+                ftp.retrbinary(f"RETR {p_files[0]}", p_buf.write)
+                t_txt = t_buf.getvalue().decode(errors="ignore").strip()
+                p_txt = p_buf.getvalue().decode(errors="ignore").strip()
+
+                combined_txt = f"{t_txt}\n{p_txt}\nNNNN\n"
+                return Response(
+                    combined_txt,
+                    mimetype="text/plain",
+                    headers={"Content-Disposition": f"attachment; filename={timestamp}_WMO_TP.txt"}
+                )
+
+        # === CASE 2: fallback → generate dari BUFR ===
         local_path = download_from_ftp(site, filename)
         decoded = decode_bufr(local_path)
         df_meta, df_levels = parse_bufr(decoded)
-        wmo_text = generate_wmo_temp(df_meta, df_levels)
+
+        block = int(df_meta.iloc[0].get("wmo_block", 99))
+        station = int(df_meta.iloc[0].get("wmo_station", 999))
+        d = int(df_meta.iloc[0].get("day", 1))
+        h = int(df_meta.iloc[0].get("hour", 0))
+        timecode = f"{d:02d}{h:02d}00"
+
+        # --- Ambil kode WMO (ID51 + callsign) dari nama file ---
+        # contoh: A_IUKG51WITT090000_C_WIIX_20251009000000.bfr
+        id_match = re.search(r"A_([A-Z0-9]{4,6})W([A-Z]{3,4})", filename)
+        if id_match:
+            base_code = id_match.group(1)  # contoh: IUKG51
+            callsign = "W" + id_match.group(2)  # contoh: WITT
+        else:
+            base_code, callsign = "ID51", site.upper()
+
+        # --- TEMP (TTAA–TTDD) ---
+        wmo_temp_text = generate_wmo_temp(df_meta, df_levels)
+        wmo_temp_lines = wmo_temp_text.strip().splitlines()
+
+        # --- PILOT (PPAA–PPDD) ---
+        def generate_wmo_pilot(df_meta, df_levels):
+            if df_meta.empty or df_levels.empty:
+                return ""
+            block = int(df_meta.iloc[0].get("wmo_block", 99))
+            station = int(df_meta.iloc[0].get("wmo_station", 999))
+            d = df_meta.iloc[0].get("day", 1)
+            h = df_meta.iloc[0].get("hour", 0)
+            df_levels = df_levels.sort_values("pressure_hPa", ascending=False)
+
+            def encode_wind_group(wd, ws):
+                if pd.isna(wd) or pd.isna(ws): return "/////"
+                dd = int(round(wd / 10)) % 36
+                ff = int(round(ws)) % 1000
+                return f"{dd:02d}{ff:03d}"[:5]
+
+            def pack(groups):
+                return [" ".join(groups[i:i+5]) for i in range(0, len(groups), 5)]
+
+            lines = []
+            for code, cond in zip(
+                ["PPAA", "PPBB", "PPCC", "PPDD"],
+                [lambda p:p>=100, lambda p:100<p<1000, lambda p:p<100, lambda p:True]
+            ):
+                sel = df_levels[df_levels["pressure_hPa"].apply(cond)]
+                groups = [encode_wind_group(r.get("wind_dir_deg"), r.get("wind_speed_mps")) for _, r in sel.iterrows()]
+                lines.append(f"{code} {block:02d}{station:03d} {d:02d}{h:02d}00")
+                lines += pack(groups)
+            return "\n".join(lines)
+
+        wmo_pilot_text = generate_wmo_pilot(df_meta, df_levels)
+        wmo_pilot_lines = wmo_pilot_text.strip().splitlines()
+
+        # --- Bagi per section ---
+        sections = {k: [] for k in ["TTAA","TTBB","TTCC","TTDD","PPAA","PPBB","PPCC","PPDD"]}
+        current = None
+        for line in wmo_temp_lines + wmo_pilot_lines:
+            for key in sections:
+                if line.startswith(key):
+                    current = key
+                    sections[key].append(line)
+                    break
+            else:
+                if current:
+                    sections[current].append(line)
+
+        # --- Prefix Meteomodem (US, UK, UL, UE, UP, UG, UH, UQ) ---
+        prefix_map = {
+            "TTAA": "US", "TTBB": "UK", "TTCC": "UL", "TTDD": "UE",
+            "PPAA": "UP", "PPBB": "UG", "PPCC": "UH", "PPDD": "UQ"
+        }
+
+        # --- Bangun format akhir ---
+        lines_out = []
+        for key, prefix in prefix_map.items():
+            if not sections[key]:
+                continue
+            lines_out.append(f"{prefix}{base_code} {callsign} {timecode}")
+            lines_out += sections[key]
+            lines_out.append("=")
+
+        lines_out.append("NNNN")
+        final_txt = "\n".join(lines_out) + "\n"
 
         return Response(
-            wmo_text,
+            final_txt,
             mimetype="text/plain",
-            headers={"Content-Disposition": f"attachment;filename={filename}.wmo.txt"}
+            headers={"Content-Disposition": f"attachment; filename={filename}_WMO_AUTO.txt"}
         )
+
     except Exception as e:
+        print("❌ Error generating WMO:", e)
         return f"Error generating WMO: {e}", 500
 
 @app.route("/raob/<site>/<filename>")
@@ -1883,8 +2055,9 @@ def api_data_availability():
                         has_bin = any(f.lower().endswith(".bin") for f in matched)
 
                         # format TxxxxxxAYYYYmmddHHMM.X dan PxxxxxxAYYYYmmddHHMM.X
-                        has_tx = any(re.search(r"T\d+[A-Z].*?(\d{12})\.[xX]$", f) for f in matched)
-                        has_px = any(re.search(r"P\d+[A-Z].*?(\d{12})\.[xX]$", f) for f in matched)
+                        has_tx = any(re.search(r"T\d+[A-Z].*?(\d{10})(?:[A-Z]+)?\.[xX]$", f) for f in matched)
+                        has_px = any(re.search(r"P\d+[A-Z].*?(\d{10})(?:[A-Z]+)?\.[xX]$", f) for f in matched)
+
 
                         available = {"bfr": has_bfr, "bin": has_bin, "T": has_tx, "P": has_px}
                         total = sum(available.values())
