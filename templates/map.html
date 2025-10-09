@@ -255,12 +255,12 @@
     );
     
     // --- Default layer ---
-    osm.addTo(map);
+    esriSat.addTo(map);
     
     // --- Layer control menu ---
     const baseMaps = {
-      "🗺️ OpenStreetMap": osm,
       "🛰️ Satellite (Esri)": esriSat,
+      "🗺️ OpenStreetMap": osm,
       "🧭 Hybrid (Google)": googleHybrid
     };
     

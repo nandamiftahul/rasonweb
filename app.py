@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-import os, re, io, configparser
+import os, re, io, configparser, warnings
 import json
 import ftplib
 import subprocess
@@ -1355,45 +1355,53 @@ def raob_analysis(site, filename):
             else:
                 hgt = mpcalc.pressure_to_height_std(p_w)
 
-        # --- Thermodynamic indices ---
-        lcl_pressure, lcl_temp = mpcalc.lcl(p[0], T[0], Td[0])
-        parcel_prof = mpcalc.parcel_profile(p, T[0], Td[0]).to("degC")
-        cape, cin = mpcalc.cape_cin(p, T, Td, parcel_prof)
-        li = mpcalc.lifted_index(p, T, parcel_prof)
-        ki = mpcalc.k_index(p, T, Td)
-
-        # --- Wind shear ---
-        shear_0_1km_mag = np.nan * units("knot")
-        shear_0_6km_mag = np.nan * units("knot")
+        # --- Thermodynamic indices (safe) ---
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+            try:
+                lcl_pressure, lcl_temp = mpcalc.lcl(p[0], T[0], Td[0])
+                parcel_prof = mpcalc.parcel_profile(p, T[0], Td[0]).to("degC")
+                cape, cin = mpcalc.cape_cin(p, T, Td, parcel_prof)
+                li = mpcalc.lifted_index(p, T, parcel_prof)
+                ki = mpcalc.k_index(p, T, Td)
+            except Exception as e:
+                print("Thermo calc failed:", e)
+                cape = cin = li = ki = np.nan * units("dimensionless")
+        
+        # --- Wind shear (safe) ---
+        shear_0_1km_mag = shear_0_6km_mag = np.nan * units("knot")
         if (u is not None) and (v is not None):
             try:
-                sh_u_1km, sh_v_1km = mpcalc.bulk_shear(p_w, u, v, depth=1000 * units.meter)
-                sh_u_6km, sh_v_6km = mpcalc.bulk_shear(p_w, u, v, depth=6000 * units.meter)
-                shear_0_1km_mag = mpcalc.wind_speed(sh_u_1km, sh_v_1km).to("knot")
-                shear_0_6km_mag = mpcalc.wind_speed(sh_u_6km, sh_v_6km).to("knot")
-            except Exception:
-                pass
-
-        # --- SRH ---
+                if len(p_w) >= 2:
+                    sh_u_1km, sh_v_1km = mpcalc.bulk_shear(p_w, u, v, depth=1000 * units.meter)
+                    sh_u_6km, sh_v_6km = mpcalc.bulk_shear(p_w, u, v, depth=6000 * units.meter)
+                    shear_0_1km_mag = mpcalc.wind_speed(sh_u_1km, sh_v_1km).to("knot")
+                    shear_0_6km_mag = mpcalc.wind_speed(sh_u_6km, sh_v_6km).to("knot")
+            except Exception as e:
+                print("Shear calc failed:", e)
+        
+        # --- SRH (safe) ---
         srh_0_1km = srh_0_3km = np.nan * units("m^2/s^2")
         if (u is not None) and (v is not None) and (hgt is not None):
             try:
                 sort_idx = np.argsort(hgt)
-                hgt_sorted = hgt[sort_idx]
-                u_sorted = u[sort_idx]
-                v_sorted = v[sort_idx]
-                rmotion, _, _ = mpcalc.bunkers_storm_motion(p_w, u_sorted, v_sorted, hgt_sorted)
-                storm_u, storm_v = rmotion
-                srh_0_1km, _, _ = mpcalc.storm_relative_helicity(
-                    hgt_sorted, u_sorted, v_sorted,
-                    depth=1000*units.m, bottom=0*units.m,
-                    storm_u=storm_u, storm_v=storm_v)
-                srh_0_3km, _, _ = mpcalc.storm_relative_helicity(
-                    hgt_sorted, u_sorted, v_sorted,
-                    depth=3000*units.m, bottom=0*units.m,
-                    storm_u=storm_u, storm_v=storm_v)
+                hgt_sorted, u_sorted, v_sorted = hgt[sort_idx], u[sort_idx], v[sort_idx]
+                if hgt_sorted[-1] > 1000 * units.m:
+                    rmotion, _, _ = mpcalc.bunkers_storm_motion(p_w, u_sorted, v_sorted, hgt_sorted)
+                    storm_u, storm_v = rmotion
+                    srh_0_1km, _, _ = mpcalc.storm_relative_helicity(
+                        hgt_sorted, u_sorted, v_sorted,
+                        depth=1000 * units.m,
+                        bottom=0 * units.m,
+                        storm_u=storm_u, storm_v=storm_v)
+                if hgt_sorted[-1] > 3000 * units.m:
+                    srh_0_3km, _, _ = mpcalc.storm_relative_helicity(
+                        hgt_sorted, u_sorted, v_sorted,
+                        depth=3000 * units.m,
+                        bottom=0 * units.m,
+                        storm_u=storm_u, storm_v=storm_v)
             except Exception as e:
-                print("SRH calculation failed:", e)
+                print("SRH calculation failed (safe):", e)
 
         # --- Freezing Level ---
         freezing_level = "-"
