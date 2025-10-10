@@ -462,12 +462,12 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                         # End pressure
                                         end_pressure = df_levels["pressure_hPa"].dropna().min()
                                         if pd.notna(end_pressure):
-                                            item["end_pressure"] = f"{end_pressure:.1f} hPa"
+                                            item["end_pressure"] = round(float(end_pressure), 1)
 
                                         # Max height
                                         max_height = df_levels["height_m"].dropna().max()
                                         if pd.notna(max_height):
-                                            item["max_height"] = f"{max_height:.0f} m"
+                                            item["max_height"] = round(float(max_height), 0)
 
                                         # End time
                                         if "time_s" in df_levels and not df_meta.empty:
@@ -484,14 +484,14 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                             st_lon = meta_row.get("station_lon")
                                             if st_lat and st_lon and pd.notna(last_lat) and pd.notna(last_lon):
                                                 dist = geodesic((st_lat, st_lon), (last_lat, last_lon)).km
-                                                item["end_distance"] = f"{dist:.1f} km"
+                                                item["end_distance"] = round(float(dist), 1)
 
                                         # Avg ascent rate
                                         if "height_m" in df_levels and "time_s" in df_levels:
                                             elapsed = df_levels["time_s"].max() - df_levels["time_s"].min()
                                             if elapsed > 0 and pd.notna(max_height):
                                                 ascent_rate = max_height / elapsed
-                                                item["avg_ascent_rate"] = f"{ascent_rate:.2f} m/s"
+                                                item["avg_ascent_rate"] = round(float(ascent_rate), 2)
                                 except Exception as e:
                                     print("Extra metadata calc failed in fetch_all_sites:", e)
 

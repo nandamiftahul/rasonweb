@@ -107,8 +107,34 @@
     }
     .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; }
     .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
-    .header-logos { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
-    .header-logos img { height: 36px; opacity: 0.9; }
+    .header-logos {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;                /* ✅ jadi horizontal */
+      align-items: center;          /* ✅ sejajarkan vertikal */
+      gap: 12px;                    /* jarak antar elemen */
+    }
+    
+    .header-logos img {
+      height: 36px;
+      opacity: 0.9;
+    }
+    
+    .header-clock {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;        /* biar angka rata kanan */
+      justify-content: center;
+      line-height: 1.1;
+      font-size: 18px;
+      color: #ffffff;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(0,0,0,0.4);
+      margin-right: 0;              /* hilangkan margin lama */
+    }
 
     /* Card */
     .card {
@@ -249,6 +275,15 @@
       border-bottom: 1px solid rgba(255,255,255,0.15);
       padding-bottom: 8px;
     }
+    .header-clock {
+      font-size: 18px;          /* 🔼 lebih besar dari sebelumnya */
+      color: #ffffff;           /* lebih terang biar kontras */
+      font-weight: 600;
+      opacity: 1;
+      margin-right: 14px;
+      letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(0,0,0,0.4); /* sedikit glow agar jelas di background */
+    }
   </style>
 </head>
 
@@ -278,9 +313,13 @@
         <h1>Radiosonde Data Resume</h1>
         <p>Summary of file data, metadata, and analysis results</p>
       </div>
-      <div class="header-logos">
-        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
-      </div>
+        <div class="header-logos">
+          <div class="header-clock">
+            <div id="utcClock">--:--:-- UTC</div>
+            <div id="utcDate" style="font-size:12px; opacity:0.8;">-- --- ----</div>
+          </div>
+          <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+        </div>
     </div>
 
     <div class="card">
@@ -371,8 +410,17 @@
       let html = `<table id='dataTable' class='display nowrap' style='width:100%'><thead><tr>
       <th>Site</th><th>File</th><th>Data Date</th>`;
       if (withMeta)
-        html += `<th>Launch</th><th>End</th><th>Status</th><th>Reason</th><th>Serial</th>
-                 <th>Pressure</th><th>Height</th><th>Distance</th><th>Ascent</th>`;
+        html += `
+          <th>Launch<br><small>(UTC)</small></th>
+          <th>End<br><small>(UTC)</small></th>
+          <th>Status</th>
+          <th>Reason</th>
+          <th>Serial</th>
+          <th>Pressure<br><small>(hPa)</small></th>
+          <th>Height<br><small>(m)</small></th>
+          <th>Distance<br><small>(km)</small></th>
+          <th>Ascent<br><small>(m/s)</small></th>
+        `;
       html += `<th>.bfr</th><th>WMO</th><th>Analysis</th></tr></thead><tbody>`;
 
       for (const [site, files] of Object.entries(sites)) {
@@ -428,6 +476,19 @@
     });
 
     loadSites("?ext={{ selected_ext }}");
+    // === UTC Clock ===
+    function updateUTCClock() {
+      const now = new Date();
+      const utcHours = String(now.getUTCHours()).padStart(2, "0");
+      const utcMinutes = String(now.getUTCMinutes()).padStart(2, "0");
+      const utcSeconds = String(now.getUTCSeconds()).padStart(2, "0");
+      const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" "); // contoh: Fri, 10 Oct 2025
+    
+      document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
+      document.getElementById("utcDate").textContent = dateStr;
+    }
+    updateUTCClock();
+    setInterval(updateUTCClock, 1000);
   </script>
 </body>
 </html>

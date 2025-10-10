@@ -98,8 +98,34 @@
     .header-icon { width: 50px; height: 50px; background: rgba(255,255,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; color: #dbeafe; }
     .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px; }
     .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
-    .header-logos { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 12px; align-items: center; }
-    .header-logos img { height: 36px; opacity: 0.9; }
+    .header-logos {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;                /* ✅ jadi horizontal */
+      align-items: center;          /* ✅ sejajarkan vertikal */
+      gap: 12px;                    /* jarak antar elemen */
+    }
+    
+    .header-logos img {
+      height: 36px;
+      opacity: 0.9;
+    }
+    
+    .header-clock {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;        /* biar angka rata kanan */
+      justify-content: center;
+      line-height: 1.1;
+      font-size: 18px;
+      color: #ffffff;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(0,0,0,0.4);
+      margin-right: 0;              /* hilangkan margin lama */
+    }
 
     /* Table style */
     .controls { text-align: center; margin-bottom: 20px; }
@@ -210,7 +236,15 @@
       border-bottom: 1px solid rgba(255,255,255,0.15);
       padding-bottom: 8px;
     }
-    
+    .header-clock {
+      font-size: 18px;          /* 🔼 lebih besar dari sebelumnya */
+      color: #ffffff;           /* lebih terang biar kontras */
+      font-weight: 600;
+      opacity: 1;
+      margin-right: 14px;
+      letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(0,0,0,0.4); /* sedikit glow agar jelas di background */
+    }    
   </style>
 </head>
 <body>
@@ -240,9 +274,13 @@
       <h1>Data Availability per Month</h1>
       <p>Monitor .bfr, .bin, T*.X, and P*.X completeness for each site & day</p>
     </div>
-    <div class="header-logos">
-      <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
-    </div>
+        <div class="header-logos">
+          <div class="header-clock">
+            <div id="utcClock">--:--:-- UTC</div>
+            <div id="utcDate" style="font-size:12px; opacity:0.8;">-- --- ----</div>
+          </div>
+          <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+        </div>
   </div>
 
   <div class="controls">
@@ -309,8 +347,20 @@
     html+="</table>";
     $("#tableContainer").html(html);
   }
-
   loadData();
+    // === UTC Clock ===
+    function updateUTCClock() {
+      const now = new Date();
+      const utcHours = String(now.getUTCHours()).padStart(2, "0");
+      const utcMinutes = String(now.getUTCMinutes()).padStart(2, "0");
+      const utcSeconds = String(now.getUTCSeconds()).padStart(2, "0");
+      const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" "); // contoh: Fri, 10 Oct 2025
+    
+      document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
+      document.getElementById("utcDate").textContent = dateStr;
+    }
+    updateUTCClock();
+    setInterval(updateUTCClock, 1000);
 </script>
 </body>
 </html>
