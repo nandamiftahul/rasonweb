@@ -161,32 +161,43 @@
     .status-warn { color: #fd7e14; font-weight: 600; }
     .status-issues { color: #dc3545; font-weight: 600; }
 
-    /* Footer */
+    /* --- Sticky Footer yang menyesuaikan sidebar --- */
     .footer {
+      position: fixed;
+      bottom: 0;
+      left: 230px;                   /* sejajar dengan sidebar */
+      width: calc(100% - 230px);     /* sisa ruang dari sidebar */
+      height: 38px;
       background: #ffffff;
-      padding: 4px 0;                     /* 🔽 sangat tipis */
+      padding: 4px 0;
       display: flex;
       justify-content: center;
       align-items: center;
-      border-top: 1px solid #d1d5db;      /* garis abu muda */
-      border-radius: 0 0 8px 8px;
-      height: 38px;                       /* 🔽 batasi tinggi maksimum */
-      margin-top: 80px;
+      border-top: 1px solid #d1d5db;
+      border-radius: 0;
+      z-index: 5;
+      transition: all 0.3s ease;     /* animasi halus */
     }
     
     .footer span {
       color: #333;
       font-weight: 500;
       margin-right: 6px;
-      font-size: 12px;                    /* 🔽 kecil dan elegan */
+      font-size: 12px;
       opacity: 0.8;
     }
     
     .footer img {
-      height: 28px;                       /* 🔽 kecilkan logo */
+      height: 28px;
       opacity: 0.85;
       margin: 0 6px;
       filter: saturate(90%);
+    }
+    
+    /* ✅ Saat sidebar disembunyikan, footer melebar penuh */
+    .main.expanded ~ .footer {
+      left: 0;
+      width: 100%;
     }
 
     /* ✅ Loading Overlay */
@@ -296,14 +307,12 @@
       <h2>Files</h2>
       <div id="content"></div>
     </div>
-
-    <div class="footer">
-      <span>Powered by</span>
-      <img src="{{ url_for('static', filename='images/meteomodem.png') }}">
-      <img src="{{ url_for('static', filename='images/terrindofull.png') }}">
-    </div>
   </div>
-
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}">
+    <img src="{{ url_for('static', filename='images/terrindofull.png') }}">
+  </div>
   <!-- ✅ Loading overlay element -->
   <div id="progressOverlay">
     <div class="progress-bar"><div class="progress-bar-inner"></div></div>

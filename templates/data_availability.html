@@ -160,6 +160,44 @@
       visibility: visible;
       opacity: 1;
     }
+    /* --- Sticky Footer yang menyesuaikan sidebar --- */
+   .footer {
+     position: fixed;
+     bottom: 0;
+     left: 230px;                   /* sejajar dengan sidebar */
+     width: calc(100% - 230px);     /* sisa ruang dari sidebar */
+     height: 38px;
+     background: #ffffff;
+     padding: 4px 0;
+     display: flex;
+     justify-content: center;
+     align-items: center;
+     border-top: 1px solid #d1d5db;
+     border-radius: 0;
+     z-index: 5;
+     transition: all 0.3s ease;     /* animasi halus */
+   }
+   
+   .footer span {
+     color: #333;
+     font-weight: 500;
+     margin-right: 6px;
+     font-size: 12px;
+     opacity: 0.8;
+   }
+   
+   .footer img {
+     height: 28px;
+     opacity: 0.85;
+     margin: 0 6px;
+     filter: saturate(90%);
+   }
+   
+   /* ✅ Saat sidebar disembunyikan, footer melebar penuh */
+   .main.expanded ~ .footer {
+     left: 0;
+     width: 100%;
+   }
     .sidebar h2 {
       font-size: 20px;
       margin-bottom: 30px;
@@ -219,7 +257,12 @@
 
   <div id="tableContainer"><p style="text-align:center;">Please select filters to load data.</p></div>
 </div>
-
+<!-- Footer -->
+<div class="footer">
+  <span>Powered by</span>
+  <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+  <img src="{{ url_for('static', filename='images/terrindofull.png') }}" alt="Terrindo Logo">
+</div>
 <script>
   function toggleSidebar() {
     const s=document.getElementById("sidebar"),m=document.getElementById("mainContent"),b=document.getElementById("toggleBtn");

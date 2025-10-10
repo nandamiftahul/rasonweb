@@ -3,97 +3,207 @@
 <head>
   <meta charset="utf-8">
   <title>Radiosonde Viewer</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/leaflet/leaflet.css') }}">
+  <script src="{{ url_for('static', filename='libs/leaflet/leaflet.js') }}"></script>
+  
+  <!-- Chart.js -->
+  <script src="{{ url_for('static', filename='libs/chartjs/chart.umd.js') }}"></script>
+  <script src="{{ url_for('static', filename='libs/chartjs/chartjs-plugin-datalabels.js') }}"></script>
+  <script src="{{ url_for('static', filename='libs/chartjs/chartjs-plugin-style.js') }}"></script>
+  <script src="{{ url_for('static', filename='libs/chartjs/chartjs-plugin-zoom.js') }}"></script>
+  
+  <!-- MapLibre -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/maplibre/maplibre-gl.css') }}">
+  <script src="{{ url_for('static', filename='libs/maplibre/maplibre-gl.js') }}"></script>
+  
+  <!-- Deck.gl -->
+  <script src="{{ url_for('static', filename='libs/deckgl/deck.gl.min.js') }}"></script>
+
   <style>
-    body, html { margin:0; padding:0; height:100%; font-family:sans-serif; }
-    #map { height:100%; width:100%; }
-
-    #controls {
-      position:absolute;
-      bottom:10px;
-      left:50%;
-      transform:translateX(-50%);
-      background:white;
-      padding:8px;
-      border-radius:8px;
-      box-shadow:0 0 6px rgba(0,0,0,0.4);
-      display:flex;
-      align-items:center;
-      gap:6px;
-      z-index:1000;
-    }
-
-    #infoPanel, #metaPanel {
-      position:absolute;
-      top:80px;
-      background:white;
-      padding:10px;
-      border-radius:6px;
-      box-shadow:0 0 6px rgba(0,0,0,0.4);
-      z-index:1000;
-      font-size:14px;
-      width:260px;
-      max-height:80%;
-      overflow-y:auto;
-    }
-    #infoPanel { right:20px; }
-    #metaPanel { left:20px; }
-
-    #infoPanel, #metaPanel {
-      backdrop-filter: blur(10px);
-      background: rgba(255, 255, 255, 0.85);
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      color: #111;
+    /* === BASE LAYOUT === */
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
       font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+    }
+  
+    #map { height: 100%; width: 100%; }
+  
+    /* === CONTROLS BAR === */
+    #controls {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.6); /* 🔹 lebih transparan */
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 4px 8px;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      z-index: 1000;
+    }
+  
+    /* --- Buttons --- */
+    #controls button {
+      background: linear-gradient(135deg, #005fa3, #0078d7);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      transition: all 0.2s ease;
+    }
+    #controls button:hover {
+      background: linear-gradient(135deg, #0078d7, #00a2ff);
+      transform: translateY(-1px);
+    }
+    #chartsBtn {
+      background: linear-gradient(135deg, #ff8c00, #ff6a00);
+    }
+    #chartsBtn:hover {
+      background: linear-gradient(135deg, #ff9f1c, #ff7a00);
+    }
+  
+    /* --- Slider (Thin & Transparent White Track) --- */
+    #frameSlider {
+      width: 190px;
+      height: 3px;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.4); /* 🔹 transparan putih lembut */
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
       transition: all 0.3s ease;
     }
-    
+  
+    /* Chrome / Edge / Safari */
+    #frameSlider::-webkit-slider-thumb {
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #0078d7;
+      border: 2px solid #fff;
+      box-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
+      transition: 0.2s;
+    }
+    #frameSlider::-webkit-slider-thumb:hover {
+      background: #00a2ff;
+    }
+  
+    /* Firefox */
+    #frameSlider::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #0078d7;
+      border: 2px solid #fff;
+      box-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
+      transition: 0.2s;
+    }
+    #frameSlider::-moz-range-thumb:hover {
+      background: #00a2ff;
+    }
+    #frameSlider::-moz-range-track {
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 2px;
+    }
+  
+    #frameText {
+      color: #004aad;
+      font-weight: 600;
+      font-size: 12px;
+      min-width: 50px;
+      text-align: center;
+    }
+  
+    /* === PANELS === */
+    #infoPanel, #metaPanel {
+      position: absolute;
+      top: 80px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #111;
+      border-radius: 8px;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25);
+      z-index: 1000;
+      font-size: 13px;
+      width: 240px;
+      max-height: 80%;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+    #infoPanel { right: 18px; }
+    #metaPanel { left: 18px; }
+  
     #infoPanel h4, #metaPanel h4 {
-      margin: 6px 0;
-      color: #0a2a6b;
-      font-size: 15px;
-      border-bottom: 1px solid #ccc;
+      margin: 5px 0;
+      color: #004aad;
+      font-size: 14px;
+      border-bottom: 1px solid #ddd;
       padding-bottom: 2px;
     }
-    
     #infoPanel b, #metaPanel b {
       color: #004aad;
     }
-
-
+  
+    /* === CHART PANEL === */
     #chartsPanel {
       position: absolute;
-      bottom: 80px;
+      bottom: 75px;
       left: 50%;
-      transform: translateX(-50%);  /
-      width: 1110px;
-      height: 320px;
-      background: white;
-      border-radius: 6px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.4);
+      transform: translateX(-50%);
+      width: 1060px;
+      height: 280px;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(8px);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
       z-index: 1000;
-      padding: 6px;
+      padding: 8px;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
+      gap: 8px;
     }
-
-    .chartBox { flex:1; height:100%; }
-
+    .chartBox {
+      flex: 1;
+      height: 100%;
+    }
+    canvas {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+  
+    /* === TOP BAR === */
     #topBar {
-      position:absolute;
-      top:10px;
-      right:10px;
-      z-index:1200;
-      background:white;
-      padding:6px 10px;
-      border-radius:6px;
-      box-shadow:0 0 6px rgba(0,0,0,0.3);
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1200;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 5px 10px;
+      border-radius: 6px;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
     }
-    #topBar a { text-decoration:none; color:#333; font-size:14px; }
-    
+    #topBar a {
+      text-decoration: none;
+      color: #333;
+      font-size: 13px;
+    }
+  
+    /* === PANEL ICON BUTTONS === */
     .panel-btn {
       border: none;
       background: none;
@@ -103,30 +213,29 @@
       transition: 0.2s;
     }
     .panel-btn:hover {
-      transform: scale(1.3);
+      transform: scale(1.2);
     }
-
-    #uploadFilterBar select, 
-    #uploadFilterBar input[type="date"], 
+  
+    /* === FILTER BAR === */
+    #uploadFilterBar select,
+    #uploadFilterBar input[type="date"],
     #uploadFilterBar button {
-      padding: 5px 8px;
-      border-radius: 5px;
+      padding: 4px 7px;
+      border-radius: 4px;
       border: 1px solid #ccc;
-      font-size: 13px;
+      font-size: 12px;
     }
-    
     #uploadFilterBar button {
       background-color: #0078d7;
       color: white;
       cursor: pointer;
       border: none;
     }
-    
     #uploadFilterBar button:hover {
       background-color: #005fa3;
     }
-
   </style>
+
 </head>
 <body>
   <div id="map"></div>
@@ -177,8 +286,6 @@
     </div>
   </div>
 
-
-
   <!-- Logout button -->
   <div id="topBar">
     Hi, {{ user }} |
@@ -213,12 +320,14 @@
 
   <!-- Controls -->
   <div id="controls">
-    <button type="button" onclick="prevFrame()">⏮ Prev</button>
-    <button type="button" onclick="togglePlay()"><span id="playBtn">▶ Play</span></button>
-    <button type="button" onclick="nextFrame()">Next ⏭</button>
-    <input type="range" id="frameSlider" min="0" value="0" step="1" style="width:200px;">
+    <button type="button" class="ctrl-btn" onclick="prevFrame()">⏮</button>
+    <button type="button" class="ctrl-btn" onclick="togglePlay()"><span id="playBtn">▶</span></button>
+    <button type="button" class="ctrl-btn" onclick="nextFrame()">⏭</button>
+    
+    <input type="range" id="frameSlider" min="0" value="0" step="1">
     <span id="frameText">0/0</span>
-    <button type="button" onclick="toggleCharts()" id="chartsBtn">📊 Hide Charts</button>
+    
+    <button type="button" class="ctrl-btn toggle" onclick="toggleCharts()" id="chartsBtn">📊 Hide Charts</button>
   </div>
 
   <script>
@@ -287,85 +396,174 @@
       iconAnchor: [32, 64]
     });
 
-    // --- Charts ---
-    const windChartData = { datasets: [
-      { label: 'Ascent Rate (m/s)', data: [], borderColor: 'blue', showLine:true },
-      { label: 'Wind Speed (m/s)', data: [], borderColor: 'red', showLine:true }
-    ]};
-    const windChart = new Chart(document.getElementById('windChart'), {
-      type: 'scatter', data: windChartData,
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            align: 'center',
-            labels: {
-              boxWidth: 12,
-              padding: 16,
-              usePointStyle: true,
-              pointStyle: 'circle'
-            }
+    // --- Charts ---  
+    // === Register Plugins ===
+    Chart.register(ChartDataLabels);
+    
+    // === Common Chart Options ===
+    const commonOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      elements: {
+        line: { tension: 0.25, borderWidth: 2 },
+        point: { radius: 2, hoverRadius: 5 }
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          align: 'center',
+          labels: {
+            color: '#222',             // 🌟 teks legend hitam gelap
+            boxWidth: 12,
+            padding: 12,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            font: { size: 13, weight: 'bold' }
           }
         },
-        scales: {
-          x: { title: { display: true, text: 'Value (m/s)' } },
-          y: { title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 25000 }
+        datalabels: { display: false },
+        style: {
+          shadowOffsetX: 1,
+          shadowOffsetY: 2,
+          shadowBlur: 5,
+          shadowColor: 'rgba(0,0,0,0.3)'
+        },
+        zoom: {
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' },
+          pan: { enabled: true, mode: 'xy' }
+        },
+        title: {
+          display: false,
+          color: '#222',
+          font: { size: 16, weight: 'bold' }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(0,0,0,0.1)' },
+          ticks: { color: '#333', font: { size: 12, weight: 'bold' } },   // 🌟 angka sumbu X hitam
+          title: { display: true, color: '#111', font: { size: 13, weight: 'bold' } } // 🌟 label sumbu X
+        },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.1)' },
+          ticks: { color: '#333', font: { size: 12, weight: 'bold' } },   // 🌟 angka sumbu Y hitam
+          title: { display: true, color: '#111', font: { size: 13, weight: 'bold' } }
         }
       }
-    });
-
-    // --- Wind Direction Chart ---
-    const dirChartData = { datasets: [
-      { label: 'Wind Dir (°)', data: [], borderColor: 'green', showLine:true }
-    ]};
+    };
+    
+    // === Wind Direction Chart ===
+    const dirChartData = {
+      datasets: [
+        {
+          label: 'Wind Direction (°)',
+          data: [],
+          borderColor: '#28c76f',
+          backgroundColor: '#28c76f70',
+          showLine: true
+        }
+      ]
+    };
     const dirChart = new Chart(document.getElementById('dirChart'), {
-      type: 'scatter', data: dirChartData,
+      type: 'scatter',
+      data: dirChartData,
       options: {
-        responsive: true, maintainAspectRatio: false,
+        ...commonOptions,
         plugins: {
-          legend: {
-            position: 'bottom',
-            align: 'center',
-            labels: {
-              boxWidth: 12,
-              padding: 16,
-              usePointStyle: true,
-              pointStyle: 'circle'
-            }
+          ...commonOptions.plugins,
+          title: {
+            display: true,
+            text: 'Wind Direction Profile',
+            color: '#111',
+            font: { size: 17, weight: 'bold' }
           }
         },
         scales: {
-          x: { title: { display: true, text: 'Direction (°)' }, min:0, max:360 },
-          y: { title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 25000 }
+          ...commonOptions.scales,
+          x: { ...commonOptions.scales.x, title: { display: true, text: 'Direction (°)' }, min: 0, max: 360 },
+          y: { ...commonOptions.scales.y, title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 30000 }
         }
       }
     });
     
-
-    const thermoChartData = { datasets: [
-      { label: 'Temp (°C)', data: [], borderColor: 'orange', showLine:true },
-      { label: 'Dewpoint (°C)', data: [], borderColor: 'cyan', showLine:true }
-    ]};
-    const thermoChart = new Chart(document.getElementById('thermoChart'), {
-      type: 'scatter', data: thermoChartData,
+    // === Wind Speed & Ascent Rate ===
+    const windChartData = {
+      datasets: [
+        {
+          label: 'Ascent Rate (m/s)',
+          data: [],
+          borderColor: '#007bff',
+          backgroundColor: '#007bff80',
+          showLine: true
+        },
+        {
+          label: 'Wind Speed (m/s)',
+          data: [],
+          borderColor: '#e74c3c',
+          backgroundColor: '#e74c3c80',
+          showLine: true
+        }
+      ]
+    };
+    const windChart = new Chart(document.getElementById('windChart'), {
+      type: 'scatter',
+      data: windChartData,
       options: {
-        responsive: true, maintainAspectRatio: false,
+        ...commonOptions,
         plugins: {
-          legend: {
-            position: 'bottom',
-            align: 'center',
-            labels: {
-              boxWidth: 12,
-              padding: 16,
-              usePointStyle: true,
-              pointStyle: 'circle'
-            }
+          ...commonOptions.plugins,
+          title: {
+            display: true,
+            text: 'Wind Speed & Ascent Rate',
+            color: '#111',
+            font: { size: 17, weight: 'bold' }
           }
         },
         scales: {
-          x: { title: { display: true, text: 'Temperature (°C)' } },
-          y: { title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 25000 }
+          ...commonOptions.scales,
+          x: { ...commonOptions.scales.x, title: { display: true, text: 'Speed / Ascent (m/s)', color: '#111' } },
+          y: { ...commonOptions.scales.y, title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 30000 }
+        }
+      }
+    });
+    
+    // === Thermodynamic Chart ===
+    const thermoChartData = {
+      datasets: [
+        {
+          label: 'Temperature (°C)',
+          data: [],
+          borderColor: '#ffa500',
+          backgroundColor: '#ffa50070',
+          showLine: true
+        },
+        {
+          label: 'Dewpoint (°C)',
+          data: [],
+          borderColor: '#00bcd4',
+          backgroundColor: '#00bcd470',
+          showLine: true
+        }
+      ]
+    };
+    const thermoChart = new Chart(document.getElementById('thermoChart'), {
+      type: 'scatter',
+      data: thermoChartData,
+      options: {
+        ...commonOptions,
+        plugins: {
+          ...commonOptions.plugins,
+          title: {
+            display: true,
+            text: 'Temperature & Dewpoint Profile',
+            color: '#111',
+            font: { size: 17, weight: 'bold' }
+          }
+        },
+        scales: {
+          ...commonOptions.scales,
+          x: { ...commonOptions.scales.x, title: { display: true, text: 'Temperature (°C)', color: '#111' } },
+          y: { ...commonOptions.scales.y, title: { display: true, text: 'Height (m)' }, suggestedMin: 0, suggestedMax: 30000 }
         }
       }
     });
@@ -697,19 +895,52 @@
       }
     }
 
-    function nextFrame() { if (!allLevels.length) return; frame = (frame + 1) % total; loadRason(); }
-    function prevFrame() { if (!allLevels.length) return; frame = (frame - 1 + total) % total; loadRason(); }
+    function nextFrame() {
+      if (!allLevels.length) return;
+    
+      // kalau belum frame terakhir → lanjut
+      if (frame < total - 1) {
+        frame++;
+        loadRason();
+      } else {
+        // kalau sudah frame terakhir → stop play otomatis
+        clearInterval(timer);
+        playing = false;
+        document.getElementById("playBtn").innerText = "▶";
+      }
+    }
+    
+    function prevFrame() {
+      if (!allLevels.length) return;
+      if (frame > 0) {
+        frame--;
+        loadRason();
+      } else {
+        frame = 0;
+      }
+    }
+    
     function togglePlay() {
       if (!allLevels.length) return;
-      if (playing) { clearInterval(timer); playing=false; document.getElementById("playBtn").innerText="▶ Play"; }
-      else { timer=setInterval(nextFrame, 1000); playing=true; document.getElementById("playBtn").innerText="⏸ Pause"; }
+    
+      const playBtn = document.getElementById("playBtn");
+      if (playing) {
+        clearInterval(timer);
+        playing = false;
+        playBtn.innerText = "▶";
+      } else {
+        playing = true;
+        playBtn.innerText = "⏸";
+        timer = setInterval(nextFrame, 1000);
+      }
     }
+    
     document.getElementById("frameSlider").addEventListener("input", function () {
       if (!allLevels.length) return;
       frame = parseInt(this.value, 10) || 0;
       loadRason();
     });
-    
+
     // --- Metadata toggle ---
     document.addEventListener("DOMContentLoaded", () => {
       const metaBtn = document.getElementById("toggleMeta");
@@ -728,12 +959,36 @@
         infoBtn.textContent = hidden ? "−" : "+";
       });
     });
+
+    // === SIMPAN FILTERS ===
+    function saveFilterState() {
+      localStorage.setItem("siteSelect", document.getElementById("siteSelect").value);
+      localStorage.setItem("dateSelect", document.getElementById("dateSelect").value);
+      localStorage.setItem("hourSelect", document.getElementById("hourSelect").value);
+      localStorage.setItem("typeSelect", document.getElementById("typeSelect").value);
+    }
     
+    // === RESTORE FILTERS SAAT PAGE LOAD ===
+    window.addEventListener("load", () => {
+      const site = localStorage.getItem("siteSelect");
+      const date = localStorage.getItem("dateSelect");
+      const hour = localStorage.getItem("hourSelect");
+      const type = localStorage.getItem("typeSelect");
+    
+      if (site) document.getElementById("siteSelect").value = site;
+      if (date) document.getElementById("dateSelect").value = date;
+      if (hour) document.getElementById("hourSelect").value = hour;
+      if (type) document.getElementById("typeSelect").value = type;
+    });
+
     async function applyFilter() {
+      // simpan dulu sebelum reload
+      saveFilterState();
+    
       const site  = document.getElementById("siteSelect").value;
-      const date  = document.getElementById("dateSelect").value; // YYYY-MM-DD
-      const hour  = document.getElementById("hourSelect").value; // "00" / "12"
-      const ftype = document.getElementById("typeSelect").value; // ".bfr" / ".bufr" / ".bfh" / ".bin"
+      const date  = document.getElementById("dateSelect").value;
+      const hour  = document.getElementById("hourSelect").value;
+      const ftype = document.getElementById("typeSelect").value;
     
       if (!site || !date || !hour || !ftype) {
         alert("⚠️ Mohon pilih site, tanggal, jam, dan tipe file!");
@@ -748,7 +1003,7 @@
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body,
-          credentials: "same-origin"   // penting, bawa cookie login
+          credentials: "same-origin"
         });
         data = await res.json();
       } catch (e) {
@@ -766,18 +1021,15 @@
         return;
       }
     
-      // pilih file (ambil yang 'terbaru' berdasarkan nama)
       const chosen = data.files.sort().slice(-1)[0];
-      // update Himawari ke waktu radiosonde
       const selectedDateTime = new Date(`${date}T${hour}:00:00Z`);
-      // hanya update waktu jika overlay sedang aktif
       if (map.hasLayer(himawariLayer)) {
         setHimawariTime(selectedDateTime);
       }
-      //if (!map.hasLayer(himawariLayer)) himawariLayer.addTo(map);
-      // redirect ke loader → backend download/parse → redirect balik ke /
+    
       window.location.href = `/load_from_ftp/${encodeURIComponent(site)}/${encodeURIComponent(chosen)}`;
     }
+
 
     // === Fungsi untuk update waktu Himawari ===
     function setHimawariTime(dateUTC) {

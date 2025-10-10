@@ -94,9 +94,11 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 40px;
-      margin-left: 230px;
-      transition: margin-left 0.3s ease;
+      min-height: 100vh;             /* ✅ pastikan penuh tinggi layar */
+      margin-left: 230px;            /* ✅ offset karena sidebar */
+      padding: 40px 40px 0;          /* bawah nol supaya footer pas */
+      box-sizing: border-box;
+      padding-bottom: 50px;
     }
 
     .main.expanded {
@@ -157,44 +159,43 @@
       margin-bottom: 30px;
     }
 
-    /* Footer */
+    /* --- Sticky Footer yang menyesuaikan sidebar --- */
     .footer {
+      position: fixed;
+      bottom: 0;
+      left: 230px;                   /* sejajar dengan sidebar */
+      width: calc(100% - 230px);     /* sisa ruang dari sidebar */
+      height: 38px;
       background: #ffffff;
-      padding: 4px 0;                     /* 🔽 sangat tipis */
+      padding: 4px 0;
       display: flex;
       justify-content: center;
       align-items: center;
-      border-top: 1px solid #d1d5db;      /* garis abu muda */
-      border-radius: 0 0 8px 8px;
-      height: 38px;                       /* 🔽 batasi tinggi maksimum */
-      margin-top: 100px;
+      border-top: 1px solid #d1d5db;
+      border-radius: 0;
+      z-index: 5;
+      transition: all 0.3s ease;     /* animasi halus */
     }
     
     .footer span {
       color: #333;
       font-weight: 500;
       margin-right: 6px;
-      font-size: 12px;                    /* 🔽 kecil dan elegan */
+      font-size: 12px;
       opacity: 0.8;
     }
     
     .footer img {
-      height: 28px;                       /* 🔽 kecilkan logo */
+      height: 28px;
       opacity: 0.85;
       margin: 0 6px;
       filter: saturate(90%);
     }
-    .sidebar h2 {
-      font-size: 20px;
-      margin-bottom: 30px;
-      color: #e0f2fe;                 /* biru muda lembut */
-      text-align: center;
-      font-weight: 700;               /* lebih tebal */
-      letter-spacing: 1.2px;          /* sedikit renggang */
-      text-transform: uppercase;      /* tampil tegas */
-      text-shadow: 0 0 6px rgba(255,255,255,0.3);
-      border-bottom: 1px solid rgba(255,255,255,0.15);
-      padding-bottom: 8px;
+    
+    /* ✅ Saat sidebar disembunyikan, footer jadi full */
+    .main.expanded ~ .footer {
+      left: 0;
+      width: 100%;
     }
   </style>
 </head>
@@ -240,15 +241,13 @@
     <div id="statusGrid" class="card-grid">
       <p>Loading latest site status...</p>
     </div>
-
-    <!-- Footer -->
-    <div class="footer">
-      <span>Powered by</span>
-      <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
-      <img src="{{ url_for('static', filename='images/terrindofull.png') }}" alt="Terrindo Logo">
-    </div>
   </div>
-
+    <!-- Footer -->
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+    <img src="{{ url_for('static', filename='images/terrindofull.png') }}" alt="Terrindo Logo">
+  </div>
   <script>
     function toggleSidebar() {
       const sidebar = document.getElementById("sidebar");
