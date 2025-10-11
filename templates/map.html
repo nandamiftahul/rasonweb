@@ -189,19 +189,30 @@
     /* === TOP BAR === */
     #topBar {
       position: absolute;
-      top: 10px;
+      top: 8px;
       right: 10px;
       z-index: 1200;
-      background: rgba(255, 255, 255, 0.7);
-      padding: 5px 10px;
-      border-radius: 6px;
-      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+      background: rgba(255, 255, 255, 0.6);
+      padding: 3px 8px;              /* 🔹 lebih tipis */
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      font-size: 12px;               /* 🔹 lebih kecil */
+      line-height: 1.2;
+      display: flex;
+      align-items: center;
+      gap: 6px;                      /* 🔹 sedikit jarak antar item */
+      backdrop-filter: blur(6px);
     }
     #topBar a {
       text-decoration: none;
-      color: #333;
-      font-size: 13px;
+      color: #004aad;
+      font-weight: 600;
+      font-size: 12px;
     }
+    #topBar a:hover {
+      text-decoration: underline;
+    }
+
   
     /* === PANEL ICON BUTTONS === */
     .panel-btn {
@@ -215,46 +226,129 @@
     .panel-btn:hover {
       transform: scale(1.2);
     }
-  
-    /* === FILTER BAR === */
+
+    /* === UPLOAD + FILTER BAR === */
+    #uploadFilterBar {
+      position: absolute;
+      top: 10px;              /* sejajar topbar */
+      left: 10px;
+      z-index: 1001;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(8px);
+      padding: 6px 8px;
+      border-radius: 6px;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column; /* Upload di bawah Filter */
+      align-items: flex-start;
+      gap: 4px;
+      font-size: 11px;
+      max-width: 98vw;
+    }
+    
+    /* Bar filter di baris pertama */
+    #filterBar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    
+    /* Upload di baris kedua */
+    #uploadForm {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      border-top: 1px solid rgba(0, 0, 0, 0.1);
+      padding-top: 4px;
+      width: 100%;
+    }
+    
+    /* Elemen kecil */
     #uploadFilterBar select,
     #uploadFilterBar input[type="date"],
+    #uploadFilterBar input[type="file"],
     #uploadFilterBar button {
-      padding: 4px 7px;
+      font-size: 11px;
+      padding: 3px 6px;
       border-radius: 4px;
       border: 1px solid #ccc;
-      font-size: 12px;
     }
+    
     #uploadFilterBar button {
       background-color: #0078d7;
       color: white;
-      cursor: pointer;
       border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.2s;
     }
     #uploadFilterBar button:hover {
       background-color: #005fa3;
+    }
+    
+    /* Responsif untuk layar kecil */
+    @media (max-width: 900px) {
+      #uploadFilterBar {
+        top: 55px; /* beri jarak aman dari topbar */
+        left: 5px;
+        right: 5px;
+      }
+      #filterBar,
+      #uploadForm {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+      }
+      #uploadFilterBar label {
+        display: none;
+      }
+      #uploadFilterBar select,
+      #uploadFilterBar input[type="date"],
+      #uploadFilterBar input[type="file"],
+      #uploadFilterBar button {
+        width: 100%;
+      }
+    }
+    /* === STATUS TEXT === */
+    .statusText {
+      font-size: 11px;
+      color: #004aad;
+      font-weight: 600;
+      margin-left: 6px;
+      min-width: 180px;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    
+    .statusText.loading {
+      color: #ff8c00;
+      animation: pulse 1.2s infinite;
+    }
+    
+    .statusText.success {
+      color: #28a745;
+    }
+    
+    .statusText.error {
+      color: #e74c3c;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
     }
   </style>
 
 </head>
 <body>
   <div id="map"></div>
-
   <!-- Upload + Filter Container -->
-  <div id="uploadFilterBar" style="
-    position:absolute; top:10px; left:10px; z-index:1000;
-    background:white; padding:8px 10px; border-radius:8px;
-    box-shadow:0 0 6px rgba(0,0,0,0.3);
-    display:flex; align-items:center; gap:10px;">
-  
-    <!-- Upload -->
-    <form method="POST" enctype="multipart/form-data" id="uploadForm" style="display:flex; align-items:center; gap:6px;">
-      <input type="file" name="rasonfiles" accept=".bufr,.bfr,.bfh,.bin">
-      <button type="submit">Upload Radiosonde</button>
-    </form>
-  
-    <!-- Filter -->
-    <div id="filterBar" style="display:flex; align-items:center; gap:6px;">
+  <div id="uploadFilterBar">
+    <!-- 🔹 FILTER BAR -->
+    <div id="filterBar">
       <label>Site:</label>
       <select id="siteSelect">
         <option value="aceh">Aceh</option>
@@ -264,16 +358,16 @@
         <option value="pangkalanbun">Pangkalanbun</option>
         <option value="ranai">Ranai</option>
       </select>
-    
+  
       <label>Date:</label>
       <input type="date" id="dateSelect">
-    
+  
       <label>Hour:</label>
       <select id="hourSelect">
         <option value="00">00Z</option>
         <option value="12">12Z</option>
       </select>
-    
+  
       <label>Type:</label>
       <select id="typeSelect">
         <option value=".bfr">.bfr</option>
@@ -281,9 +375,18 @@
         <option value=".bfh">.bfh</option>
         <option value=".bin">.bin</option>
       </select>
-    
+  
       <button onclick="applyFilter()">Apply</button>
     </div>
+  
+    <!-- 🔹 UPLOAD MANUAL (status gabung di sini) -->
+    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <input type="file" name="rasonfiles" accept=".bufr,.bfr,.bfh,.bin">
+        <button type="submit">Upload Radiosonde</button>
+        <span id="statusText" class="statusText"></span>
+      </div>
+    </form>
   </div>
 
   <!-- Logout button -->
@@ -982,7 +1085,10 @@
     });
 
     async function applyFilter() {
-      // simpan dulu sebelum reload
+      const statusEl = document.getElementById("statusText");
+      statusEl.textContent = "🔄 Getting file from FTP...";
+      statusEl.className = "statusText loading";
+    
       saveFilterState();
     
       const site  = document.getElementById("siteSelect").value;
@@ -992,56 +1098,87 @@
     
       if (!site || !date || !hour || !ftype) {
         alert("⚠️ Mohon pilih site, tanggal, jam, dan tipe file!");
+        statusEl.textContent = "⚠️ Incomplete filter";
+        statusEl.className = "statusText error";
         return;
       }
     
-      // kirim filter ke backend
-      const body = new URLSearchParams({ site, date, hour, ftype });
-      let data;
       try {
         const res = await fetch("/api/filter", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body,
+          body: new URLSearchParams({ site, date, hour, ftype }),
           credentials: "same-origin"
         });
-        data = await res.json();
+        const data = await res.json();
+    
+        if (data.status === "no_files") {
+          statusEl.textContent = "⚠️ No files found";
+          statusEl.className = "statusText error";
+          alert(data.message || "No matching files found");
+          return;
+        }
+        if (data.status !== "ok" || !Array.isArray(data.files) || data.files.length === 0) {
+          statusEl.textContent = "❌ Filter error";
+          statusEl.className = "statusText error";
+          alert("❌ Filter error.");
+          return;
+        }
+    
+        statusEl.textContent = "📦 Decoding BUFR...";
+        const chosen = data.files.sort().slice(-1)[0];
+        const selectedDateTime = new Date(`${date}T${hour}:00:00Z`);
+        if (map.hasLayer(himawariLayer)) setHimawariTime(selectedDateTime);
+    
+        // sedikit delay biar smooth
+        setTimeout(() => {
+          statusEl.textContent = "✅ Success — File Loaded";
+          statusEl.className = "statusText success";
+          window.location.href = `/load_from_ftp/${encodeURIComponent(site)}/${encodeURIComponent(chosen)}`;
+        }, 800);
       } catch (e) {
         console.error(e);
         alert("❌ Gagal menghubungi /api/filter");
-        return;
-      }
-    
-      if (data.status === "no_files") {
-        alert("⚠️ " + (data.message || "Tidak ada file yang cocok"));
-        return;
-      }
-      if (data.status !== "ok" || !Array.isArray(data.files) || data.files.length === 0) {
-        alert("❌ Filter error.");
-        return;
-      }
-    
-      const chosen = data.files.sort().slice(-1)[0];
-      const selectedDateTime = new Date(`${date}T${hour}:00:00Z`);
-      if (map.hasLayer(himawariLayer)) {
-        setHimawariTime(selectedDateTime);
-      }
-    
-      window.location.href = `/load_from_ftp/${encodeURIComponent(site)}/${encodeURIComponent(chosen)}`;
-    }
-
-
-    // === Fungsi untuk update waktu Himawari ===
-    function setHimawariTime(dateUTC) {
-      // Bulatkan ke kelipatan 10 menit (slot GIBS)
-      const rounded = new Date(Math.floor(dateUTC.getTime() / (10 * 60 * 1000)) * (10 * 60 * 1000));
-      const iso = rounded.toISOString().split('.')[0] + "Z";
-      console.log("[Himawari] Update time:", iso);
-      himawariLayer.setParams({ time: iso });
-      if (map.hasLayer(himawariLayer)) {
-        map.addLayer(himawariLayer);
+        statusEl.textContent = "❌ Connection failed";
+        statusEl.className = "statusText error";
       }
     }
+
+    // === UPLOAD RADIOSONDE (versi DOM native, bukan fetch) ===
+    const uploadForm = document.getElementById("uploadForm");
+    const fileInput = document.getElementById("rasonFile");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const statusEl = document.getElementById("statusText");
+    
+    uploadForm.addEventListener("submit", (e) => {
+      if (!fileInput.files.length) {
+        e.preventDefault();
+        alert("⚠️ Please choose a file first!");
+        return;
+      }
+    
+      // tampilkan status sementara
+      statusEl.textContent = "🔄 Uploading file...";
+      statusEl.className = "statusText loading";
+    
+      // biarkan form submit normal (page reload otomatis)
+      uploadBtn.disabled = true;
+    
+      // kalau upload berhasil, Flask akan reload otomatis,
+      // jadi kita tidak perlu handle res di JS
+    });
+    
+        // === Fungsi untuk update waktu Himawari ===
+        function setHimawariTime(dateUTC) {
+          // Bulatkan ke kelipatan 10 menit (slot GIBS)
+          const rounded = new Date(Math.floor(dateUTC.getTime() / (10 * 60 * 1000)) * (10 * 60 * 1000));
+          const iso = rounded.toISOString().split('.')[0] + "Z";
+          console.log("[Himawari] Update time:", iso);
+          himawariLayer.setParams({ time: iso });
+          if (map.hasLayer(himawariLayer)) {
+            map.addLayer(himawariLayer);
+          }
+        }
 
   </script>
 </body>
