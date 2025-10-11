@@ -124,59 +124,6 @@ hr { border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 12px 0; 
   margin-top: -2px;
   color: #fff;
 }
-/* === Responsive layout for mobile === */
-@media (max-width: 768px) {
-
-  /* Buat panel kiri (filter/upload) jadi full width di bawah */
-  .panel {
-    position: static;               /* tidak absolute lagi */
-    width: 92%;
-    margin: 10px auto;
-    padding: 12px 14px;
-    font-size: 13px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255,255,255,0.25);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  }
-
-  /* Panel kanan (Level Info) pindah ke bawah map juga */
-  #levelPanel {
-    position: static;
-    width: 92%;
-    margin: 10px auto;
-    display: block;                  /* pastikan tetap muncul */
-    background: rgba(255, 255, 255, 0.12);
-  }
-
-  /* Map tidak tertutup panel */
-  #map {
-    position: relative;
-    height: 60vh;                    /* sisakan area map */
-  }
-
-  /* Compass agak kecil dan tidak menutupi map */
-  #northArrow {
-    bottom: 10px;
-    right: 10px;
-    width: 40px;
-    height: 40px;
-  }
-  #northArrow::before {
-    font-size: 16px;
-    margin-top: 6px;
-  }
-
-  /* Text dan tombol sedikit kecil */
-  button, select, input {
-    font-size: 12px;
-  }
-
-  /* Jarak antar elemen lebih rapat */
-  .row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
 
 </style>
 </head>
