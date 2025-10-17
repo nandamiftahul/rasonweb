@@ -263,7 +263,7 @@
       <div class="header-icon">⏱️</div>
       <div class="header-text">
         <h1>Time Accuracy Monitoring</h1>
-        <p>Balloon time to reach 100 hPa (blue) and 30 hPa (red) — current month</p>
+        <p>Balloon time to reach 100 hPa (blue) and burst (red) — current month</p>
       </div>
         <div class="header-logos">
           <div class="header-clock">
@@ -368,104 +368,180 @@
       }
     }
 
-    function renderChart() {
-      const filterTime = timeSelect.value;
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = now.getUTCMonth();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      let labels = [];
-      let AB = [];
-      let CD = [];
-      if (filterTime === "ALL") {
-        for (let d = 1; d <= daysInMonth; d++) {
-          const day = d.toString().padStart(2, "0");
-          labels.push(`${day} (00Z)`);
-          labels.push(`${day} (12Z)`);
-        }
-        const map = {};
-        allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
-        AB = labels.map(lbl => {
-          const [day, tag] = lbl.split(" ");
-          const h = tag.replace(/[()]/g, "");
-          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
-          return entry ? entry.AB : null;
-        });
-        CD = labels.map(lbl => {
-          const [day, tag] = lbl.split(" ");
-          const h = tag.replace(/[()]/g, "");
-          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
-          return entry ? entry.CD : null;
-        });
-      } else {
-        for (let d = 1; d <= daysInMonth; d++) {
-          const day = d.toString().padStart(2, "0");
-          labels.push(day);
-        }
-        const map = {};
-        allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
-        AB = labels.map(day => {
-          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
-          return entry ? entry.AB : null;
-        });
-        CD = labels.map(day => {
-          const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
-          return entry ? entry.CD : null;
-        });
-      }
+function renderChart() {
+  const filterTime = timeSelect.value;
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-      loadingMsg.style.display = "none";
-      const validAB = AB.filter(v => v !== null);
-      const validCD = CD.filter(v => v !== null);
-      const avgAB = validAB.length ? (validAB.reduce((a,b)=>a+b,0)/validAB.length).toFixed(1) : "-";
-      const avgCD = validCD.length ? (validCD.reduce((a,b)=>a+b,0)/validCD.length).toFixed(1) : "-";
-      summaryDiv.textContent = `Average A–B: ${avgAB} min | Average C–D: ${avgCD} min`;
+  let labels = [];
+  let AB = [];     // Launch → 100 hPa
+  let CD = [];     // Launch → 30 hPa (opsional)
+  let prep = [];   // Preparation → Launch (bar putih)
+  let redDiff = []; // 100 hPa → End (Burst)
 
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [
-            { label: "A–B (100 hPa)", data: AB, backgroundColor: "rgba(59,130,246,0.85)", stack: "stack1" },
-            { label: "C–D (30 hPa)", data: CD, backgroundColor: "rgba(239,68,68,0.85)", stack: "stack1" }
-          ]
+  // === helper hitung selisih waktu preparation–launch ===
+  // === helper hitung menit selisih (launch_time - waktu persiapan) ===
+  function prepDiff(entry) {
+    if (!entry || !entry.launch_time) return null;
+  
+    // ubah format agar bisa diparse semua browser
+    const launch = new Date(entry.launch_time.replace(" ", "T") + "Z");
+    if (isNaN(launch)) return null;
+  
+    // patokan dasar (jam persiapan)
+    const base = new Date(launch);
+    if (entry.hour === "00Z") {
+      // untuk 00Z → 23:30 hari yang sama (bukan mundur sehari)
+      base.setUTCHours(23, 30, 0, 0);
+    } else if (entry.hour === "12Z") {
+      // untuk 12Z → 11:30 hari yang sama
+      base.setUTCHours(11, 30, 0, 0);
+    } else {
+      // fallback
+      base.setUTCHours(launch.getUTCHours() - 1, 30, 0, 0);
+    }
+  
+    const diffMin = (launch - base) / 60000.0; // menit
+    // terima nilai positif kecil hingga 6 jam
+    return diffMin >= 0 && diffMin < 360 ? diffMin : null;
+  }
+
+
+  // === Bangun label dan ambil data dari JSON ===
+  if (filterTime === "ALL") {
+    for (let d = 1; d <= daysInMonth; d++) {
+      const day = d.toString().padStart(2, "0");
+      labels.push(`${day} (00Z)`);
+      labels.push(`${day} (12Z)`);
+    }
+
+    const map = {};
+    allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+    AB = labels.map(lbl => {
+      const [day, tag] = lbl.split(" ");
+      const h = tag.replace(/[()]/g, "");
+      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
+      return entry ? entry.AB : null;
+    });
+
+    CD = labels.map(lbl => {
+      const [day, tag] = lbl.split(" ");
+      const h = tag.replace(/[()]/g, "");
+      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
+      return entry ? entry.CD : null;
+    });
+
+    prep = labels.map(lbl => {
+      const [day, tag] = lbl.split(" ");
+      const h = tag.replace(/[()]/g, "");
+      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
+      return prepDiff(entry);
+    });
+
+    redDiff = CD.map((c, i) => (c && AB[i]) ? Math.max(c - AB[i], 0) : null);
+
+  } else {
+    for (let d = 1; d <= daysInMonth; d++) labels.push(d.toString().padStart(2, "0"));
+    const map = {};
+    allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+    AB = labels.map(day => {
+      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
+      return entry ? entry.AB : null;
+    });
+
+    CD = labels.map(day => {
+      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
+      return entry ? entry.CD : null;
+    });
+
+    prep = labels.map(day => {
+      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
+      return prepDiff(entry);
+    });
+
+    redDiff = CD.map((c, i) => (c && AB[i]) ? Math.max(c - AB[i], 0) : null);
+  }
+
+  // === Hitung rata-rata ===
+  const avgPrep = prep.filter(v => v !== null).reduce((a,b)=>a+b,0) / (prep.filter(v => v !== null).length || 1);
+  const avgAB = AB.filter(v => v !== null).reduce((a,b)=>a+b,0) / (AB.filter(v => v !== null).length || 1);
+  const avgCD = CD.filter(v => v !== null).reduce((a,b)=>a+b,0) / (CD.filter(v => v !== null).length || 1);
+
+  summaryDiv.textContent =
+    `Avg Prep–Launch: ${isFinite(avgPrep)?avgPrep.toFixed(1):"-"} min | ` +
+    `Avg Launch–AB: ${isFinite(avgAB)?avgAB.toFixed(1):"-"} min | ` +
+    `Avg AB–End: ${isFinite(avgCD)?avgCD.toFixed(1):"-"} min`;
+
+  // === Render Chart ===
+  loadingMsg.style.display = "none";
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Preparation–Launch",
+          data: prep,
+          backgroundColor: "rgba(255,255,255,0.9)",
+          stack: "stack1"
         },
-        options: {
-          responsive: true,
-          interaction: { mode: "index", intersect: false },
-          scales: {
-            x: {
-              title: { display: true, text: "Tanggal (UTC)", color: "#fff" },
-              ticks: {
-                color: "#fff",
-                callback: (value, index) => filterTime === "ALL" ? 
-                  (labels[index].includes("(00Z)") ? labels[index].slice(0,2) : "") : labels[index]
-              },
-              grid: { color: "rgba(255,255,255,0.1)" },
-              stacked: true
-            },
-            y: {
-              title: { display: true, text: "Waktu (menit)", color: "#fff" },
-              ticks: { color: "#fff" },
-              grid: { color: "rgba(255,255,255,0.1)" },
-              beginAtZero: true,
-              max: 180
-            }
-          },
-          plugins: {
-            legend: { labels: { color: "#fff" } },
-            title: {
-              display: true,
-              text: `Time Accuracy - ${siteSelect.value} (${filterTime})`,
-              color: "#fff",
-              font: { size: 18 }
-            },
-            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} menit` } }
+        {
+          label: "Launch–AB (100 hPa)",
+          data: AB,
+          backgroundColor: "rgba(59,130,246,0.85)",
+          stack: "stack1"
+        },
+        {
+          label: "AB–End (Burst)",
+          data: redDiff,
+          backgroundColor: "rgba(239,68,68,0.85)",
+          stack: "stack1"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: {
+          title: { display: true, text: "Tanggal (UTC)", color: "#fff" },
+          ticks: { color: "#fff" },
+          grid: { color: "rgba(255,255,255,0.1)" },
+          stacked: true
+        },
+        y: {
+          title: { display: true, text: "Waktu (menit)", color: "#fff" },
+          ticks: { color: "#fff" },
+          grid: { color: "rgba(255,255,255,0.1)" },
+          beginAtZero: true,
+          max: 240
+        }
+      },
+      plugins: {
+        legend: { labels: { color: "#fff" } },
+        title: {
+          display: true,
+          text: `Time Accuracy - ${siteSelect.value} (${filterTime})`,
+          color: "#fff",
+          font: { size: 18 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} menit`
           }
         }
-      });
+      }
     }
+  });
+}
+
+
 
     siteSelect.addEventListener("change", () => loadTimeAccuracy(siteSelect.value));
     timeSelect.addEventListener("change", renderChart);

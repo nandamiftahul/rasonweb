@@ -29,6 +29,68 @@ from geopy.distance import geodesic
 # Load local .env file (ignored in production)
 load_dotenv()
 
+# === Database SQLite for Radiosonde Cache ===
+import sqlite3
+
+DB_PATH = "rason_data.db"
+
+def db_init():
+    """Initialize 4 main tables for BUFR/BFR/BFH/BIN caching."""
+    with sqlite3.connect(DB_PATH) as conn:
+        for t in ["bufr", "bfr", "bfh", "bin"]:
+            conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {t} (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    site TEXT,
+                    filename TEXT UNIQUE,
+                    filetype TEXT,
+                    file_date TEXT,
+                    meta_json TEXT,
+                    levels_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+db_init()
+
+def db_get(filetype, site, filename):
+    """Return (df_meta, df_levels) if exists in DB; else None."""
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            f"SELECT meta_json, levels_json FROM {filetype} WHERE site=? AND filename=?",
+            (site, filename)
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        meta_df = pd.read_json(io.StringIO(row[0]))
+        levels_df = pd.read_json(io.StringIO(row[1]))
+        return meta_df, levels_df
+    except Exception as e:
+        print(f"[DB] decode error {filename}: {e}")
+        return None
+
+def db_insert(filetype, site, filename, file_date, df_meta, df_levels):
+    """Insert parsed BUFR into DB."""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(f"""
+                INSERT OR REPLACE INTO {filetype}
+                (site, filename, filetype, file_date, meta_json, levels_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                site,
+                filename,
+                filetype,
+                file_date,
+                df_meta.to_json(),
+                df_levels.to_json()
+            ))
+            conn.commit()
+        print(f"[DB] ✅ inserted {filename}")
+    except Exception as e:
+        print(f"[DB] insert error {filename}: {e}")
+
+
 # --- Load configuration from environment ---
 CONFIG = {
     "ftp": {
@@ -336,19 +398,25 @@ SENSOR_MAPS = {
 # --- FTP utility ---
 def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                     start_date=None, end_date=None):
+    """
+    Fetch list of radiosonde files from FTP or (if cached) from local SQLite DB.
 
+    - ext_filter: list of extensions (e.g. ['.bfr'])
+    - limit: maximum number of files per site
+    - with_meta: if True, decode/parse or use DB cache for metadata extraction
+    - start_date, end_date: UTC naive datetime range
+    """
     _tz = None  # fallback (pakai UTC kalau zoneinfo tidak ada)
 
-    # --- Default window: today 00:00 WIT -> tomorrow 00:00 WIT, converted to UTC (naive) ---
+    # --- Default window: today 00:00 UTC -> tomorrow 00:00 UTC ---
     if start_date is None or end_date is None:
         now_local = datetime.now(_tz) if _tz else datetime.utcnow().replace(tzinfo=timezone.utc)
         today_local_midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         tomorrow_local_midnight = today_local_midnight + timedelta(days=1)
 
         def to_utc_naive(dt_local):
-            # jadikan UTC naive agar comparable dengan dt hasil strptime (naive) dari filename "UTC"
             if dt_local.tzinfo is None:
-                return dt_local  # sudah naive (anggap UTC)
+                return dt_local
             return dt_local.astimezone(timezone.utc).replace(tzinfo=None)
 
         if start_date is None:
@@ -373,48 +441,65 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                     ftp.cwd(f"{cfg['base_path']}/{site}")
                     all_files = ftp.nlst()
                     print(f"[DEBUG] {site}: total files returned by FTP = {len(all_files)}")
+
                     selected = [f for f in all_files if any(f.lower().endswith(ext) for ext in exts)]
-                    # Attach parsed date to each file
                     items = []
+
                     for fname in selected:
                         dt_str = extract_date_from_filename(fname)
                         try:
-                            # contoh format: "%Y-%m-%d %H:%M:%S UTC"
                             dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S UTC")
-                            # ⚖️ Filter dengan window [start_date, end_date)
                             if start_date or end_date:
                                 if start_date and dt < start_date:
                                     continue
-                                if end_date and dt >= end_date:  # end eksklusif
+                                if end_date and dt >= end_date:
                                     continue
                         except Exception:
                             dt = datetime.min
                         items.append((fname, dt))
-                    
-                    # Sort by datetime (newest first)
+
+                    # Sort newest first
                     items.sort(key=lambda x: x[1], reverse=True)
-                    
-                    # Only keep the last N (limit)
-                    if limit: items = items[:limit]
-                    
-                    # Build back list of names
-                    selected = [fname for fname, dt in items]
-                    
+                    if limit:
+                        items = items[:limit]
+                    selected = [fname for fname, _ in items]
+
                     for fname in selected:
                         item = {
                             "name": fname,
                             "site": site,
                             "file_date": extract_date_from_filename(fname)
                         }
+
+                        # ==========================================================
+                        # 🔹 Jika with_meta=True, gunakan DB cache
+                        # ==========================================================
                         if with_meta:
                             try:
-                                local_path = os.path.join(app.config["UPLOAD_FOLDER"], fname)
-                                with open(local_path, "wb") as f:
-                                    ftp.retrbinary(f"RETR " + fname, f.write)
+                                ftype = fname.split(".")[-1].lower()
+                                if ftype not in ["bufr", "bfr", "bfh", "bin"]:
+                                    ftype = "bufr"
 
-                                decoded = decode_bufr(local_path)
-                                df_meta, df_levels = parse_bufr(decoded)
+                                # --- Cek di database dulu ---
+                                cached = db_get(ftype, site, fname)
+                                if cached:
+                                    df_meta, df_levels = cached
+                                    print(f"[DB] ✅ fetch_all cache hit for {fname}")
+                                else:
+                                    # --- Jika belum ada di DB, ambil dari FTP ---
+                                    local_path = os.path.join(app.config["UPLOAD_FOLDER"], fname)
+                                    with open(local_path, "wb") as f:
+                                        ftp.retrbinary(f"RETR " + fname, f.write)
 
+                                    decoded = decode_bufr(local_path)
+                                    df_meta, df_levels = parse_bufr(decoded)
+
+                                    db_insert(ftype, site, fname,
+                                              extract_date_from_filename(fname),
+                                              df_meta, df_levels)
+                                    print(f"[DB] 💾 cached {fname}")
+
+                                # --- Ambil metadata dari DataFrame ---
                                 if not df_meta.empty:
                                     meta_row = df_meta.iloc[0]
 
@@ -451,12 +536,12 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                             if pd.notna(code):
                                                 item[k] = f"{int(code)} – {mapping.get(int(code), 'Unknown')}"
 
-                                # Flight issues
+                                # --- Flight issues ---
                                 issues = analyze_flight(df_meta, df_levels)
                                 if issues:
                                     item["flight_issues"] = issues
 
-                                # --- Extra derived flight metadata ---
+                                # --- Derived flight metadata ---
                                 try:
                                     if not df_levels.empty:
                                         # End pressure
@@ -473,7 +558,8 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                         if "time_s" in df_levels and not df_meta.empty:
                                             launch_time = pd.to_datetime(meta_row.get("launch_time"))
                                             if pd.notna(launch_time):
-                                                end_time = launch_time + pd.to_timedelta(df_levels["time_s"].max(), unit="s")
+                                                end_time = launch_time + pd.to_timedelta(
+                                                    df_levels["time_s"].max(), unit="s")
                                                 item["end_time"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
 
                                         # Distance from station
@@ -499,14 +585,20 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                 item["launch_time"] = f"Error: {e}"
                                 item["flight_issues"] = [f"Error: {e}"]
 
+                        # ==========================================================
+                        # ✅ Append hasil per file
+                        # ==========================================================
                         site_files.append(item)
 
                     ftp.cwd(cfg["base_path"])
                     result[site] = site_files
+
                 except Exception as e:
                     result[site] = [{"name": f"Error: {e}", "site": site, "file_date": "-"}]
+
     except Exception as e:
         result["GLOBAL"] = [{"name": f"FTP Error: {e}", "site": "GLOBAL", "file_date": "-"}]
+
     return result
 
 # --- API routes ---
@@ -754,26 +846,61 @@ def api_filter():
         return jsonify({"status": "error", "message": str(e)})
 
 def download_and_process(site, filename):
-    """Fetch BUFR from FTP and save into THIS user's store."""
+    """
+    Fetch BUFR/BFR/BFH/BIN data either from local SQLite DB (if cached)
+    or from FTP (then decode via pybufrkit and save into DB).
+    Return results into current user's session store.
+    """
+    ftype = filename.split(".")[-1].lower()
+    if ftype not in ["bufr", "bfr", "bfh", "bin"]:
+        ftype = "bufr"
+
     cfg = CONFIG["ftp"]
     local_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    store = get_user_store()
 
     try:
-        # --- Download from FTP ---
+        # ==========================================================
+        # 1️⃣ Coba baca dari DATABASE (cache)
+        # ==========================================================
+        cached = db_get(ftype, site, filename)
+        if cached:
+            print(f"[DB] ✅ Loaded {filename} from cache ({ftype})")
+            df_meta, df_levels = cached
+            issues = analyze_flight(df_meta, df_levels)
+
+            store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+            store["metadata"]["flight_issues"] = issues
+            store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
+            return  # 🚀 Selesai — tidak perlu FTP atau decode
+
+        # ==========================================================
+        # 2️⃣ Jika belum ada di DB, download dari FTP
+        # ==========================================================
         with ftplib.FTP() as ftp:
             ftp.connect(cfg["host"], cfg.get("port", 21))
             ftp.login(cfg["user"], cfg["password"])
             ftp.cwd(f"{cfg['base_path']}/{site}")
             with open(local_path, "wb") as f:
                 ftp.retrbinary(f"RETR " + filename, f.write)
+        print(f"[FTP] ✅ Downloaded {filename} to {local_path}")
 
-        # --- Decode & parse ---
+        # ==========================================================
+        # 3️⃣ Decode & parse pakai pybufrkit sekali saja
+        # ==========================================================
         decoded = decode_bufr(local_path)
         df_meta, df_levels = parse_bufr(decoded)
         issues = analyze_flight(df_meta, df_levels)
 
-        # --- User store ---
-        store = get_user_store()
+        # ==========================================================
+        # 4️⃣ Simpan hasil decode ke DATABASE untuk cache
+        # ==========================================================
+        db_insert(ftype, site, filename, extract_date_from_filename(filename), df_meta, df_levels)
+        print(f"[DB] 💾 Cached {filename} ({ftype})")
+
+        # ==========================================================
+        # 5️⃣ Isi user session store (hasil decode)
+        # ==========================================================
         store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
         meta = store["metadata"]
 
@@ -804,8 +931,7 @@ def download_and_process(site, filename):
             except Exception:
                 pass
 
-        # Sensor/Balloon type code tables.
-        # We handle BOTH possible key styles that might come from parse_bufr.
+        # --- Sensor/Balloon type code tables ---
         sensor_maps = {
             "pressure": {0:"Unknown",1:"Aneroid",2:"Capacitive",3:"Other"},
             "temperature": {0:"Unknown",1:"Thermistor",2:"Platinum",3:"Other"},
@@ -814,7 +940,6 @@ def download_and_process(site, filename):
             "balloon_gas": {0:"Unknown",1:"Hydrogen",2:"Helium"},
             "balloon_manufacturer": {0:"Unknown",1:"Totex",2:"Kaysam",3:"Other"},
         }
-        # key aliases seen in different decoders
         alias_groups = {
             "pressure": ["pressure_sensor_type", "type_of_pressure_sensor"],
             "temperature": ["temperature_sensor_type", "type_of_temperature_sensor"],
@@ -869,7 +994,7 @@ def download_and_process(site, filename):
                         except Exception:
                             pass
 
-                # Avg ascent rate = max_height / elapsed_seconds
+                # Avg ascent rate
                 if "height_m" in df_levels and "time_s" in df_levels and df_levels["time_s"].notna().any():
                     max_h = df_levels["height_m"].dropna().max()
                     elapsed = df_levels["time_s"].max() - df_levels["time_s"].min()
@@ -878,13 +1003,12 @@ def download_and_process(site, filename):
         except Exception as e:
             print("Extra metadata calc failed in download_and_process:", e)
 
-        # --- Save & exit ---
+        # --- Save to user store & exit ---
         meta["flight_issues"] = issues
         store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
 
     except Exception as e:
-        print(f"FTP download error: {e}")
-        store = get_user_store()
+        print(f"[ERROR] download_and_process failed for {filename}: {e}")
         store["metadata"], store["levels"] = {}, []
 
 def safe_float(val):
@@ -1159,17 +1283,57 @@ def dashboard():
 @app.route("/api/filemeta/<site>/<filename>")
 @login_required
 def file_metadata(site, filename):
+    """
+    Return minimal metadata (launch_time, serial_number) from BUFR cache.
+    - Cek dulu di SQLite cache
+    - Jika belum ada → download dari FTP → decode → parse → simpan ke DB
+    """
     try:
-        local_path = download_from_ftp(site, filename)
-        decoded = decode_bufr(local_path)
-        df_meta, _ = parse_bufr(decoded)
+        ftype = filename.split(".")[-1].lower()
+        if ftype not in ["bufr", "bfr", "bfh", "bin"]:
+            ftype = "bufr"
+
+        # ==========================================================
+        # 1️⃣ Coba dari database dulu
+        # ==========================================================
+        cached = db_get(ftype, site, filename)
+        if cached:
+            print(f"[DB] ✅ filemeta cache hit for {filename}")
+            df_meta, _ = cached
+        else:
+            # ======================================================
+            # 2️⃣ Jika tidak ada di DB → ambil dari FTP + decode
+            # ======================================================
+            local_path = download_from_ftp(site, filename)
+            decoded = decode_bufr(local_path)
+            df_meta, df_levels = parse_bufr(decoded)
+
+            # ======================================================
+            # 3️⃣ Simpan hasil parse ke DB
+            # ======================================================
+            db_insert(
+                ftype,
+                site,
+                filename,
+                extract_date_from_filename(filename),
+                df_meta,
+                df_levels
+            )
+            print(f"[DB] 💾 Cached {filename} into {ftype} table")
+
+        # ==========================================================
+        # 4️⃣ Ambil data dari hasil decode/cache (df_meta)
+        # ==========================================================
         meta = df_meta.to_dict("records")[0] if not df_meta.empty else {}
         return jsonify({
             "launch_time": meta.get("launch_time", "-"),
             "radiosonde_serial_number": meta.get("radiosonde_serial_number", "-")
         })
+
     except Exception as e:
+        print(f"[ERROR] file_metadata failed for {filename}: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/load_from_ftp/<site>/<filename>")
 @login_required
@@ -1379,12 +1543,50 @@ def download_wmo(site, filename):
 @app.route("/raob/<site>/<filename>")
 @login_required
 def raob_analysis(site, filename):
+    """
+    Analisis RAOB lengkap dengan caching SQLite.
+    - Coba ambil df_meta & df_levels dari database dulu.
+    - Jika belum ada, download dari FTP + decode + parse + simpan ke DB.
+    """
     try:
-        # --- Fetch & decode BUFR ---
-        local_path = download_from_ftp(site, filename)
-        decoded = decode_bufr(local_path)
-        df_meta, df_levels = parse_bufr(decoded)
+        # ==========================================================
+        # 1️⃣ Tentukan tipe file (bufr/bfr/bfh/bin)
+        # ==========================================================
+        ftype = filename.split(".")[-1].lower()
+        if ftype not in ["bufr", "bfr", "bfh", "bin"]:
+            ftype = "bufr"
 
+        # ==========================================================
+        # 2️⃣ Coba ambil dari DATABASE dulu
+        # ==========================================================
+        cached = db_get(ftype, site, filename)
+        if cached:
+            print(f"[DB] ✅ RAOB cache hit for {filename}")
+            df_meta, df_levels = cached
+        else:
+            # ======================================================
+            # 3️⃣ Jika belum ada di DB → ambil dari FTP & decode
+            # ======================================================
+            local_path = download_from_ftp(site, filename)
+            decoded = decode_bufr(local_path)
+            df_meta, df_levels = parse_bufr(decoded)
+
+            # ======================================================
+            # 4️⃣ Simpan hasil parse ke DB
+            # ======================================================
+            db_insert(
+                ftype,
+                site,
+                filename,
+                extract_date_from_filename(filename),
+                df_meta,
+                df_levels
+            )
+            print(f"[DB] 💾 Cached {filename} into {ftype} table")
+
+        # ==========================================================
+        # 5️⃣ Pastikan ada data level untuk analisis
+        # ==========================================================
         if df_levels.empty:
             return "No levels found", 500
 
@@ -1539,15 +1741,8 @@ def raob_analysis(site, filename):
             fig2, ax = plt.subplots(figsize=(6, 6))
             hodo = Hodograph(ax, component_range=60.0)
             hodo.add_grid(increment=10)
-        
-            # 🔄 Rotasi 180° (berlawanan arah jarum jam)
-            u_rot = -u.to("m/s")
-            v_rot = -v.to("m/s")
-        
-            # Plot garis utama
+            u_rot, v_rot = -u.to("m/s"), -v.to("m/s")
             hodo.plot(u_rot, v_rot, color="#007bff", linewidth=2, label="Wind profile")
-        
-            # Scatter dengan warna tinggi
             if hgt is not None:
                 mask = ~np.isnan(hgt.m)
                 ax.scatter(
@@ -1560,32 +1755,22 @@ def raob_analysis(site, filename):
                     linewidths=0.3,
                     label="Height (km)"
                 )
-        
-            # Background & grid
             ax.set_facecolor("#f9f9f9")
             ax.grid(True, linestyle="--", color="gray", alpha=0.5)
             ax.axhline(0, color="black", linewidth=0.8)
             ax.axvline(0, color="black", linewidth=0.8)
             ax.set_aspect("equal", adjustable="box")
-            # Ubah label axis jadi absolute value (tanpa tanda minus)
-            ax.set_xticks(ax.get_xticks())
-            ax.set_yticks(ax.get_yticks())
             ax.set_xticklabels([f"{abs(int(t))}" for t in ax.get_xticks()])
             ax.set_yticklabels([f"{abs(int(t))}" for t in ax.get_yticks()])
             ax.set_xlabel("U wind (m/s)")
             ax.set_ylabel("V wind (m/s)")
             ax.set_title("Hodograph", fontsize=10, fontweight="bold", color="#004085")
             ax.legend(fontsize=8, loc="upper left")
-        
-            # 🔠 Tambahkan label arah mata angin
-            lim = 60  # disesuaikan dengan component_range
-            offset = lim * 0.9
+            lim, offset = 60, 54
             ax.text(0,  offset, "N", fontsize=10, fontweight="bold", ha="center", va="bottom", color="#222")
             ax.text(0, -offset, "S", fontsize=10, fontweight="bold", ha="center", va="top", color="#222")
             ax.text( offset, 0, "E", fontsize=10, fontweight="bold", ha="left", va="center", color="#222")
             ax.text(-offset, 0, "W", fontsize=10, fontweight="bold", ha="right", va="center", color="#222")
-        
-            # Simpan ke buffer
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", bbox_inches="tight")
             buf2.seek(0)
@@ -1593,10 +1778,7 @@ def raob_analysis(site, filename):
             plt.close(fig2)
         else:
             hodo_img = None
-        
-        
 
-        # --- Indices table ---
         def scalar_str(x, fmt=".1f"):
             try:
                 val = np.atleast_1d(x.m)[0]
@@ -1618,10 +1800,8 @@ def raob_analysis(site, filename):
             "Tropopause": tropopause_level,
         }
 
-        # --- Auto Weather Analysis ---
         analysis_text = generate_weather_analysis(df)
 
-        # --- Render Template ---
         return render_template(
             "raob.html",
             meta=meta,
@@ -1632,6 +1812,7 @@ def raob_analysis(site, filename):
         )
 
     except Exception as e:
+        print(f"[ERROR] RAOB analysis failed for {filename}: {e}")
         return f"RAOB error: {e}", 500
 
 # ==============================
@@ -1702,9 +1883,9 @@ def time_accuracy():
 def api_time_accuracy(site):
     """
     Ambil data time accuracy dari file .bfr bulan berjalan untuk site tertentu.
-    - Patokan waktu: dari nama file (bukan metadata)
-    - Jika hanya 100 hPa tercapai, tetap disertakan
-    - Jam disimpan sebagai '00Z' atau '12Z'
+    🔹 Menggunakan SQLite cache:
+       - Cek di DB dulu, jika belum ada, ambil dari FTP dan decode.
+       - Kirim launch_time (real atau fallback dari filename) agar frontend bisa menghitung Preparation–Launch.
     """
     from datetime import datetime, timedelta
     import pandas as pd
@@ -1715,26 +1896,21 @@ def api_time_accuracy(site):
     end_date = (start_date + timedelta(days=32)).replace(day=1)
 
     def extract_datetime_from_filename(fname: str):
-        """
-        Contoh nama: T2097502A202510050000.BFR -> datetime(2025,10,5,0,0)
-        """
+        """Ambil datetime dari nama file (contoh: A202510050000.BFR -> 2025-10-05 00:00:00 UTC)."""
         match = re.search(r"(\d{10,14})", fname)
         if not match:
             return None
         dt_str = match.group(1)
-        try:
-            if len(dt_str) == 10:
-                return datetime.strptime(dt_str, "%Y%m%d%H")
-            elif len(dt_str) == 12:
-                return datetime.strptime(dt_str, "%Y%m%d%H%M")
-            elif len(dt_str) == 14:
-                return datetime.strptime(dt_str, "%Y%m%d%H%M%S")
-        except Exception:
-            return None
+        for fmt in ["%Y%m%d%H%M%S", "%Y%m%d%H%M", "%Y%m%d%H"]:
+            try:
+                return datetime.strptime(dt_str, fmt)
+            except Exception:
+                continue
         return None
 
     data = []
     try:
+        # Ambil semua file .bfr dari FTP (via cache fetch_all_sites)
         all_sites = fetch_all_sites(
             ext_filter=[".bfr"],
             with_meta=False,
@@ -1744,55 +1920,101 @@ def api_time_accuracy(site):
 
         site_keys = {s.lower(): s for s in all_sites.keys()}
         site_key = site.lower()
-
         if site_key not in site_keys:
             print(f"⚠️ Site {site} not found in FTP")
             return jsonify({"site": site, "data": []})
 
         true_site = site_keys[site_key]
+
+        # ==========================================================
+        # 🔁 Loop semua file .bfr bulan berjalan
+        # ==========================================================
         for f in all_sites[true_site]:
             fname = f["name"]
             try:
-                # --- Ambil waktu dari nama file (bukan metadata) ---
                 file_dt = extract_datetime_from_filename(fname)
                 if not file_dt:
-                    print(f"⚠️ Skip (no datetime): {fname}")
                     continue
 
                 date_str = file_dt.strftime("%Y-%m-%d")
                 hour_label = f"{file_dt.hour:02d}Z"
                 if hour_label not in ["00Z", "12Z"]:
-                    # Pastikan hanya dua siklus utama
                     hour_label = "00Z" if file_dt.hour < 6 else "12Z"
 
-                # --- Baca isi BUFR ---
-                local_path = download_from_ftp(true_site, fname)
-                decoded = decode_bufr(local_path)
-                df_meta, df_levels = parse_bufr(decoded)
+                # ======================================================
+                # 🔹 Ambil data dari cache atau FTP
+                # ======================================================
+                ftype = fname.split(".")[-1].lower()
+                if ftype not in ["bufr", "bfr", "bfh", "bin"]:
+                    ftype = "bfr"
+
+                cached = db_get(ftype, true_site, fname)
+                if cached:
+                    df_meta, df_levels = cached
+                else:
+                    local_path = download_from_ftp(true_site, fname)
+                    decoded = decode_bufr(local_path)
+                    df_meta, df_levels = parse_bufr(decoded)
+                    db_insert(ftype, true_site, fname,
+                              extract_date_from_filename(fname),
+                              df_meta, df_levels)
+
                 if df_levels.empty:
                     continue
 
-                # --- Cari waktu ke 100 dan 30 hPa ---
-                t100 = df_levels.loc[df_levels["pressure_hPa"] <= 100, "time_s"].min()
-                t30  = df_levels.loc[df_levels["pressure_hPa"] <= 30,  "time_s"].min()
+                # ======================================================
+                # 🔹 Ambil launch_time (real atau fallback)
+                # ======================================================
+                launch_time = None
+                if not df_meta.empty:
+                    possible_keys = [
+                        "launch_time",
+                        "launch_datetime",
+                        "time_of_launch",
+                        "launch_time_UTC"
+                    ]
+                    for key in possible_keys:
+                        if key in df_meta.columns:
+                            val = df_meta.iloc[0][key]
+                            if pd.notna(val):
+                                try:
+                                    launch_time = pd.to_datetime(val)
+                                    break
+                                except Exception:
+                                    pass
 
-                # --- Simpan meskipun cuma 100 hPa ---
+                # fallback jika tidak ditemukan (biasanya kasus 00Z)
+                if launch_time is None:
+                    launch_time = file_dt
+
+                # ======================================================
+                # 🔹 Hitung waktu ke 100 & 30 hPa
+                # ======================================================
+                t100 = df_levels.loc[df_levels["pressure_hPa"] <= 100, "time_s"].min()
+                t30 = df_levels.loc[df_levels["pressure_hPa"] <= 30, "time_s"].min()
+
+                # ======================================================
+                # 🔹 Simpan hasil
+                # ======================================================
                 if pd.notna(t100):
                     data.append({
                         "filename": fname,
                         "date": date_str,
                         "hour": hour_label,
+                        "launch_time": launch_time.strftime("%Y-%m-%d %H:%M:%S"),
                         "AB": round(t100 / 60.0, 1),
                         "CD": round(t30 / 60.0, 1) if pd.notna(t30) else None
                     })
 
             except Exception as e:
-                print(f"⚠️ Error parsing {fname}:", e)
+                print(f"⚠️ Error parsing {fname}: {e}")
 
     except Exception as e:
-        print("❌ Time accuracy fetch failed:", e)
+        print(f"❌ Time accuracy fetch failed for {site}: {e}")
 
-    # --- Urutkan: tanggal + jam (00Z dulu, baru 12Z) ---
+    # ==========================================================
+    # 🔹 Urutkan hasil: tanggal + jam (00Z dulu, 12Z setelahnya)
+    # ==========================================================
     def sort_key(x):
         return (x["date"], 0 if x["hour"] == "00Z" else 1)
 
@@ -1807,7 +2029,11 @@ def height_reach():
 @app.route("/api/height_reach/<site>")
 @login_required
 def api_height_reach(site):
-    """Ambil data ketinggian maksimum balon (.bfr) per hari untuk satu bulan berjalan."""
+    """
+    Ambil data ketinggian maksimum balon (.bfr) per hari untuk satu bulan berjalan.
+    🔹 Sekarang menggunakan SQLite cache:
+       - Cek dari DB dulu, jika belum ada baru download dari FTP dan decode.
+    """
     from datetime import datetime, timedelta
     import pandas as pd, re
 
@@ -1818,22 +2044,35 @@ def api_height_reach(site):
     def extract_datetime_from_filename(fname):
         """Ambil waktu dari nama file (contoh: T2097502A202510050000.BFR)."""
         m = re.search(r"(\d{10,14})", fname)
-        if not m: return None
+        if not m:
+            return None
         s = m.group(1)
         for fmt in ["%Y%m%d%H%M%S", "%Y%m%d%H%M", "%Y%m%d%H"]:
-            try: return datetime.strptime(s, fmt)
-            except: pass
+            try:
+                return datetime.strptime(s, fmt)
+            except Exception:
+                continue
         return None
 
     data = []
     try:
-        all_sites = fetch_all_sites(ext_filter=[".bfr"], with_meta=False,
-                                    start_date=start_date, end_date=end_date)
+        # ==========================================================
+        # 🔹 Ambil daftar semua file BFR dari FTP
+        # ==========================================================
+        all_sites = fetch_all_sites(
+            ext_filter=[".bfr"],
+            with_meta=False,
+            start_date=start_date,
+            end_date=end_date
+        )
         site_keys = {s.lower(): s for s in all_sites.keys()}
         if site.lower() not in site_keys:
             return jsonify({"site": site, "data": []})
         true_site = site_keys[site.lower()]
 
+        # ==========================================================
+        # 🔁 Loop setiap file di bulan berjalan
+        # ==========================================================
         for f in all_sites[true_site]:
             fname = f["name"]
             dt = extract_datetime_from_filename(fname)
@@ -1842,9 +2081,34 @@ def api_height_reach(site):
             hour_label = "00Z" if dt.hour < 6 else "12Z"
 
             try:
-                local_path = download_from_ftp(true_site, fname)
-                decoded = decode_bufr(local_path)
-                _, df_levels = parse_bufr(decoded)
+                # ======================================================
+                # 🔹 Ambil data dari DB cache atau FTP
+                # ======================================================
+                ftype = fname.split(".")[-1].lower()
+                if ftype not in ["bufr", "bfr", "bfh", "bin"]:
+                    ftype = "bfr"
+
+                cached = db_get(ftype, true_site, fname)
+                if cached:
+                    _, df_levels = cached
+                    print(f"[DB] ✅ cache hit for {fname}")
+                else:
+                    local_path = download_from_ftp(true_site, fname)
+                    decoded = decode_bufr(local_path)
+                    df_meta, df_levels = parse_bufr(decoded)
+                    db_insert(
+                        ftype,
+                        true_site,
+                        fname,
+                        extract_date_from_filename(fname),
+                        df_meta,
+                        df_levels
+                    )
+                    print(f"[DB] 💾 cached {fname}")
+
+                # ======================================================
+                # 🔹 Proses data ketinggian maksimum
+                # ======================================================
                 if df_levels.empty or "height_m" not in df_levels.columns:
                     continue
 
@@ -1856,12 +2120,16 @@ def api_height_reach(site):
                         "hour": hour_label,
                         "max_height": round(float(max_height), 0)
                     })
+
             except Exception as e:
-                print("⚠️ Skip file:", fname, e)
+                print(f"⚠️ Skip file: {fname}", e)
 
     except Exception as e:
         print("❌ Height reach fetch failed:", e)
 
+    # ==========================================================
+    # 🔹 Urutkan hasil: tanggal + jam (00Z dulu, baru 12Z)
+    # ==========================================================
     data = sorted(data, key=lambda x: (x["date"], 0 if x["hour"] == "00Z" else 1))
     return jsonify({"site": site, "data": data})
 
@@ -2177,6 +2445,8 @@ def api_data_availability():
         return jsonify({"error": str(e)}), 500
 
     return jsonify({"year": year, "month": month, "sites": results})
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0",port=8082,debug=True)

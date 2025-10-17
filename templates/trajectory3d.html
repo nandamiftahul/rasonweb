@@ -172,6 +172,16 @@ hr { border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 12px 0; 
     <option value="google">Google Hybrid</option>
   </select>
   <hr>
+  <label>Analytical Layers</label>
+  <label style="display:flex;align-items:center;gap:8px;">
+    <input type="checkbox" id="chk-freeze">
+    ❄️ Freezing Layer (0 °C)
+  </label>
+  <label style="display:flex;align-items:center;gap:8px;">
+    <input type="checkbox" id="chk-shear">
+    🌀 Wind Barb Profile
+  </label>
+  <hr>
 
   <div id="info-panel" style="display:none;">
     <div class="row"><div class="label">Station</div><div class="val" id="st-name">-</div></div>
@@ -251,6 +261,7 @@ async function loadTrajectory(){
     const [trajRes, levelRes] = await Promise.all([fetch("/api/trajectory3d"), fetch("/all_levels")]);
     const d=await trajRes.json();
     allLevels=await levelRes.json();
+    console.log("🔍 Contoh level[0]:", allLevels[0]);
     if(!d||d.error){st.textContent="⚠️ Tidak ada data trajectory.";return;}
     st.textContent="✅ Data trajectory berhasil dimuat.";
     document.getElementById("info-panel").style.display="block";
@@ -263,7 +274,7 @@ async function loadTrajectory(){
 }
 
 function start3DMap(d){
-  const {TripsLayer,IconLayer,LineLayer,MapboxOverlay}=deck;
+  const {TripsLayer,IconLayer,LineLayer,PolygonLayer,ColumnLayer,MapboxOverlay}=deck;
   const t0=Math.min(...d.trip.timestamps),ts=d.trip.timestamps.map(t=>t-t0);
   const path=d.trip.path,dur=Math.max(...ts),stn=d.station;
   const map=new maplibregl.Map({
@@ -292,6 +303,11 @@ function start3DMap(d){
   for(let i=1;i<path.length;i++){const z=path[i][2];if(z-mark>=200){mark=z;allLines.push({source:[path[i][0],path[i][1],0],target:[path[i][0],path[i][1],z]});}}
 
   let cur=0,play=false,spd=1,pos={lon:path[0][0],lat:path[0][1],alt:path[0][2]};
+  // === Freezing layer state ===
+  let freezeZ = getFreezingZ(allLevels);   // hitung sekali dari profil
+  let showFreeze = false;                  // default off (checkbox belum dicentang)  
+  let shearData = computeShearLevels(allLevels);
+  let showShear = false;  
   const getPos=t=>{
     if(t<=0)return{lon:path[0][0],lat:path[0][1],alt:path[0][2]};
     if(t>=dur)return{lon:path.at(-1)[0],lat:path.at(-1)[1],alt:path.at(-1)[2]};
@@ -315,34 +331,146 @@ function start3DMap(d){
     document.getElementById("levelContent").innerHTML=html||"No data";
   }
 
-  function makeLayers(){
-    const visLines=allLines.filter(l=>l.target[2]<=pos.alt);
+  function makeFreezingLayer(zMeters){
+    if(!Number.isFinite(zMeters)) return [];
+    // bikin “karpet” kecil 0.25° x 0.25° di sekitar stasiun (sekitar 25 km)
+    const lon0 = d.station.lon, lat0 = d.station.lat;
+    const span = 0.25;
+    const corners = [
+      [lon0 - span, lat0 - span, zMeters],
+      [lon0 + span, lat0 - span, zMeters],
+      [lon0 + span, lat0 + span, zMeters],
+      [lon0 - span, lat0 + span, zMeters]
+    ];
     return [
-      new TripsLayer({id:"trip",data:[{path,timestamps:ts}],
-        getPath:d=>d.path,getTimestamps:d=>d.timestamps,
-        getColor:d=>d.path.map(p=>color(p[2])),
-        widthMinPixels:5,trailLength:dur,currentTime:cur}),
-      new LineLayer({id:"lines",data:visLines,getSourcePosition:d=>d.source,
-        getTargetPosition:d=>d.target,getColor:[0,122,255],getWidth:1.5}),
-      new LineLayer({id:"dyn",data:[{source:[pos.lon,pos.lat,0],target:[pos.lon,pos.lat,pos.alt]}],
-        getSourcePosition:d=>d.source,getTargetPosition:d=>d.target,getColor:[0,122,255],getWidth:2}),
-      new IconLayer({
-        id:"icon",
-        data:[pos],
-        getIcon:()=>({
-          url:"/static/images/balloon.png",
-          width:64,height:64,anchorY:64
-        }),
-        getPosition:d=>[d.lon,d.lat,d.alt],
-        sizeScale:15,billboard:true,getSize:4
+      new PolygonLayer({
+        id: 'freeze-layer',
+        data: [{ polygon: corners }],
+        getPolygon: f => f.polygon,
+        filled: true,
+        extruded: false,
+        getFillColor: [0,180,255,80],    // biru transparan
+        getLineColor: [0,120,255,180],
+        lineWidthMinPixels: 2,
+        pickable: false
       })
     ];
   }
+
+
+
+  
+  function makeLayers(){
+    // --- filter garis vertikal yang sudah terlewati ---
+    const visLines = allLines.filter(l => l.target[2] <= pos.alt);
+  
+    // --- layer dasar: lintasan, garis vertikal, dan ikon balon ---
+    const base = [
+      new TripsLayer({
+        id: "trip",
+        data: [{ path, timestamps: ts }],
+        getPath: d => d.path,
+        getTimestamps: d => d.timestamps,
+        getColor: d => d.path.map(p => color(p[2])),
+        widthMinPixels: 5,
+        trailLength: dur,
+        currentTime: cur
+      }),
+  
+      new LineLayer({
+        id: "lines",
+        data: visLines,
+        getSourcePosition: d => d.source,
+        getTargetPosition: d => d.target,
+        getColor: [0,122,255],
+        getWidth: 1.5
+      }),
+  
+      new LineLayer({
+        id: "dyn",
+        data: [{ source:[pos.lon,pos.lat,0], target:[pos.lon,pos.lat,pos.alt] }],
+        getSourcePosition: d => d.source,
+        getTargetPosition: d => d.target,
+        getColor: [0,122,255],
+        getWidth: 2
+      }),
+  
+      new IconLayer({
+        id: "icon",
+        data: [pos],
+        getIcon: () => ({
+          url: "/static/images/balloon.png",
+          width: 64,
+          height: 64,
+          anchorY: 64
+        }),
+        getPosition: d => [d.lon, d.lat, d.alt],
+        sizeScale: 15,
+        billboard: true,
+        getSize: 4
+      })
+    ];
+  
+    // --- gabungkan semua optional layer ---
+    return base
+      .concat(showShear ? makeWindBarbLayer(allLevels) : [])
+      .concat(showFreeze && Number.isFinite(freezeZ) ? makeFreezingLayer(freezeZ) : []);
+    console.log("Layers:", {
+      base: base.length,
+      shear: showShear ? shearData.length : 0,
+      freeze: showFreeze ? freezeZ : null
+    });
+  }
+
+
 
   map.on("load",()=>{
     const overlay=new MapboxOverlay({layers:makeLayers(),interleaved:true});
     map.addControl(overlay);
     const deckgl=overlay._deck;
+    // === Toggle UI untuk Freezing Layer ===
+    const chkFreeze = document.getElementById("chk-freeze");
+    if(chkFreeze){
+      chkFreeze.onchange = () => {
+        showFreeze = chkFreeze.checked;
+        // kalau belum ada 0°C, coba hitung ulang
+        if(showFreeze && !Number.isFinite(freezeZ)){
+          freezeZ = getFreezingZ(allLevels);
+          const st = document.getElementById("upload-status");
+          if(!Number.isFinite(freezeZ)){
+            if(st) st.textContent = "⚠️ Freezing layer tidak ditemukan pada profil ini.";
+            showFreeze = false;
+            chkFreeze.checked = false;
+          } else {
+            if(st) st.textContent = "❄️ Freezing level ≈ " + Math.round(freezeZ) + " m";
+          }
+        }
+        deckgl.setProps({layers: makeLayers()});
+      };
+
+      // info awal (kalau mau langsung kasih hint)
+      if(Number.isFinite(freezeZ)){
+        const st = document.getElementById("upload-status");
+        if(st) st.textContent = "ℹ️ Freezing level terdeteksi ≈ " + Math.round(freezeZ) + " m";
+      }
+    }
+    // === Toggle UI untuk Wind Shear Zones ===
+    const chkShear=document.getElementById("chk-shear");
+    if(chkShear){
+      chkShear.onchange=()=>{
+        showShear = chkShear.checked;
+        const st=document.getElementById("upload-status");
+        if(showShear){
+          if(!shearData.length){
+            shearData = computeShearLevels(allLevels);
+          }
+          const maxShear=Math.max(...shearData.map(d=>d.shear));
+          if(st) st.textContent=`💨 Max shear: ${maxShear.toFixed(1)} m/s/km`;
+        }
+        deckgl.setProps({layers:makeLayers()});
+      };
+    }
+
     const el=document.getElementById("st-elap"),
           pl=document.getElementById("btn-play"),
           pa=document.getElementById("btn-pause"),
@@ -381,6 +509,98 @@ function start3DMap(d){
     northArrow.style.transform = `rotate(${-bearing}deg)`; // jarum tetap menunjuk utara
   });
 }
+
+  // === Hitung ketinggian 0 °C (freezing level) dari profil allLevels ===
+  function getFreezingZ(levels){
+    if(!Array.isArray(levels)||levels.length<2) return null;
+    // cari crossing pertama dari bawah: T > 0 ke T <= 0
+    for(let i=1;i<levels.length;i++){
+      const a=levels[i-1], b=levels[i];
+      const t1=a?.temp_C, t2=b?.temp_C;
+      const z1=a?.height_m, z2=b?.height_m;
+      if([t1,t2,z1,z2].some(v=>v==null)) continue;
+      if(t1>0 && t2<=0){
+        // interpolasi linear
+        const frac = t1 / (t1 - t2);
+        return z1 + frac*(z2 - z1);
+      }
+    }
+    return null; // tidak ketemu
+  }
+
+
+  // === Hitung Wind Shear antar level (m/s per km) ===
+  function computeShearLevels(levels){
+    if(!Array.isArray(levels)||levels.length<2) return [];
+    const result=[];
+    
+    // Pastikan urutan naik
+    levels = [...levels].sort((a,b)=>a.height_m - b.height_m);
+  
+    for(let i=1;i<levels.length;i++){
+      const a=levels[i-1], b=levels[i];
+      
+      // Ambil komponen angin
+      const spd1 = a.wind_speed_mps ?? a.wind_speed ?? a.spd_ms ?? null;
+      const spd2 = b.wind_speed_mps ?? b.wind_speed ?? b.spd_ms ?? null;
+      const dir1 = a.wind_dir_deg ?? a.wind_dir ?? a.dir_deg ?? null;
+      const dir2 = b.wind_dir_deg ?? b.wind_dir ?? b.dir_deg ?? null;
+      const z1 = a.height_m, z2 = b.height_m;
+      if([spd1,spd2,dir1,dir2,z1,z2].some(v=>v==null)) continue;
+  
+      // Konversi ke komponen u/v
+      const u1 = -spd1 * Math.sin(dir1 * Math.PI/180);
+      const v1 = -spd1 * Math.cos(dir1 * Math.PI/180);
+      const u2 = -spd2 * Math.sin(dir2 * Math.PI/180);
+      const v2 = -spd2 * Math.cos(dir2 * Math.PI/180);
+  
+      const du = u2 - u1;
+      const dv = v2 - v1;
+      const dz = (z2 - z1)/1000; // km
+      if(dz <= 0) continue;
+  
+      const shear = Math.sqrt(du*du + dv*dv)/dz; // m/s per km
+  
+      result.push({
+        lon: a.longitude || levels[0].longitude,
+        lat: a.latitude || levels[0].latitude,
+        z_mid: (z1 + z2) / 2,
+        shear
+      });
+    }
+    return result;
+  }
+
+  // === Layer Wind Barb (Arah dan Kecepatan Angin) ===
+  function makeWindBarbLayer(levels){
+    if(!Array.isArray(levels)||!levels.length) return [];
+  
+    // Filter level yang punya data arah dan kecepatan
+    const data = levels.filter(l => l.wind_dir_deg != null && l.wind_speed_mps != null);
+  
+    return [
+      new deck.IconLayer({
+        id: 'windbarb-layer',
+        data: data,
+        getIcon: d => ({
+          // pakai ikon barb PNG transparan (bisa kamu ganti di /static/images)
+          url: '/static/images/windbarb.png',
+          width: 64,
+          height: 64,
+          anchorY: 32
+        }),
+        getPosition: d => [d.longitude, d.latitude, d.height_m],
+        getSize: d => 2.5 + d.wind_speed_mps * 0.1, // makin besar makin cepat
+        sizeScale: 6,
+        billboard: true,
+        getAngle: d => d.wind_dir_deg,              // orientasi panah
+        opacity: 0.9,
+        pickable: false
+      })
+    ];
+  }
+
+
 </script>
 </body>
 </html>
