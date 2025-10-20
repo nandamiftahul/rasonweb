@@ -434,8 +434,16 @@
   </div>
 
   <script>
+    // 🧹 Bersihkan map lama kalau ada (misal dari page cache)
+    if (window.map && window.map.remove) {
+      try { window.map.off(); window.map.remove(); } catch(e) {}
+      window.map = null;
+    }
+
     // --- Map ---
-    const map = L.map('map', { zoomControl: false }).setView([0,0], 3);
+    // Fokus ke tengah Indonesia (sekitar Kalimantan)
+    const map = L.map('map', { zoomControl: false }).setView([-2.5, 118], 5);
+
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
     // --- Base maps ---
@@ -493,7 +501,7 @@
 
     // --- Balloon icon ---
     const balloonIcon = L.divIcon({
-      html: "<div style='font-size:64px;'>🎈</div>",
+      html: "<div style='font-size:64px; filter:brightness(10) saturate(0.1);'>🎈</div>",
       className: "",
       iconSize: [64, 64],
       iconAnchor: [32, 64]
@@ -1073,6 +1081,9 @@
     
     // === RESTORE FILTERS SAAT PAGE LOAD ===
     window.addEventListener("load", () => {
+      if (!window.location.href.includes("/map")) return; // hanya jalan di map
+      if (document.getElementById("frameText").textContent !== "0/0") return; // kalau sudah punya data, skip restore
+
       const site = localStorage.getItem("siteSelect");
       const date = localStorage.getItem("dateSelect");
       const hour = localStorage.getItem("hourSelect");
@@ -1130,12 +1141,30 @@
         const selectedDateTime = new Date(`${date}T${hour}:00:00Z`);
         if (map.hasLayer(himawariLayer)) setHimawariTime(selectedDateTime);
     
-        // sedikit delay biar smooth
         setTimeout(() => {
           statusEl.textContent = "✅ Success — File Loaded";
           statusEl.className = "statusText success";
-          window.location.href = `/load_from_ftp/${encodeURIComponent(site)}/${encodeURIComponent(chosen)}`;
-        }, 800);
+        
+          const target = `/load_from_ftp/${encodeURIComponent(site)}/${encodeURIComponent(chosen)}?t=${Date.now()}`;
+        
+          // 🔥 Reset map & dataset sebelum benar-benar redirect
+          try {
+            if (window.map && window.map.remove) {
+              window.map.off();
+              window.map.remove();
+              window.map = null;
+            }
+            allLevels = [];
+            total = 0;
+            frame = 0;
+            pathLine = null;
+            balloonMarker = null;
+          } catch(e) { console.warn("Map cleanup failed:", e); }
+        
+          // 🚀 Paksa hard reload agar JS lama dihentikan total
+          window.location.replace(target);
+        }, 300);
+
       } catch (e) {
         console.error(e);
         alert("❌ Gagal menghubungi /api/filter");
@@ -1168,17 +1197,17 @@
       // jadi kita tidak perlu handle res di JS
     });
     
-        // === Fungsi untuk update waktu Himawari ===
-        function setHimawariTime(dateUTC) {
-          // Bulatkan ke kelipatan 10 menit (slot GIBS)
-          const rounded = new Date(Math.floor(dateUTC.getTime() / (10 * 60 * 1000)) * (10 * 60 * 1000));
-          const iso = rounded.toISOString().split('.')[0] + "Z";
-          console.log("[Himawari] Update time:", iso);
-          himawariLayer.setParams({ time: iso });
-          if (map.hasLayer(himawariLayer)) {
-            map.addLayer(himawariLayer);
-          }
-        }
+    // === Fungsi untuk update waktu Himawari ===
+    function setHimawariTime(dateUTC) {
+      // Bulatkan ke kelipatan 10 menit (slot GIBS)
+      const rounded = new Date(Math.floor(dateUTC.getTime() / (10 * 60 * 1000)) * (10 * 60 * 1000));
+      const iso = rounded.toISOString().split('.')[0] + "Z";
+      console.log("[Himawari] Update time:", iso);
+      himawariLayer.setParams({ time: iso });
+      if (map.hasLayer(himawariLayer)) {
+        map.addLayer(himawariLayer);
+      }
+    }
 
   </script>
 </body>

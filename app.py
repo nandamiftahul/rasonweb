@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-import os, re, io, configparser, warnings
+import os, re, io, configparser, warnings, time
 import json
 import ftplib
 import subprocess
@@ -360,14 +360,19 @@ def parse_bufr(decoded_text):
         df_levels["longitude"] = station_lon + df_levels["lon_disp"].fillna(0)
 
     # --- Combine launch time ---
-    if all(k in meta for k in ("year","month","day","hour","minute","second")):
-        meta["launch_time"] = (
-            f"{meta['year']:04d}-{meta['month']:02d}-{meta['day']:02d} "
-            f"{meta['hour']:02d}:{meta['minute']:02d}:{meta['second']:02d} UTC"
-        )
-        # remove old fields so they don't appear in df_meta
+    if all(k in meta for k in ("year", "month", "day", "hour", "minute", "second")):
+        try:
+            dt_utc = datetime(
+                meta["year"], meta["month"], meta["day"],
+                meta["hour"], meta["minute"], meta["second"],
+                tzinfo=timezone.utc
+            )
+            meta["launch_time"] = dt_utc.isoformat().replace("+00:00", "Z")  # format ISO UTC
+        except Exception:
+            meta["launch_time"] = "-"
         for k in ("year","month","day","hour","minute","second"):
             meta.pop(k, None)
+    
     
     # --- Convert to DataFrame AFTER cleanup ---
     df_meta = pd.DataFrame([meta])
@@ -400,11 +405,6 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                     start_date=None, end_date=None):
     """
     Fetch list of radiosonde files from FTP or (if cached) from local SQLite DB.
-
-    - ext_filter: list of extensions (e.g. ['.bfr'])
-    - limit: maximum number of files per site
-    - with_meta: if True, decode/parse or use DB cache for metadata extraction
-    - start_date, end_date: UTC naive datetime range
     """
     _tz = None  # fallback (pakai UTC kalau zoneinfo tidak ada)
 
@@ -503,10 +503,25 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                 if not df_meta.empty:
                                     meta_row = df_meta.iloc[0]
 
-                                    # Launch time
-                                    launch_time = meta_row.get("launch_time")
-                                    if launch_time:
-                                        item["launch_time"] = launch_time
+                                    # ✅ Launch time (auto-handle any format)
+                                    raw_lt = meta_row.get("launch_time")
+                                    lt = None
+                                    if raw_lt is not None and not pd.isna(raw_lt):
+                                        try:
+                                            if isinstance(raw_lt, (datetime, pd.Timestamp)):
+                                                lt = raw_lt.astimezone(timezone.utc) if raw_lt.tzinfo else raw_lt.replace(tzinfo=timezone.utc)
+                                            elif isinstance(raw_lt, (int, float)):
+                                                lt = pd.to_datetime(raw_lt, utc=True, errors="coerce")
+                                            elif isinstance(raw_lt, str):
+                                                clean_lt = raw_lt.strip().replace("Z", "").replace(" UTC", "")
+                                                lt = pd.to_datetime(clean_lt, utc=True, errors="coerce")
+                                        except Exception as e:
+                                            print(f"[WARN] launch_time parse failed for {fname}: {e}")
+
+                                    if lt is not None and pd.notna(lt):
+                                        item["launch_time"] = lt.strftime("%Y-%m-%d %H:%M:%S UTC")
+                                    else:
+                                        item["launch_time"] = "-"
 
                                     # Radiosonde serial number
                                     sn = meta_row.get("radiosonde_serial_number")
@@ -554,13 +569,15 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                         if pd.notna(max_height):
                                             item["max_height"] = round(float(max_height), 0)
 
-                                        # End time
+                                        # End time (consistent with launch_time UTC)
                                         if "time_s" in df_levels and not df_meta.empty:
-                                            launch_time = pd.to_datetime(meta_row.get("launch_time"))
-                                            if pd.notna(launch_time):
-                                                end_time = launch_time + pd.to_timedelta(
-                                                    df_levels["time_s"].max(), unit="s")
-                                                item["end_time"] = end_time.strftime("%Y-%m-%d %H:%M:%S")
+                                            if "launch_time" in item and item["launch_time"] != "-":
+                                                try:
+                                                    lt = pd.to_datetime(item["launch_time"].replace(" UTC", ""), utc=True)
+                                                    end_time = lt + pd.to_timedelta(df_levels["time_s"].max(), unit="s")
+                                                    item["end_time"] = end_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+                                                except Exception as e:
+                                                    print(f"[WARN] end_time calc failed for {fname}: {e}")
 
                                         # Distance from station
                                         if {"latitude", "longitude"} <= set(df_levels.columns) and not df_meta.empty:
@@ -1339,12 +1356,11 @@ def file_metadata(site, filename):
 @login_required
 def load_from_ftp(site, filename):
     download_and_process(site, filename)
-    return redirect(url_for("index"))
+    return redirect(url_for("map_view", t=int(time.time())))
 
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def index():
-    global rason_levels, metadata
     if request.method == "POST":
         f = request.files["rasonfiles"]
         if not f or not f.filename:
@@ -1355,13 +1371,13 @@ def index():
         decoded = decode_bufr(filepath)
         df_meta, df_levels = parse_bufr(decoded)
 
-        # 🔧 Tambahkan analisis issues di sini
         issues = analyze_flight(df_meta, df_levels)
-
         store = get_user_store()
         store["metadata"] = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+        store["metadata"]["flight_issues"] = issues
+        store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
 
-        # --- Normalize radiosonde frequency (Hz → MHz with 3 decimals) ---
+        # 🔧 konversi frequency Hz → MHz
         if "radiosonde_operating_frequency" in store["metadata"]:
             try:
                 hz_val = float(store["metadata"]["radiosonde_operating_frequency"])
@@ -1370,13 +1386,11 @@ def index():
             except Exception:
                 pass
 
-        store["metadata"]["flight_issues"] = issues
-        store["levels"] = df_levels.to_dict("records") if not df_levels.empty else []
+        # ✅ setelah upload berhasil, redirect ke /map?t=timestamp
+        return redirect(url_for("map_view", t=int(time.time())))
 
-        return redirect(url_for("index"))
-
-    store = get_user_store()
-    return render_template("map.html", total=len(store["levels"]), user=session.get("user"))
+    # GET: tampilkan halaman utama / dashboard
+    return render_template("main.html", user=session.get("user"))
 
 @app.route("/value")
 @login_required
@@ -1545,8 +1559,9 @@ def download_wmo(site, filename):
 def raob_analysis(site, filename):
     """
     Analisis RAOB lengkap dengan caching SQLite.
-    - Coba ambil df_meta & df_levels dari database dulu.
-    - Jika belum ada, download dari FTP + decode + parse + simpan ke DB.
+    - Ambil data dari DB kalau sudah ada.
+    - Jika belum, unduh dari FTP, decode, parse, dan simpan ke DB.
+    - Hasil: Skew-T, Hodograph, Indeks, dan Analisis cuaca.
     """
     try:
         # ==========================================================
@@ -1590,10 +1605,19 @@ def raob_analysis(site, filename):
         if df_levels.empty:
             return "No levels found", 500
 
-        # --- Metadata harus diambil lebih awal ---
+        # --- Metadata ---
         meta = df_meta.to_dict("records")[0] if not df_meta.empty else {}
 
-        # --- Clean profile ---
+        # --- Konversi launch_time agar aman (Timestamp → str UTC) ---
+        launch_time = meta.get("launch_time", "-")
+        if isinstance(launch_time, pd.Timestamp):
+            launch_time = launch_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+        elif isinstance(launch_time, datetime):
+            launch_time = launch_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+        elif not isinstance(launch_time, str):
+            launch_time = str(launch_time)
+
+        # --- Clean & sort data ---
         df = df_levels.dropna(subset=["pressure_hPa"]).copy()
         df = df.sort_values("pressure_hPa", ascending=False)
         df["pressure_hPa"] = medfilt(df["pressure_hPa"].values, kernel_size=3)
@@ -1635,7 +1659,9 @@ def raob_analysis(site, filename):
             else:
                 hgt = mpcalc.pressure_to_height_std(p_w)
 
-        # --- Thermodynamic indices (safe) ---
+        # ==========================================================
+        # 6️⃣ Hitung indeks termodinamik dan kinematik
+        # ==========================================================
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
             try:
@@ -1647,8 +1673,8 @@ def raob_analysis(site, filename):
             except Exception as e:
                 print("Thermo calc failed:", e)
                 cape = cin = li = ki = np.nan * units("dimensionless")
-        
-        # --- Wind shear (safe) ---
+
+        # --- Wind shear ---
         shear_0_1km_mag = shear_0_6km_mag = np.nan * units("knot")
         if (u is not None) and (v is not None):
             try:
@@ -1659,8 +1685,8 @@ def raob_analysis(site, filename):
                     shear_0_6km_mag = mpcalc.wind_speed(sh_u_6km, sh_v_6km).to("knot")
             except Exception as e:
                 print("Shear calc failed:", e)
-        
-        # --- SRH (safe) ---
+
+        # --- SRH ---
         srh_0_1km = srh_0_3km = np.nan * units("m^2/s^2")
         if (u is not None) and (v is not None) and (hgt is not None):
             try:
@@ -1681,7 +1707,7 @@ def raob_analysis(site, filename):
                         bottom=0 * units.m,
                         storm_u=storm_u, storm_v=storm_v)
             except Exception as e:
-                print("SRH calculation failed (safe):", e)
+                print("SRH calculation failed:", e)
 
         # --- Freezing Level ---
         freezing_level = "-"
@@ -1713,7 +1739,10 @@ def raob_analysis(site, filename):
         except Exception as e:
             print("Tropopause calc failed:", e)
 
-        # --- Skew-T plot ---
+        # ==========================================================
+        # 7️⃣ Skew-T dan Hodograph
+        # ==========================================================
+        # --- Skew-T ---
         fig1 = plt.figure(figsize=(7, 7))
         skew = SkewT(fig1, rotation=45)
         skew.ax.set_facecolor("#fff9ef")
@@ -1726,9 +1755,7 @@ def raob_analysis(site, filename):
         skew.ax.set_ylim(1050, 100)
         skew.ax.set_xlim(-40, 40)
         skew.ax.legend(fontsize=8, loc="best")
-        skew.ax.set_xlabel("Temperature (°C)")
-        skew.ax.set_ylabel("Pressure (hPa)")
-        skew.ax.set_title(f"{meta.get('wmo_station','')}  {meta.get('launch_time','')}",
+        skew.ax.set_title(f"{site.upper()}  {launch_time}",
                           fontsize=10, fontweight="bold", color="#222")
         buf1 = BytesIO()
         plt.savefig(buf1, format="png", bbox_inches="tight")
@@ -1736,7 +1763,7 @@ def raob_analysis(site, filename):
         skewt_img = base64.b64encode(buf1.read()).decode("utf-8")
         plt.close(fig1)
 
-        # --- Hodograph (Cartesian style + compass labels) ---
+        # --- Hodograph ---
         if (u is not None) and (v is not None):
             fig2, ax = plt.subplots(figsize=(6, 6))
             hodo = Hodograph(ax, component_range=60.0)
@@ -1745,32 +1772,18 @@ def raob_analysis(site, filename):
             hodo.plot(u_rot, v_rot, color="#007bff", linewidth=2, label="Wind profile")
             if hgt is not None:
                 mask = ~np.isnan(hgt.m)
-                ax.scatter(
-                    u_rot[mask].to("m/s"),
-                    v_rot[mask].to("m/s"),
-                    c=hgt[mask].m / 1000.0,
-                    cmap="viridis",
-                    s=30,
-                    edgecolors="black",
-                    linewidths=0.3,
-                    label="Height (km)"
-                )
+                ax.scatter(u_rot[mask].to("m/s"), v_rot[mask].to("m/s"),
+                           c=hgt[mask].m / 1000.0, cmap="viridis",
+                           s=30, edgecolors="black", linewidths=0.3,
+                           label="Height (km)")
             ax.set_facecolor("#f9f9f9")
             ax.grid(True, linestyle="--", color="gray", alpha=0.5)
             ax.axhline(0, color="black", linewidth=0.8)
             ax.axvline(0, color="black", linewidth=0.8)
             ax.set_aspect("equal", adjustable="box")
-            ax.set_xticklabels([f"{abs(int(t))}" for t in ax.get_xticks()])
-            ax.set_yticklabels([f"{abs(int(t))}" for t in ax.get_yticks()])
             ax.set_xlabel("U wind (m/s)")
             ax.set_ylabel("V wind (m/s)")
-            ax.set_title("Hodograph", fontsize=10, fontweight="bold", color="#004085")
             ax.legend(fontsize=8, loc="upper left")
-            lim, offset = 60, 54
-            ax.text(0,  offset, "N", fontsize=10, fontweight="bold", ha="center", va="bottom", color="#222")
-            ax.text(0, -offset, "S", fontsize=10, fontweight="bold", ha="center", va="top", color="#222")
-            ax.text( offset, 0, "E", fontsize=10, fontweight="bold", ha="left", va="center", color="#222")
-            ax.text(-offset, 0, "W", fontsize=10, fontweight="bold", ha="right", va="center", color="#222")
             buf2 = BytesIO()
             plt.savefig(buf2, format="png", bbox_inches="tight")
             buf2.seek(0)
@@ -1779,6 +1792,9 @@ def raob_analysis(site, filename):
         else:
             hodo_img = None
 
+        # ==========================================================
+        # 8️⃣ Kumpulkan indeks & hasil analisis
+        # ==========================================================
         def scalar_str(x, fmt=".1f"):
             try:
                 val = np.atleast_1d(x.m)[0]
@@ -1802,8 +1818,13 @@ def raob_analysis(site, filename):
 
         analysis_text = generate_weather_analysis(df)
 
+        # ==========================================================
+        # 9️⃣ Render template
+        # ==========================================================
         return render_template(
             "raob.html",
+            site=site,
+            date_str=launch_time,
             meta=meta,
             indices=indices,
             skewt_img=skewt_img,
@@ -1862,8 +1883,13 @@ def main_page():
 
 @app.route("/map")
 @login_required
-def map():
-    return render_template("map.html")
+def map_view():
+    t = request.args.get("t", str(int(time.time())))
+    store = get_user_store()
+    total = len(store.get("levels", []))
+    user = session.get("user")
+    return render_template("map.html", total=total, user=user, t=t)
+
 
 @app.route("/underdev")
 @login_required
@@ -2446,6 +2472,12 @@ def api_data_availability():
 
     return jsonify({"year": year, "month": month, "sites": results})
 
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 if __name__ == "__main__":
