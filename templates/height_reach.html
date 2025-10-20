@@ -204,7 +204,15 @@
       background: rgba(255,255,255,0.15);
       font-weight: 600;
     }
-
+    .table-summary {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      font-size: 13px;
+      color: #e0e7ff;
+      text-align: center;
+      line-height: 1.4;
+    }
     canvas { width: 100% !important; height: 500px !important; }
     .loading { font-size: 15px; color: #dbeafe; margin-top: 20px; }
     .summary { margin-top: 20px; margin-bottom: 40px; font-size: 14px; color: #e0e7ff; text-align: center; }
@@ -342,6 +350,12 @@
           </thead>
           <tbody></tbody>
         </table>
+        <!-- 🔽 Tambahan summary -->
+        <div class="table-summary" id="tableSummary">
+          <p>Max Height: - m | Min Height: - m</p>
+          <p>Max Pressure: - hPa | Min Pressure: - hPa</p>
+        </div>
+      </div>
       </div>
     </div>
   </div>
@@ -541,6 +555,19 @@
         </tr>
         `);
       });
+      // === Hitung Max / Min untuk summary ===
+      const heights = allData.map(d => d.max_height).filter(v => v != null && !isNaN(v));
+      const pressures = allData.map(d => d.end_pressure).filter(v => v != null && !isNaN(v));
+    
+      const maxH = heights.length ? Math.max(...heights).toFixed(0) : "-";
+      const minH = heights.length ? Math.min(...heights).toFixed(0) : "-";
+      const maxP = pressures.length ? Math.max(...pressures).toFixed(1) : "-";
+      const minP = pressures.length ? Math.min(...pressures).toFixed(1) : "-";
+    
+      document.getElementById("tableSummary").innerHTML = `
+        <p>Max Height: ${maxH} m | Min Height: ${minH} m</p>
+        <p>Max Pressure: ${maxP} hPa | Min Pressure: ${minP} hPa</p>
+      `;
     }
     
 
