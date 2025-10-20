@@ -169,6 +169,42 @@
       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
 
+    /* === Chart dan tabel berdampingan === */
+    .chart-container {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    
+    .table-box {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 15px;
+      max-height: 500px;
+      overflow-y: auto;
+      flex: 0 0 300px; /* lebar tetap */
+      color: #fff;
+    }
+    
+    .table-box table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    
+    .table-box th, .table-box td {
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      padding: 6px 8px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    
+    .table-box th {
+      background: rgba(255,255,255,0.15);
+      font-weight: 600;
+    }
+
     canvas { width: 100% !important; height: 500px !important; }
     .loading { font-size: 15px; color: #dbeafe; margin-top: 20px; }
     .summary { margin-top: 20px; margin-bottom: 40px; font-size: 14px; color: #e0e7ff; text-align: center; }
@@ -233,6 +269,7 @@
       letter-spacing: 1px;
       text-shadow: 0 0 6px rgba(0,0,0,0.4); /* sedikit glow agar jelas di background */
     }
+    
   </style>
 </head>
 
@@ -288,14 +325,25 @@
         <option value="12Z">12Z</option>
       </select>
     </div>
-
-    <!-- Chart -->
-    <div class="chart-box">
-      <canvas id="heightChart"></canvas>
-      <div id="loadingMsg" class="loading">Loading data...</div>
+    <!-- Chart + Table side-by-side -->
+    <div class="chart-container">
+      <div class="chart-box">
+        <canvas id="heightChart"></canvas>
+        <div id="loadingMsg" class="loading">Loading data...</div>
+        <div id="summary" class="summary"></div>
+      </div>
+    
+      <div class="table-box">
+        <table id="heightTable">
+          <thead>
+            <tr>
+              <th>Date</th><th>Height(m)</th><th>Pressure(hPa)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
-
-    <div id="summary" class="summary"></div>
   </div>
   <!-- Footer -->
   <div class="footer">
@@ -448,7 +496,53 @@
       const allVals = [...data00, ...data12].filter(v => v != null);
       const avg = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(0) : "-";
       summaryDiv.textContent = `Average maximum height: ${avg} m`;
+      renderTable();
     }
+
+    function renderTable() {
+      const tbody = document.querySelector("#heightTable tbody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+    
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+    
+      // Map cepat date_hour → data
+      const map = {};
+      allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+    
+      // Buat daftar label (00Z & 12Z)
+      const daysInMonth = new Date(year, now.getUTCMonth() + 1, 0).getDate();
+      const labels = [];
+      for (let i = 1; i <= daysInMonth; i++) {
+        const day = String(i).padStart(2, "0");
+        if (timeSelect.value === "ALL" || timeSelect.value === "00Z") labels.push(`${day} (00Z)`);
+        if (timeSelect.value === "ALL" || timeSelect.value === "12Z") labels.push(`${day} (12Z)`);
+      }
+    
+      labels.forEach(lbl => {
+        const [dayRaw, tagRaw] = lbl.split(" ");
+        const day = dayRaw.padStart(2, "0");
+        const hourZ = tagRaw.replace(/[()]/g, "");
+        const entry = map[`${year}-${month}-${day}_${hourZ}`];
+        if (!entry) return;
+    
+        const dateFmt = `${day}/${month} ${hourZ}`;
+        const pres = (entry.end_pressure && entry.end_pressure > 0)
+          ? entry.end_pressure.toFixed(1)
+          : "-";
+    
+        tbody.insertAdjacentHTML("beforeend", `
+        <tr>
+          <td>${dateFmt}</td>
+          <td>${entry.max_height}</td>
+          <td>${pres}</td>
+        </tr>
+        `);
+      });
+    }
+    
 
     siteSelect.addEventListener("change", () => loadHeightReach(siteSelect.value));
     timeSelect.addEventListener("change", renderChart);

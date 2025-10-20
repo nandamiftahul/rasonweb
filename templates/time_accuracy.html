@@ -169,6 +169,41 @@
       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
 
+    .chart-container {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    
+    .table-box {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 15px;
+      max-height: 500px;
+      overflow-y: auto;
+      flex: 0 0 300px; /* lebar tetap */
+      color: #fff;
+    }
+    
+    .table-box table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    
+    .table-box th, .table-box td {
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      padding: 6px 8px;
+      text-align: center;
+    }
+    
+    .table-box th {
+      background: rgba(255,255,255,0.15);
+      font-weight: 600;
+    }
+
+
     canvas { width: 100% !important; height: 500px !important; }
     .loading { font-size: 15px; color: #dbeafe; margin-top: 20px; }
     .summary { margin-top: 20px; margin-bottom: 40px;  font-size: 14px; color: #e0e7ff; text-align: center; }
@@ -288,10 +323,22 @@
     </div>
 
     <!-- Chart -->
-    <div class="chart-box">
-      <canvas id="timeAccuracyChart"></canvas>
-      <div id="loadingMsg" class="loading">Loading data...</div>
+    <!-- Chart + Table side-by-side -->
+    <div class="chart-container">
+      <div class="chart-box">
+        <canvas id="timeAccuracyChart"></canvas>
+        <div id="loadingMsg" class="loading">Loading data...</div>
+      </div>
+      <div class="table-box">
+        <table id="dataTable">
+          <thead>
+            <tr><th>Date</th><th>Launch</th><th>AB</th><th>Burst</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
+
 
     <div id="summary" class="summary"></div>
   </div>
@@ -538,8 +585,75 @@ function renderChart() {
       }
     }
   });
+  renderTable(labels, AB, CD);
 }
 
+function renderTable(labels, AB, CD) {
+  const tbody = document.querySelector("#dataTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+
+  // Buat peta cepat
+  const map = {};
+  allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+  // Tambahkan menit ke waktu UTC (berdasarkan launch_time string)
+  function addMinutesToLaunch(launchStr, addMin) {
+    if (!launchStr || addMin == null || isNaN(addMin)) return "-";
+    try {
+      // ambil jam dan menit dari string "YYYY-MM-DD HH:MM:SS UTC"
+      const m = launchStr.match(/\b(\d{2}):(\d{2})/);
+      if (!m) return "-";
+      let hour = parseInt(m[1]);
+      let minute = parseInt(m[2]);
+  
+      // tambahkan menit
+      let totalMin = hour * 60 + minute + Number(addMin);
+      totalMin = ((totalMin % 1440) + 1440) % 1440; // wrap 24 jam
+  
+      const hh = String(Math.floor(totalMin / 60)).padStart(2, "0");
+      const mm = String(Math.floor(totalMin % 60)).padStart(2, "0");
+      return `${hh}:${mm}`;
+    } catch {
+      return "-";
+    }
+  }
+
+
+  // Ambil HH:MM langsung dari backend string
+  function getLaunchHHMM(str) {
+    if (!str) return "-";
+    const m = str.match(/\b(\d{2}):(\d{2})/);
+    return m ? `${m[1]}:${m[2]}` : "-";
+  }
+
+  labels.forEach(lbl => {
+    const [dayRaw, tagRaw] = lbl.includes("(") ? lbl.split(" ") : [lbl, "00Z"];
+    const day = dayRaw.padStart(2, "0");
+    const hourZ = tagRaw.replace(/[()]/g, "") || "00Z";
+
+    const entry = map[`${year}-${month}-${day}_${hourZ}`];
+    if (!entry) return;
+
+    const dateFmt = `${day}/${month} ${hourZ}`;
+    const launchHHMM = getLaunchHHMM(entry.launch_time);       // ⏱ ambil langsung dari backend
+    const abUTC = addMinutesToLaunch(entry.launch_time, entry.AB);
+    const burstUTC = addMinutesToLaunch(entry.launch_time, entry.CD);
+
+    tbody.insertAdjacentHTML("beforeend", `
+      <tr>
+        <td>${dateFmt}</td>
+        <td>${launchHHMM}</td>
+        <td>${abUTC}</td>
+        <td>${burstUTC}</td>
+      </tr>
+    `);
+  });
+}
 
 
     siteSelect.addEventListener("change", () => loadTimeAccuracy(siteSelect.value));

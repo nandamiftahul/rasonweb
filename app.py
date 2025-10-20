@@ -2017,8 +2017,9 @@ def api_time_accuracy(site):
                 # 🔹 Hitung waktu ke 100 & 30 hPa
                 # ======================================================
                 t100 = df_levels.loc[df_levels["pressure_hPa"] <= 100, "time_s"].min()
-                t30 = df_levels.loc[df_levels["pressure_hPa"] <= 30, "time_s"].min()
-
+                t30 = df_levels.loc[df_levels["pressure_hPa"] <= 0, "time_s"].min()
+                if pd.isna(t30):
+                    t30 = df_levels["time_s"].max()
                 # ======================================================
                 # 🔹 Simpan hasil
                 # ======================================================
@@ -2031,6 +2032,7 @@ def api_time_accuracy(site):
                         "AB": round(t100 / 60.0, 1),
                         "CD": round(t30 / 60.0, 1) if pd.notna(t30) else None
                     })
+                
 
             except Exception as e:
                 print(f"⚠️ Error parsing {fname}: {e}")
@@ -2056,9 +2058,9 @@ def height_reach():
 @login_required
 def api_height_reach(site):
     """
-    Ambil data ketinggian maksimum balon (.bfr) per hari untuk satu bulan berjalan.
-    🔹 Sekarang menggunakan SQLite cache:
-       - Cek dari DB dulu, jika belum ada baru download dari FTP dan decode.
+    Ambil data ketinggian maksimum & tekanan minimum balon (.bfr) per hari untuk bulan berjalan.
+    🔹 Menggunakan SQLite cache:
+       - Cek dari DB dulu, jika belum ada, baru download dari FTP dan decode.
     """
     from datetime import datetime, timedelta
     import pandas as pd, re
@@ -2068,7 +2070,7 @@ def api_height_reach(site):
     end_date = (start_date + timedelta(days=32)).replace(day=1)
 
     def extract_datetime_from_filename(fname):
-        """Ambil waktu dari nama file (contoh: T2097502A202510050000.BFR)."""
+        """Ambil datetime dari nama file (contoh: T2097502A202510050000.BFR)."""
         m = re.search(r"(\d{10,14})", fname)
         if not m:
             return None
@@ -2083,7 +2085,7 @@ def api_height_reach(site):
     data = []
     try:
         # ==========================================================
-        # 🔹 Ambil daftar semua file BFR dari FTP
+        # 🔹 Ambil daftar semua file .bfr dari FTP
         # ==========================================================
         all_sites = fetch_all_sites(
             ext_filter=[".bfr"],
@@ -2097,7 +2099,7 @@ def api_height_reach(site):
         true_site = site_keys[site.lower()]
 
         # ==========================================================
-        # 🔁 Loop setiap file di bulan berjalan
+        # 🔁 Loop semua file dalam bulan berjalan
         # ==========================================================
         for f in all_sites[true_site]:
             fname = f["name"]
@@ -2133,18 +2135,26 @@ def api_height_reach(site):
                     print(f"[DB] 💾 cached {fname}")
 
                 # ======================================================
-                # 🔹 Proses data ketinggian maksimum
+                # 🔹 Proses data level
                 # ======================================================
                 if df_levels.empty or "height_m" not in df_levels.columns:
                     continue
 
+                # pastikan kolom tekanan ada
+                if "pressure_hPa" not in df_levels.columns:
+                    continue
+
+                # nilai maksimum dan minimum
                 max_height = df_levels["height_m"].max()
+                min_pres = df_levels["pressure_hPa"].min()
+
                 if pd.notna(max_height) and max_height > 0:
                     data.append({
                         "filename": fname,
                         "date": dt.strftime("%Y-%m-%d"),
                         "hour": hour_label,
-                        "max_height": round(float(max_height), 0)
+                        "max_height": round(float(max_height), 0),
+                        "end_pressure": round(float(min_pres), 1) if pd.notna(min_pres) else None
                     })
 
             except Exception as e:
