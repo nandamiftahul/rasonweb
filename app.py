@@ -125,6 +125,33 @@ def clear_user_store():
     if user in USER_STATE:
         del USER_STATE[user]
 
+SITES_FILE = "sites.json"
+SITE_LIST = ["aceh", "tarakan", "sorong", "cilacap", "pangkalanbun", "ranai"]
+def load_sites():
+    """Load site list from JSON file or use defaults."""
+    global SITE_LIST
+    if os.path.exists(SITES_FILE):
+        try:
+            with open(SITES_FILE, "r") as f:
+                data = json.load(f)
+                SITE_LIST = data.get("sites", [])
+        except Exception as e:
+            print("⚠️ Failed to read sites.json:", e)
+            SITE_LIST = SITE_LIST
+    else:
+        SITE_LIST = SITE_LIST
+        save_sites()
+
+def save_sites():
+    """Save site list to JSON file."""
+    try:
+        with open(SITES_FILE, "w") as f:
+            json.dump({"sites": SITE_LIST}, f, indent=2)
+    except Exception as e:
+        print("⚠️ Failed to save sites.json:", e)
+
+load_sites()
+
 USER_FILE = "users.json"
 
 def load_users():
@@ -525,7 +552,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                         ftp.retrbinary(f"RETR " + fname, f.write)
 
                                     decoded = decode_bufr(local_path)
-                                    df_meta, df_levels = parse_bufr(decoded)
+                                    df_meta, df_levels = parse_bufr(decoded, site=site)
 
                                     db_insert(ftype, site, fname,
                                               extract_date_from_filename(fname),
@@ -735,7 +762,7 @@ def api_status():
     from datetime import datetime, timedelta
 
     cfg = CONFIG["ftp"]
-    sites = ["aceh", "tarakan", "sorong", "cilacap", "pangkalanbun", "ranai"]
+    sites = SITE_LIST
     results = []
 
     # Offset per site
@@ -939,7 +966,7 @@ def download_and_process(site, filename):
         # 3️⃣ Decode & parse pakai pybufrkit sekali saja
         # ==========================================================
         decoded = decode_bufr(local_path)
-        df_meta, df_levels = parse_bufr(decoded)
+        df_meta, df_levels = parse_bufr(decoded, site=site)
         issues = analyze_flight(df_meta, df_levels)
 
         # ==========================================================
@@ -1356,7 +1383,7 @@ def file_metadata(site, filename):
             # ======================================================
             local_path = download_from_ftp(site, filename)
             decoded = decode_bufr(local_path)
-            df_meta, df_levels = parse_bufr(decoded)
+            df_meta, df_levels = parse_bufr(decoded, site=site)
 
             # ======================================================
             # 3️⃣ Simpan hasil parse ke DB
@@ -1492,7 +1519,7 @@ def download_wmo(site, filename):
         # === CASE 2: fallback → generate dari BUFR ===
         local_path = download_from_ftp(site, filename)
         decoded = decode_bufr(local_path)
-        df_meta, df_levels = parse_bufr(decoded)
+        df_meta, df_levels = parse_bufr(decoded, site=site)
 
         block = int(df_meta.iloc[0].get("wmo_block", 99))
         station = int(df_meta.iloc[0].get("wmo_station", 999))
@@ -1618,7 +1645,7 @@ def raob_analysis(site, filename):
             # ======================================================
             local_path = download_from_ftp(site, filename)
             decoded = decode_bufr(local_path)
-            df_meta, df_levels = parse_bufr(decoded)
+            df_meta, df_levels = parse_bufr(decoded, site=site)
 
             # ======================================================
             # 4️⃣ Simpan hasil parse ke DB
@@ -2087,7 +2114,7 @@ def api_time_accuracy(site):
                 else:
                     local_path = download_from_ftp(true_site, fname)
                     decoded = decode_bufr(local_path)
-                    df_meta, df_levels = parse_bufr(decoded)
+                    df_meta, df_levels = parse_bufr(decoded, site=site)
                     db_insert(ftype, true_site, fname,
                               extract_date_from_filename(fname),
                               df_meta, df_levels)
@@ -2263,7 +2290,7 @@ def api_height_reach(site):
                 else:
                     local_path = download_from_ftp(true_site, fname)
                     decoded = decode_bufr(local_path)
-                    df_meta, df_levels = parse_bufr(decoded)
+                    df_meta, df_levels = parse_bufr(decoded, site=site)
                     db_insert(
                         ftype,
                         true_site,
@@ -2371,6 +2398,35 @@ def manage_users():
         save_users()
         print(f"🗑️ Deleted user: {username}")
         return jsonify({"success": True, "users": VALID_USERS})
+
+@app.route("/api/sites_config", methods=["GET", "POST", "DELETE"])
+@login_required
+def manage_sites():
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    if request.method == "GET":
+        return jsonify({"sites": SITE_LIST})
+
+    data = request.get_json(force=True)
+    name = data.get("name", "").strip().lower()
+    if not name:
+        return jsonify({"error": "Missing site name"}), 400
+
+    if request.method == "POST":
+        if name in SITE_LIST:
+            return jsonify({"error": "Site already exists"}), 400
+        SITE_LIST.append(name)
+        save_sites()
+        return jsonify({"success": True, "sites": SITE_LIST})
+
+    if request.method == "DELETE":
+        if name not in SITE_LIST:
+            return jsonify({"error": "Site not found"}), 404
+        SITE_LIST.remove(name)
+        save_sites()
+        return jsonify({"success": True, "sites": SITE_LIST})
+
 
 @app.route("/raob_doc")
 @login_required
@@ -2576,7 +2632,7 @@ def api_data_availability():
     start_date = datetime(year, month, 1)
     end_day = calendar.monthrange(year, month)[1]
 
-    sites = ["aceh", "tarakan", "sorong", "cilacap", "pangkalanbun", "ranai"]
+    sites = SITE_LIST
     results = []
 
     try:
@@ -2857,24 +2913,35 @@ def api_bufrmap_site(site):
     elif request.method == "PUT":
         js = request.get_json(force=True)
         section = js.get("type")
+    
+        # ✅ Special case: full JSON import (from Load JSON in settings.html)
+        if section == "full" and "data" in js:
+            data = js["data"]
+            if "meta" in data and "level" in data:
+                if save_mapping(data):
+                    return jsonify({"success": True})
+            return jsonify({"error": "Invalid JSON structure"}), 400
+    
+        # --- Normal single-field update ---
         original = js.get("original", "").strip()
         variable = js.get("variable", "").strip()
         if section not in ("meta", "level"):
             return jsonify({"error": "Invalid mapping type"}), 400
-
+    
         updated = False
         for m in mapping[section]:
             if m["original"] == original:
                 m["variable"] = variable
                 updated = True
                 break
-
+    
         if not updated:
             return jsonify({"error": f"Field '{original}' not found"}), 404
-
+    
         if save_mapping(mapping):
             return jsonify({"success": True})
         return jsonify({"error": "Failed to save mapping"}), 500
+    
 
     # =========================================================
     # DELETE — Remove mapping entry
@@ -2898,7 +2965,6 @@ def api_bufrmap_site(site):
             return jsonify({"success": True})
         return jsonify({"error": "Failed to save mapping"}), 500
 
-
 @app.route("/release")
 @login_required
 def release_page():
@@ -2910,7 +2976,6 @@ def add_no_cache_headers(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0",port=8082,debug=True)

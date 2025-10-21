@@ -399,14 +399,49 @@
       });
     
     // --- Titik site (koordinat tetap di sini) ---
-    const sites = [
-      { name: "Aceh",         lat: 5.52256,   lon: 95.41685 },
-      { name: "Tarakan",      lat: 3.32708,   lon: 117.57052 },
-      { name: "Sorong",       lat: -0.89059,  lon: 131.28581 },
-      { name: "Cilacap",      lat: -7.71897,  lon: 109.01487 },
-      { name: "Pangkalanbun", lat: -2.70508,  lon: 111.66573 },
-      { name: "Ranai",        lat: 3.95929,   lon: 108.38576 }
-    ];
+    let sites = [];
+  
+    async function loadSitesFromConfig() {
+      try {
+        const res = await fetch("/api/sites_config");
+        const data = await res.json();
+    
+        // Kalau backend sudah mengirim array of objects
+        if (Array.isArray(data.sites) && data.sites.length > 0 && typeof data.sites[0] === "object") {
+          sites = data.sites.map(s => ({
+            name: s.name.charAt(0).toUpperCase() + s.name.slice(1),
+            lat: parseFloat(s.lat) || 0,
+            lon: parseFloat(s.lon) || 0
+          }));
+        } else {
+          // fallback (kalau masih string array)
+          const defaultCoords = {
+            aceh: [5.52256, 95.41685],
+            tarakan: [3.32708, 117.57052],
+            sorong: [-0.89059, 131.28581],
+            cilacap: [-7.71897, 109.01487],
+            pangkalanbun: [-2.70508, 111.66573],
+            ranai: [3.95929, 108.38576]
+          };
+          const siteNames = data.sites || [];
+          sites = siteNames.map(name => ({
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            lat: defaultCoords[name]?.[0] ?? 0,
+            lon: defaultCoords[name]?.[1] ?? 0
+          }));
+        }
+    
+        drawStaticMarkers();     // tampilkan marker awal
+        updateSiteStatus();      // update status real
+      } catch (err) {
+        console.error("❌ Gagal load site list:", err);
+        drawStaticMarkers();
+      }
+    }
+  
+  loadSitesFromConfig();
+
+
     
     // --- Map status → warna ---
     function getColorByStatus(status) {

@@ -86,6 +86,13 @@
       text-align: center;
       margin: 15px 0 30px;
     }
+    .action-buttons {
+      text-align: center;
+      margin-top: 15px;
+    }
+    .action-buttons button {
+      margin: 5px;
+    }
   </style>
 </head>
 <body>
@@ -93,6 +100,7 @@
 
   <div class="tab-container">
     <button class="tab-btn active" onclick="switchTab('users')">👥 User Management</button>
+    <button class="tab-btn" onclick="switchTab('sites')">🌐 Site Configuration</button>
     <button class="tab-btn" onclick="switchTab('bufr')">🧩 BUFR Mapping Configuration</button>
   </div>
 
@@ -127,6 +135,12 @@
       </select>
     </div>
 
+    <div class="action-buttons">
+      <button onclick="applyGenerate()">💾 Apply & Generate JSON</button>
+      <input type="file" id="jsonFileInput" accept=".json" style="display:none" onchange="importJSONFile(this)">
+      <button onclick="document.getElementById('jsonFileInput').click()">📂 Load JSON</button>
+    </div>
+
     <h2>📘 Metadata Mapping</h2>
     <table id="metaTable">
       <thead>
@@ -153,6 +167,19 @@
       <input type="text" id="newLevelField" placeholder="e.g. PRESSURE">
       <input type="text" id="newLevelVar" placeholder="e.g. pressure_hPa">
       <button onclick="addMapping('level')">Add Level Field</button>
+    </div>
+  </div>
+
+  <!-- ===== TAB 3: SITE CONFIGURATION ===== -->
+  <div id="tab-sites" class="tab-content">
+    <table id="siteTable">
+      <thead><tr><th>Site Name</th><th>Action</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  
+    <div class="add-section">
+      <input type="text" id="newSiteName" placeholder="e.g. pontianak">
+      <button onclick="addSite()">Add Site</button>
     </div>
   </div>
 
@@ -237,6 +264,10 @@
     async function loadMappings() {
       const res = await fetch(`/api/bufrmap/${currentSite}`);
       const data = await res.json();
+      renderTables(data);
+    }
+
+    function renderTables(data) {
       const metaBody = document.querySelector("#metaTable tbody");
       const levelBody = document.querySelector("#levelTable tbody");
       metaBody.innerHTML = ""; levelBody.innerHTML = "";
@@ -252,7 +283,6 @@
             </td>
           </tr>`;
       });
-
       data.level.forEach(l => {
         levelBody.innerHTML += `
           <tr>
@@ -271,8 +301,7 @@
       const variable = document.getElementById(`new${type==='meta'?'Meta':'Level'}Var`).value.trim();
       if (!field || !variable) return alert("Please fill both fields.");
       const res = await fetch(`/api/bufrmap/${currentSite}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({type, original: field, variable})
       });
       const json = await res.json();
@@ -284,8 +313,7 @@
       const newVar = prompt(`New variable name for "${original}":`, variable);
       if (!newVar) return;
       const res = await fetch(`/api/bufrmap/${currentSite}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({type, original, variable: newVar})
       });
       const json = await res.json();
@@ -296,8 +324,7 @@
     async function deleteMapping(type, original) {
       if (!confirm(`Delete mapping for "${original}"?`)) return;
       const res = await fetch(`/api/bufrmap/${currentSite}`, {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'},
+        method: 'DELETE', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({type, original})
       });
       const json = await res.json();
@@ -305,9 +332,93 @@
       loadMappings();
     }
 
-    // INIT
+    // ===== APPLY & LOAD JSON =====
+    async function applyGenerate() {
+      const res = await fetch(`/api/bufrmap/${currentSite}`);
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bufr_mapping_${currentSite}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert(`✅ Mapping for ${currentSite} exported successfully!`);
+    }
+
+    function importJSONFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          const res = await fetch(`/api/bufrmap/${currentSite}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: 'full', data})
+          });
+          const json = await res.json();
+          alert(json.success ? "✅ JSON imported & applied" : json.error);
+          loadMappings();
+        } catch (err) {
+          alert("❌ Invalid JSON format");
+        }
+      };
+      reader.readAsText(file);
+    }
+
     loadUsers();
     loadMappings();
+
+    async function loadSites() {
+      const res = await fetch('/api/sites_config');
+      const data = await res.json();
+      const tbody = document.querySelector("#siteTable tbody");
+      tbody.innerHTML = "";
+      data.sites.forEach(site => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${site}</td>
+            <td><button class="btn-del" onclick="deleteSite('${site}')">Delete</button></td>
+          </tr>`;
+      });
+    
+      // Refresh dropdown site di tab BUFR
+      const sel = document.getElementById("siteSelect");
+      if (sel) {
+        sel.innerHTML = `<option value="default">Default (All Sites)</option>` +
+          data.sites.map(s => `<option value="${s}">${s}</option>`).join("");
+      }
+    }
+    
+    async function addSite() {
+      const name = document.getElementById("newSiteName").value.trim();
+      if (!name) return alert("Please enter site name");
+      const res = await fetch('/api/sites_config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name})
+      });
+      const json = await res.json();
+      alert(json.success ? "✅ Site added" : json.error);
+      loadSites();
+    }
+    
+    async function deleteSite(name) {
+      if (!confirm(`Delete site "${name}"?`)) return;
+      const res = await fetch('/api/sites_config', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name})
+      });
+      const json = await res.json();
+      alert(json.success ? "🗑️ Site removed" : json.error);
+      loadSites();
+    }
+    
+    loadSites();
+
   </script>
 </body>
 </html>
