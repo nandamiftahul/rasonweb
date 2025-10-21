@@ -252,19 +252,20 @@
 <!-- Toggle -->
 <button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
 
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-  <h2>RASON PANEL</h2>
-  <a href="{{ url_for('main_page') }}">🏠 Main Page</a>
-  <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
-  <a href="{{ url_for('map_view') }}" target="_blank">🗺️ Map</a>
-  <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
-  <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
-  <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
-  <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
-  <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
-  <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
-</div>
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <h2>RASON PANEL</h2>
+    <a href="{{ url_for('main_page') }}">🏠 Main Page</a>
+    <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
+    <a href="{{ url_for('map_view') }}" target="_blank">🗺️ Map</a>
+    <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
+    <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
+    <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
+    <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
+    <a href="{{ url_for('error_analysis_page') }}"><b>❗ Error Analysis</b></a>
+    <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
+    <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
+  </div>
 
 <!-- Main -->
 <div class="main" id="mainContent">

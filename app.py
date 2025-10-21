@@ -2965,6 +2965,11 @@ def api_bufrmap_site(site):
             return jsonify({"success": True})
         return jsonify({"error": "Failed to save mapping"}), 500
 
+@app.route("/error_analysis")
+@login_required
+def error_analysis_page():
+    return render_template("error_analysis.html")
+
 @app.route("/release")
 @login_required
 def release_page():

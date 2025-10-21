@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Error Analysis - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='libs/chartjs/chart.umd.js') }}"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+
+    /* Sidebar (same as main.html) */
+    .sidebar {
+      width: 230px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 40px 10px 20px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 10;
+      transition: transform 0.3s ease;
+    }
+    .sidebar.hidden { transform: translateX(-240px); }
+    .sidebar h2 {
+      font-size: 20px;
+      margin-bottom: 30px;
+      color: #e0f2fe;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 6px rgba(255,255,255,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding-bottom: 8px;
+    }
+    .sidebar a {
+      display: block;
+      text-decoration: none;
+      color: white;
+      width: 100%;
+      padding: 12px 15px;
+      border-radius: 8px;
+      text-align: left;
+      margin: 8px 0;
+      transition: background 0.3s;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.15); }
+    .logout {
+      margin-top: auto;
+      font-size: 14px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: #fca5a5;
+      text-decoration: none;
+    }
+    .logout:hover { background: rgba(255,255,255,0.2); }
+
+    /* Toggle Button */
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+    .toggle-btn:hover { background: rgba(255,255,255,0.4); }
+    .toggle-btn.hidden-position { left: 10px; }
+
+    /* Main */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      margin-left: 230px;
+      padding: 40px 40px 0;
+      box-sizing: border-box;
+      padding-bottom: 50px;
+    }
+    .main.expanded { margin-left: 0; }
+
+    /* Header (same as main.html) */
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 35px;
+    }
+    .header-icon {
+      width: 50px; height: 50px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: #dbeafe;
+    }
+    .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px; }
+    .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
+    .header-logos {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .header-logos img { height: 36px; opacity: 0.9; }
+    .header-clock {
+      display: flex; flex-direction: column; align-items: flex-end;
+      justify-content: center; line-height: 1.1; font-size: 18px;
+      color: #ffffff; font-weight: 600; letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(0,0,0,0.4);
+    }
+
+    /* Charts */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-auto-rows: 420px;
+      gap: 30px;
+      margin-top: 25px;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      padding: 8px;
+    }
+
+    table { width:100%; border-collapse:collapse; margin-top:25px; font-size:13px; }
+    th,td { text-align:center; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.2); }
+
+    .status-ok { color:#6eff9e; }
+    .status-err { color:#ff6e6e; }
+
+    /* Footer (same as main.html) */
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 230px;
+      width: calc(100% - 230px);
+      height: 38px;
+      background: #ffffff;
+      padding: 4px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid #d1d5db;
+      border-radius: 0;
+      z-index: 5;
+      transition: all 0.3s ease;
+    }
+    .footer span { color: #333; font-weight: 500; margin-right: 6px; font-size: 12px; opacity: 0.8; }
+    .footer img { height: 28px; opacity: 0.85; margin: 0 6px; filter: saturate(90%); }
+    .main.expanded ~ .footer { left: 0; width: 100%; }
+  </style>
+</head>
+
+<body>
+
+  <!-- Toggle Button -->
+  <button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <h2>RASON PANEL</h2>
+    <a href="{{ url_for('main_page') }}">🏠 Main Page</a>
+    <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
+    <a href="{{ url_for('map_view') }}" target="_blank">🗺️ Map</a>
+    <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
+    <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
+    <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
+    <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
+    <a href="{{ url_for('error_analysis_page') }}"><b>❗ Error Analysis</b></a>
+    <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
+    <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
+  </div>
+
+  <!-- Main -->
+  <div class="main" id="mainContent">
+    <div class="header-box">
+      <div class="header-icon">❗</div>
+      <div class="header-text">
+        <h1>Error Analysis</h1>
+        <p>Comprehensive sensor performance and atmospheric diagnostics</p>
+      </div>
+      <div class="header-logos">
+        <div class="header-clock">
+          <div id="utcClock">--:--:-- UTC</div>
+          <div id="utcDate" style="font-size:12px; opacity:0.8;">-- --- ----</div>
+        </div>
+        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+      </div>
+    </div>
+
+    <!-- Filter -->
+    <div>
+      <label>Site:</label>
+      <select id="siteSelect">
+        {% for s in ['aceh','cilacap','pangkalanbun','ranai','tarakan','sorong'] %}
+          <option value="{{s}}">{{s|capitalize}}</option>
+        {% endfor %}
+      </select>
+      <label>Date:</label><input type="date" id="dateSelect">
+      <label>Hour:</label><select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
+      <label>File:</label><select id="typeSelect">
+        <option value="bfr">BFR</option><option value="bufr">BUFR</option><option value="bfh">BFH</option><option value="bin">BIN</option>
+      </select>
+      <button id="filterBtn">📁 List Files</button>
+    </div>
+
+    <div id="fileList" style="margin-top:15px;"></div>
+    <div id="summary" style="margin-top:20px;"></div>
+    <div id="analysisBox" style="margin-top:20px;"></div>
+
+    <!-- Chart Grid -->
+    <div class="chart-grid">
+      <canvas id="chartRH"></canvas>
+      <canvas id="chartTemp"></canvas>
+      <canvas id="chartWindDir"></canvas>
+      <canvas id="chartWindSpeed"></canvas>
+    </div>
+
+    <table id="levelTable" style="display:none;">
+      <thead><tr><th>Pressure</th><th>Height</th><th>Temp</th><th>Dewpoint</th><th>RH</th><th>Wind Speed</th><th>Dir</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      const main = document.getElementById("mainContent");
+      const btn = document.getElementById("toggleBtn");
+      sidebar.classList.toggle("hidden");
+      main.classList.toggle("expanded");
+      if (sidebar.classList.contains("hidden")) {
+        btn.textContent = "☰";
+        btn.classList.add("hidden-position");
+      } else {
+        btn.textContent = "❮";
+        btn.classList.remove("hidden-position");
+      }
+    }
+
+    function updateUTCClock() {
+      const now = new Date();
+      const utcHours = String(now.getUTCHours()).padStart(2, "0");
+      const utcMinutes = String(now.getUTCMinutes()).padStart(2, "0");
+      const utcSeconds = String(now.getUTCSeconds()).padStart(2, "0");
+      const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" ");
+      document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
+      document.getElementById("utcDate").textContent = dateStr;
+    }
+    updateUTCClock(); setInterval(updateUTCClock, 1000);
+  </script>
+  <script>
+    // === FILTER ===
+    $("#filterBtn").click(function(){
+      const site=$("#siteSelect").val(),date=$("#dateSelect").val(),hour=$("#hourSelect").val(),ftype=$("#typeSelect").val();
+      if(!date)return alert("Pilih tanggal!");
+      $("#fileList").html("⏳ Searching...");
+      $.post("/api/filter",{site,date,hour,ftype},function(r){
+        if(r.status!=="ok"){ $("#fileList").html("<b style='color:#ff6e6e'>"+r.message+"</b>"); return; }
+        let html="<h3>Hasil File:</h3>";
+        r.files.forEach(f=>html+=`<div><button class='loadBtn' data-file='${f}'>🔍 Analyze ${f}</button></div>`);
+        $("#fileList").html(html);
+      },"json");
+    });
+
+    // === LOAD ===
+    $(document).on("click",".loadBtn",function(){
+      const site=$("#siteSelect").val(),file=$(this).data("file");
+      $("#summary").html("⏳ Loading "+file+"...");
+      $.post("/upload_bufr",{remote_site:site,remote_file:file},res=>{
+        if(!res.success){$("#summary").html("<b style='color:#ff6e6e'>Error: "+res.error+"</b>");return;}
+        loadAnalysis();
+      },"json");
+    });
+
+    const rhFromT_Td=(T,Td)=>{if(T==null||Td==null)return null;const a=17.625,b=243.04;const gT=(a*T)/(b+T),gTd=(a*Td)/(b+Td);let rh=100*Math.exp(gTd-gT);return Math.min(100,Math.max(0,rh));};
+    let cT,cRH,cWS,cWD;
+
+    function loadAnalysis(){
+      $.getJSON("/metadata",m=>{
+        $("#summary").html(`<h3>${m.radiosonde_serial_number||'-'}</h3>
+        <p>Launch: ${m.launch_time||'-'} | Max Height: ${m.max_height||'-'}</p>`);
+      });
+
+      $.getJSON("/all_levels",levels=>{
+        if(!levels.length){$("#summary").append("<p>⚠️ No data</p>");return;}
+        const H=levels.map(l=>l.height_m),
+              T=levels.map(l=>l.temp_C),
+              Td=levels.map(l=>l.dewpoint_C),
+              RH=levels.map(l=>rhFromT_Td(l.temp_C,l.dewpoint_C)),
+              WS=levels.map(l=>l.wind_speed_mps||Math.sqrt((l.wind_u||0)**2+(l.wind_v||0)**2)||null),
+              WD=levels.map(l=>l.wind_dir_deg||null);
+        drawCharts(H,T,Td,RH,WS,WD);
+        renderTable(levels,RH,WS,WD);
+        deepPhysics(levels,RH,WS);
+      });
+    }
+
+    function drawCharts(H,T,Td,RH,WS,WD){
+      const gridColor='rgba(255,255,255,0.15)';
+
+      const baseX = {
+        title:{
+          display:true,
+          text:'Height (m)',
+          color:'#fff',
+          font:{size:22, weight:'bold'}   // 🔥 ukuran besar untuk label axis X
+        },
+        min:0,max:30000,
+        ticks:{
+          color:'#fff',
+          font:{size:20, weight:'600'},   // 🔥 ukuran tick besar di axis X
+        },
+        grid:{color:gridColor}
+      };
+      
+      const commonOpt = {
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{
+            labels:{color:'#fff',font:{size:16,weight:'600'}} // 🔥 legend besar
+          },
+          tooltip:{mode:'nearest'}
+        },
+        scales:{
+          x: baseX,
+          y:{
+            title:{
+              display:true,
+              text:'Value',
+              color:'#fff',
+              font:{size:22,weight:'bold'}   // 🔥 ukuran besar untuk label axis Y
+            },
+            ticks:{
+              color:'#fff',
+              font:{size:20, weight:'600'},   // 🔥 ukuran tick besar di axis Y
+            },
+            grid:{color:gridColor}
+          }
+        },
+        elements:{point:{radius:2},line:{borderWidth:2,tension:0.25}}
+      };
+
+      if(cT) cT.destroy();
+      cT=new Chart(document.getElementById('chartTemp'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'Temp (°C)',data:T,borderColor:'orange',backgroundColor:'rgba(255,165,0,0.25)',fill:true},
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cT.options.scales.y.title={display:true,text:'Temperature (°C)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cT.update();
+
+      if(cRH) cRH.destroy();
+      cRH=new Chart(document.getElementById('chartRH'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'RH (%)',data:RH,borderColor:'lime',backgroundColor:'rgba(0,255,0,0.25)',fill:true}
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cRH.options.scales.y.title={display:true,text:'Relative Humidity (%)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cRH.options.scales.y.min=0;cRH.options.scales.y.max=100;
+      cRH.update();
+
+      if(cWS) cWS.destroy();
+      cWS=new Chart(document.getElementById('chartWindSpeed'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'Wind Speed (m/s)',data:WS,borderColor:'#00bfff',backgroundColor:'rgba(0,191,255,0.25)',fill:true}
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cWS.options.scales.y.title={display:true,text:'Wind Speed (m/s)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cWS.update();
+
+      if(cWD) cWD.destroy();
+      cWD=new Chart(document.getElementById('chartWindDir'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'Wind Direction (°)',data:WD,borderColor:'#ffcc00',backgroundColor:'rgba(255,204,0,0.25)',fill:true}
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cWD.options.scales.y.title={display:true,text:'Wind Direction (°)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cWD.options.scales.y.min=0;cWD.options.scales.y.max=360;
+      cWD.update();
+    }
+
+    function renderTable(levels,RH,WS,WD){
+      const tb=$("#levelTable tbody");tb.empty();
+      levels.forEach((l,i)=>tb.append(`<tr>
+        <td>${l.pressure_hPa?.toFixed?.(1)||'-'}</td>
+        <td>${l.height_m?.toFixed?.(0)||'-'}</td>
+        <td>${l.temp_C?.toFixed?.(1)||'-'}</td>
+        <td>${l.dewpoint_C?.toFixed?.(1)||'-'}</td>
+        <td>${RH[i]?.toFixed?.(1)||'-'}</td>
+        <td>${WS[i]?.toFixed?.(1)||'-'}</td>
+        <td>${WD[i]?.toFixed?.(0)||'-'}</td>`));
+      $("#levelTable").show();
+    }
+
+function deepPhysics(levels, RH, WS) {
+  const H = levels.map(l => l.height_m || null);
+  const T = levels.map(l => l.temp_C || null);
+  const P = levels.map(l => l.pressure_hPa || null);
+  const WD = levels.map(l => l.wind_dir_deg || null);
+
+  const issues = [];
+  const meanRH = RH.reduce((a,b)=>a+(b||0),0)/RH.length;
+  const Tmin = Math.min(...T.filter(v => v!=null));
+  const Tmax = Math.max(...T.filter(v => v!=null));
+  const shear = Math.max(...WS) - Math.min(...WS);
+
+  // === 1. Cold point tropopause
+  if (Tmin < -75) issues.push("❄️ Strong cold point (< −75°C) → clear tropopause, possible thermistor stress region.");
+
+  // === 2. Lapse rate inversion
+  for (let i=1; i<T.length; i++) {
+    if (T[i]!=null && T[i-1]!=null && H[i]!=null && H[i-1]!=null) {
+      const lapse = (T[i]-T[i-1]) / ((H[i]-H[i-1])/1000);
+      if (H[i] < 1500 && lapse > 0.8) {
+        issues.push("🌫️ Surface inversion detected → possible trapped moisture or night-time cooling.");
+        break;
+      }
+    }
+  }
+
+  // === 3. RH freeze-out
+  for (let i=0; i<T.length; i++) {
+    if (T[i] < -40 && RH[i] < 5) {
+      issues.push("💧 RH near 0% below −40°C → possible humidity sensor desensitization or icing.");
+      break;
+    }
+  }
+
+  // === 4. Pressure anomaly
+  for (let i=1; i<P.length; i++) {
+    if (P[i]!=null && P[i-1]!=null && P[i] > P[i-1]) {
+      issues.push("⚠️ Pressure reversal detected → barometric sensor glitch or GPS noise.");
+      break;
+    }
+  }
+
+  // === 5. Ascent deceleration
+  const ascent = levels.map((l,i)=> i>0 ? (H[i]-H[i-1]) : null);
+  const last10 = ascent.slice(-10).filter(v=>v!=null);
+  if (last10.length>5 && last10.every(v=>v<5))
+    issues.push("🎈 Ascent deceleration before burst → possible gas leak or wind drag.");
+
+  // === 6. Strong shear layer
+  for (let i=1; i<WS.length; i++) {
+    if (H[i]!=null && H[i-1]!=null && WS[i]!=null && WS[i-1]!=null) {
+      const grad = Math.abs(WS[i]-WS[i-1]) / ((H[i]-H[i-1])/1000);
+      if (grad > 10) {
+        issues.push("🌪️ Strong vertical wind shear (>10 m/s/km) → potential string vibration.");
+        break;
+      }
+    }
+  }
+
+  // === 7. Directional shear
+  for (let i=1; i<WD.length; i++) {
+    if (WD[i]!=null && WD[i-1]!=null && H[i]!=null && H[i-1]!=null) {
+      const dwd = Math.abs(WD[i]-WD[i-1]);
+      if (dwd > 60 && (H[i]-H[i-1]) < 1000)
+        issues.push("🌀 Rapid directional shift (>60°/km) → frontal zone or GPS orientation issue.");
+    }
+  }
+
+  // === 8. RH vs T mismatch
+  for (let i=1; i<RH.length; i++) {
+    if (T[i]!=null && T[i-1]!=null && RH[i]!=null && RH[i-1]!=null) {
+      if ((RH[i]-RH[i-1]) > 15 && (T[i]-T[i-1]) > -0.5)
+        issues.push("⚗️ RH rise without cooling → possible condensation on sensor film.");
+    }
+  }
+
+  // === 9. Burst low
+  const Pmin = Math.min(...P.filter(v=>v!=null));
+  if (Pmin > 100) issues.push("🎯 Balloon burst below 100 hPa → premature termination.");
+
+  // === 10. Ground bias
+  if (T[0]!=null && (T[0] < 20 || T[0] > 35))
+    issues.push("🌡️ Ground temp out of expected range (20–35°C) → possible calibration drift.");
+
+  // === Summary render
+  let html = "<h3>🧠 Extended Physical Interpretation</h3>";
+  if (!issues.length)
+    html += "<p class='status-ok'>✅ No significant anomalies detected.</p>";
+  else {
+    html += "<ul>";
+    issues.forEach(i => html += `<li class='status-err'>${i}</li>`);
+    html += "</ul>";
+  }
+  $("#analysisBox").html(html);
+}
+
+  </script>
+</body>
+</html>
