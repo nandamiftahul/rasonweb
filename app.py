@@ -161,6 +161,8 @@ VALID_USERS = {
     "bmkg" : "Bmkg2025$"
 }
 
+load_users()
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -198,21 +200,23 @@ def decode_bufr(filepath):
         raise RuntimeError(f"BUFR decode failed: {result.stderr}")
     return result.stdout
 
-# --- Parse BUFR ---
-def parse_bufr(decoded_text):
+# --- Parse BUFR (dynamic + site-specific + fallback) ---
+def parse_bufr(decoded_text, site="default"):
+    import os, json, re
+    import pandas as pd, numpy as np
+    from datetime import datetime, timezone
+
     meta = {}
     levels = []
     current = {}
     station_lat, station_lon = None, None
 
+    # --- Helper functions ---
     def _extract_bytes_field(line: str) -> str:
-        """
-        Extract b'..' or b"..". Returns stripped string, else last token.
-        """
+        """Extract b'..' or b"..". Returns stripped string, else last token."""
         m = re.search(r"b[\"'](.*?)[\"']", line)
         if m:
             return m.group(1).strip()
-        # fallback to entire tail
         return line.split()[-1]
 
     def _safe_float_tail(line: str):
@@ -221,123 +225,158 @@ def parse_bufr(decoded_text):
         except Exception:
             return None
 
+    # ==================================================================
+    # 🔹 1. Load site-specific mapping (priority)
+    # ==================================================================
+    CONFIG_DIR = "config"
+    site_key = str(site).lower().strip().replace(" ", "_")
+    site_file = os.path.join(CONFIG_DIR, f"bufr_mapping_{site_key}.json")
+    default_file = "bufr_mapping_full.json"
+
+    mapping = None
+
+    # Try site-specific mapping first
+    if os.path.exists(site_file):
+        try:
+            with open(site_file) as f:
+                mapping = json.load(f)
+            print(f"🗺️ Using site mapping: {site_file}")
+        except Exception as e:
+            print(f"⚠️ Failed to read mapping for site '{site_key}': {e}")
+
+    # Fallback to global bufr_mapping_full.json
+    if not mapping and os.path.exists(default_file):
+        try:
+            with open(default_file) as f:
+                mapping = json.load(f)
+            print(f"ℹ️ Using global mapping: {default_file}")
+        except Exception:
+            mapping = None
+
+    # ==================================================================
+    # 🔹 2. Default fallback mapping (original unchanged)
+    # ==================================================================
+    default_mapping = {
+        "meta": [
+            {"original": "WMO BLOCK NUMBER", "variable": "wmo_block"},
+            {"original": "WMO STATION NUMBER", "variable": "wmo_station"},
+            {"original": "004001 YEAR", "variable": "year"},
+            {"original": "004002 MONTH", "variable": "month"},
+            {"original": "004003 DAY", "variable": "day"},
+            {"original": "004004 HOUR", "variable": "hour"},
+            {"original": "004005 MINUTE", "variable": "minute"},
+            {"original": "004006 SECOND", "variable": "second"},
+            {"original": "LATITUDE (HIGH ACCURACY)", "variable": "station_lat"},
+            {"original": "LONGITUDE (HIGH ACCURACY)", "variable": "station_lon"},
+            {"original": "HEIGHT OF STATION GROUND", "variable": "station_height_m"},
+            {"original": "RADIOSONDE SERIAL NUMBER", "variable": "radiosonde_serial_number"},
+            {"original": "RADIOSONDE ASCENSION NUMBER", "variable": "radiosonde_ascension_number"},
+            {"original": "RADIOSONDE RELEASE NUMBER", "variable": "radiosonde_release_number"},
+            {"original": "RADIOSONDE GROUND RECEIVING SYSTEM", "variable": "radiosonde_ground_rx_system"},
+            {"original": "RADIOSONDE OPERATING FREQUENCY", "variable": "radiosonde_operating_frequency"},
+            {"original": "BALLOON MANUFACTURER", "variable": "balloon_manufacturer"},
+            {"original": "WEIGHT OF BALLOON", "variable": "balloon_weight_kg"},
+            {"original": "TYPE OF GAS USED IN BALLOON", "variable": "balloon_gas_type"},
+            {"original": "TYPE OF PRESSURE SENSOR", "variable": "pressure_sensor_type"},
+            {"original": "TYPE OF TEMPERATURE SENSOR", "variable": "temperature_sensor_type"},
+            {"original": "TYPE OF HUMIDITY SENSOR", "variable": "humidity_sensor_type"},
+            {"original": "SOFTWARE IDENTIFICATION AND VERSION NUMBER", "variable": "software_version"},
+            {"original": "REASON FOR TERMINATION", "variable": "reason_for_termination"},
+            {"original": "TRACKING TECHNIQUE/STATUS OF SYSTEM USED", "variable": "system_status"}
+        ],
+        "level": [
+            {"original": "PRESSURE", "variable": "pressure_hPa"},
+            {"original": "GEOPOTENTIAL HEIGHT", "variable": "height_m"},
+            {"original": "TEMPERATURE/AIR TEMPERATURE", "variable": "temp_C"},
+            {"original": "DEW-POINT TEMPERATURE", "variable": "dewpoint_C"},
+            {"original": "WIND DIRECTION", "variable": "wind_dir_deg"},
+            {"original": "WIND SPEED", "variable": "wind_speed_mps"},
+            {"original": "LATITUDE DISPLACEMENT", "variable": "lat_disp"},
+            {"original": "LONGITUDE DISPLACEMENT", "variable": "lon_disp"},
+            {"original": "LONG TIME PERIOD OR DISPLACEMENT", "variable": "time_s"},
+            {"original": "EXTENDED VERTICAL SOUNDING SIGNIFICANCE", "variable": "status_flag"}
+        ]
+    }
+
+    # ==================================================================
+    # 🔹 3. Choose active mapping (same as before)
+    # ==================================================================
+    active_map = mapping if (mapping and "meta" in mapping and "level" in mapping) else default_mapping
+
+    # ==================================================================
+    # 🔹 4. Original parsing logic (unchanged)
+    # ==================================================================
     for line in decoded_text.splitlines():
         line = line.strip()
         if not line:
             continue
 
-        # --- Metadata ---
-        if "WMO BLOCK NUMBER" in line:
-            meta["wmo_block"] = int(line.split()[-1])
-        elif "WMO STATION NUMBER" in line:
-            meta["wmo_station"] = int(line.split()[-1])
-        elif line.startswith("004001 YEAR"):
-            meta["year"] = int(line.split()[-1])
-        elif line.startswith("004002 MONTH"):
-            meta["month"] = int(line.split()[-1])
-        elif line.startswith("004003 DAY"):
-            meta["day"] = int(line.split()[-1])
-        elif line.startswith("004004 HOUR"):
-            meta["hour"] = int(line.split()[-1])
-        elif line.startswith("004005 MINUTE"):
-            meta["minute"] = int(line.split()[-1])
-        elif line.startswith("004006 SECOND"):
-            meta["second"] = int(line.split()[-1])
-        elif "LATITUDE (HIGH ACCURACY)" in line and "005001" in line:
-            station_lat = float(line.split()[-1])
-            meta["station_lat"] = station_lat
-        elif "LONGITUDE (HIGH ACCURACY)" in line and "006001" in line:
-            station_lon = float(line.split()[-1])
-            meta["station_lon"] = station_lon
-        elif "HEIGHT OF STATION GROUND" in line:
-            meta["station_height_m"] = float(line.split()[-1])
-        # --- Radiosonde/balloon/instrument metadata (add these) ---
-        elif "RADIOSONDE SERIAL NUMBER" in line or "001081" in line:
-            meta["radiosonde_serial_number"] = _extract_bytes_field(line)
-        elif "RADIOSONDE ASCENSION NUMBER" in line or "001082" in line:
-            try:
-                meta["radiosonde_ascension_number"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "RADIOSONDE RELEASE NUMBER" in line or "001083" in line:
-            try:
-                meta["radiosonde_release_number"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "RADIOSONDE GROUND RECEIVING SYSTEM" in line or "002066" in line:
-            try:
-                meta["radiosonde_ground_rx_system"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "RADIOSONDE OPERATING FREQUENCY" in line or "002067" in line:
-            v = _safe_float_tail(line)
-            if v is not None:
-                meta["radiosonde_operating_frequency"] = v  # Hz
-        elif "BALLOON MANUFACTURER" in line or "002080" in line:
-            try:
-                meta["balloon_manufacturer"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "WEIGHT OF BALLOON" in line or "002082" in line:
-            v = _safe_float_tail(line)
-            if v is not None:
-                meta["balloon_weight_kg"] = v
-        elif "TYPE OF GAS USED IN BALLOON" in line or "002084" in line:
-            try:
-                meta["balloon_gas_type"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "TYPE OF PRESSURE SENSOR" in line or "002095" in line:
-            try:
-                meta["pressure_sensor_type"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "TYPE OF TEMPERATURE SENSOR" in line or "002096" in line:
-            try:
-                meta["temperature_sensor_type"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "TYPE OF HUMIDITY SENSOR" in line or "002097" in line:
-            try:
-                meta["humidity_sensor_type"] = int(line.split()[-1])
-            except Exception:
-                pass
-        elif "SOFTWARE IDENTIFICATION AND VERSION NUMBER" in line or "025061" in line:
-            meta["software_version"] = _extract_bytes_field(line)
-        elif "REASON FOR TERMINATION" in line or "008021" in line:
-            try:
-                meta["reason_for_termination"] = int(line.split()[-1])
-            except Exception:
-                pass
+        # ========== METADATA ==========
+        matched_meta = False
+        for item in active_map["meta"]:
+            if item["original"] in line:
+                key = item["variable"]
+                val = _safe_float_tail(line)
+
+                if "LATITUDE" in item["original"] and "005001" in line:
+                    try:
+                        station_lat = float(line.split()[-1])
+                        meta[key] = station_lat
+                    except Exception:
+                        pass
+                    matched_meta = True
+                    break
+
+                elif "LONGITUDE" in item["original"] and "006001" in line:
+                    try:
+                        station_lon = float(line.split()[-1])
+                        meta[key] = station_lon
+                    except Exception:
+                        pass
+                    matched_meta = True
+                    break
+
+                elif "SERIAL" in item["original"] or "VERSION" in item["original"]:
+                    meta[key] = _extract_bytes_field(line)
+                    matched_meta = True
+                    break
+
+                elif val is not None:
+                    meta[key] = val
+                    matched_meta = True
+                    break
+
+        if matched_meta:
+            continue
 
         # --- Level separator ---
-        elif line.startswith("# ---") and current:
+        if line.startswith("# ---") and current:
             levels.append(current)
             current = {}
+            continue
 
-        # --- Per-level data ---
-        elif "PRESSURE" in line and "007004" in line:
-            current["pressure_hPa"] = safe_float(line.split()[-1]) / 100.0
-        elif "GEOPOTENTIAL HEIGHT" in line and "010009" in line:
-            current["height_m"] = safe_float(line.split()[-1])
-        elif "TEMPERATURE/AIR TEMPERATURE" in line:
-            current["temp_C"] = safe_float(line.split()[-1]) - 273.15
-        elif "DEW-POINT TEMPERATURE" in line:
-            current["dewpoint_C"] = safe_float(line.split()[-1]) - 273.15
-        elif "WIND DIRECTION" in line and "011001" in line:
-            current["wind_dir_deg"] = safe_float(line.split()[-1])
-        elif "WIND SPEED" in line and "011002" in line:
-            current["wind_speed_mps"] = safe_float(line.split()[-1])
-        elif "LATITUDE DISPLACEMENT" in line and "005015" in line:
-            current["lat_disp"] = safe_float(line.split()[-1])
-        elif "LONGITUDE DISPLACEMENT" in line and "006015" in line:
-            current["lon_disp"] = safe_float(line.split()[-1])
-        elif "LONG TIME PERIOD OR DISPLACEMENT" in line and "004086" in line:
-            current["time_s"] = safe_float(line.split()[-1])
-        elif "EXTENDED VERTICAL SOUNDING SIGNIFICANCE" in line and "008042" in line:
-            current["status_flag"] = line.split()[-1]
-        elif "TRACKING TECHNIQUE/STATUS OF SYSTEM USED" in line and "002014" in line:
-            meta["system_status"] = line.split()[-1]
+        # ========== PER-LEVEL DATA ==========
+        matched_level = False
+        for lv in active_map["level"]:
+            if lv["original"] in line:
+                key = lv["variable"]
+                val = _safe_float_tail(line)
+
+                if "TEMPERATURE" in lv["original"]:
+                    try: val = val - 273.15
+                    except Exception: pass
+                elif "DEW-POINT" in lv["original"]:
+                    try: val = val - 273.15
+                    except Exception: pass
+                elif key == "pressure_hPa" and val is not None:
+                    val = val / 100.0
+
+                current[key] = val
+                matched_level = True
+                break
+
+        if matched_level:
+            continue
 
     if current:
         levels.append(current)
@@ -345,7 +384,6 @@ def parse_bufr(decoded_text):
     df_meta = pd.DataFrame([meta])
     df_levels = pd.DataFrame(levels).replace({None: np.nan})
 
-    # Ascent rate
     if "time_s" in df_levels and "height_m" in df_levels:
         delta_h = df_levels["height_m"].diff()
         delta_t = df_levels["time_s"].diff()
@@ -359,25 +397,20 @@ def parse_bufr(decoded_text):
     if station_lon is not None and "lon_disp" in df_levels:
         df_levels["longitude"] = station_lon + df_levels["lon_disp"].fillna(0)
 
-    # --- Combine launch time ---
     if all(k in meta for k in ("year", "month", "day", "hour", "minute", "second")):
         try:
             dt_utc = datetime(
-                meta["year"], meta["month"], meta["day"],
-                meta["hour"], meta["minute"], meta["second"],
+                int(meta["year"]), int(meta["month"]), int(meta["day"]),
+                int(meta["hour"]), int(meta["minute"]), int(meta["second"]),
                 tzinfo=timezone.utc
             )
-            meta["launch_time"] = dt_utc.isoformat().replace("+00:00", "Z")  # format ISO UTC
+            meta["launch_time"] = dt_utc.isoformat().replace("+00:00", "Z")
         except Exception:
             meta["launch_time"] = "-"
-        for k in ("year","month","day","hour","minute","second"):
+        for k in ("year", "month", "day", "hour", "minute", "second"):
             meta.pop(k, None)
-    
-    
-    # --- Convert to DataFrame AFTER cleanup ---
-    df_meta = pd.DataFrame([meta])
 
-    return df_meta, df_levels
+    return pd.DataFrame([meta]), df_levels
 
 # --- Mappings ---
 REASON_MAP = {
@@ -1562,6 +1595,7 @@ def raob_analysis(site, filename):
     - Ambil data dari DB kalau sudah ada.
     - Jika belum, unduh dari FTP, decode, parse, dan simpan ke DB.
     - Hasil: Skew-T, Hodograph, Indeks, dan Analisis cuaca.
+    - Metadata dikonversi ke human-readable (sensor, gas, balloon, termination, dsb.)
     """
     try:
         # ==========================================================
@@ -1605,10 +1639,10 @@ def raob_analysis(site, filename):
         if df_levels.empty:
             return "No levels found", 500
 
-        # --- Metadata ---
+        # --- Metadata dasar ---
         meta = df_meta.to_dict("records")[0] if not df_meta.empty else {}
 
-        # --- Konversi launch_time agar aman (Timestamp → str UTC) ---
+        # --- Konversi launch_time ke string UTC ---
         launch_time = meta.get("launch_time", "-")
         if isinstance(launch_time, pd.Timestamp):
             launch_time = launch_time.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -1617,7 +1651,49 @@ def raob_analysis(site, filename):
         elif not isinstance(launch_time, str):
             launch_time = str(launch_time)
 
-        # --- Clean & sort data ---
+        # ==========================================================
+        # 🔹 Human-readable mappings
+        # ==========================================================
+        # Termination reason
+        if "reason_for_termination" in meta and meta["reason_for_termination"] not in (None, ""):
+            try:
+                code = int(meta["reason_for_termination"])
+                meta["reason_for_termination"] = f"{code} – {REASON_MAP.get(code, 'Unknown')}"
+            except Exception:
+                pass
+
+        # Sensor & balloon types
+        alias_groups = {
+            "pressure": ["pressure_sensor_type", "type_of_pressure_sensor"],
+            "temperature": ["temperature_sensor_type", "type_of_temperature_sensor"],
+            "humidity": ["humidity_sensor_type", "type_of_humidity_sensor"],
+            "balloon": ["balloon_type", "type_of_balloon"],
+            "balloon_gas": ["balloon_gas_type", "type_of_gas_used_in_balloon"],
+            "balloon_manufacturer": ["balloon_manufacturer"],
+        }
+        for group, keys in alias_groups.items():
+            mapping = SENSOR_MAPS.get(group, {})
+            for k in keys:
+                if k in meta and meta[k] not in (None, ""):
+                    try:
+                        code = int(meta[k])
+                        meta[k] = f"{code} – {mapping.get(code, 'Unknown')}"
+                    except Exception:
+                        pass
+
+        # Derived max height & min pressure
+        if "height_m" in df_levels:
+            max_h = df_levels["height_m"].dropna().max()
+            if pd.notna(max_h):
+                meta["max_height"] = f"{max_h:.0f} m"
+        if "pressure_hPa" in df_levels:
+            min_p = df_levels["pressure_hPa"].dropna().min()
+            if pd.notna(min_p):
+                meta["end_pressure"] = f"{min_p:.1f} hPa"
+
+        # ==========================================================
+        # 🔹 Data preparation
+        # ==========================================================
         df = df_levels.dropna(subset=["pressure_hPa"]).copy()
         df = df.sort_values("pressure_hPa", ascending=False)
         df["pressure_hPa"] = medfilt(df["pressure_hPa"].values, kernel_size=3)
@@ -1625,15 +1701,13 @@ def raob_analysis(site, filename):
         if "temp_C" in df:
             df["temp_C"] = pd.Series(df["temp_C"]).interpolate(limit_direction="both")
             df["temp_C"] = medfilt(df["temp_C"].values, kernel_size=3)
-
         if "dewpoint_C" in df:
             df["dewpoint_C"] = pd.Series(df["dewpoint_C"]).interpolate(limit_direction="both")
             df["dewpoint_C"] = medfilt(df["dewpoint_C"].values, kernel_size=3)
 
-        df = df.drop_duplicates(subset=["pressure_hPa"])
-        df = df.sort_values("pressure_hPa", ascending=False).reset_index(drop=True)
+        df = df.drop_duplicates(subset=["pressure_hPa"]).sort_values("pressure_hPa", ascending=False).reset_index(drop=True)
 
-        # --- Thermo profile ---
+        # --- Thermodynamic profile ---
         thermo = df.dropna(subset=["pressure_hPa", "temp_C", "dewpoint_C"]).copy()
         if thermo.empty:
             return "Insufficient thermo data", 500
@@ -1651,7 +1725,6 @@ def raob_analysis(site, filename):
             ws = wind["wind_speed_mps"].values * (units.meter / units.second)
             wdir = wind["wind_dir_deg"].values * units.degree
             u, v = mpcalc.wind_components(ws, wdir)
-
             if "height_m" in wind:
                 hgt = wind["height_m"].values * units.meter
             elif "height_m" in df:
@@ -1660,7 +1733,7 @@ def raob_analysis(site, filename):
                 hgt = mpcalc.pressure_to_height_std(p_w)
 
         # ==========================================================
-        # 6️⃣ Hitung indeks termodinamik dan kinematik
+        # 🔹 Thermodynamic indices
         # ==========================================================
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
@@ -1709,7 +1782,7 @@ def raob_analysis(site, filename):
             except Exception as e:
                 print("SRH calculation failed:", e)
 
-        # --- Freezing Level ---
+        # --- Freezing level ---
         freezing_level = "-"
         try:
             idx = np.where(np.diff(np.sign(T.m)))[0]
@@ -1740,9 +1813,8 @@ def raob_analysis(site, filename):
             print("Tropopause calc failed:", e)
 
         # ==========================================================
-        # 7️⃣ Skew-T dan Hodograph
+        # 🔹 Generate plots (Skew-T + Hodograph)
         # ==========================================================
-        # --- Skew-T ---
         fig1 = plt.figure(figsize=(7, 7))
         skew = SkewT(fig1, rotation=45)
         skew.ax.set_facecolor("#fff9ef")
@@ -1763,7 +1835,6 @@ def raob_analysis(site, filename):
         skewt_img = base64.b64encode(buf1.read()).decode("utf-8")
         plt.close(fig1)
 
-        # --- Hodograph ---
         if (u is not None) and (v is not None):
             fig2, ax = plt.subplots(figsize=(6, 6))
             hodo = Hodograph(ax, component_range=60.0)
@@ -1793,7 +1864,7 @@ def raob_analysis(site, filename):
             hodo_img = None
 
         # ==========================================================
-        # 8️⃣ Kumpulkan indeks & hasil analisis
+        # 🔹 Build indices + weather analysis
         # ==========================================================
         def scalar_str(x, fmt=".1f"):
             try:
@@ -1819,7 +1890,7 @@ def raob_analysis(site, filename):
         analysis_text = generate_weather_analysis(df)
 
         # ==========================================================
-        # 9️⃣ Render template
+        # 🔹 Render template
         # ==========================================================
         return render_template(
             "raob.html",
@@ -2247,7 +2318,7 @@ def settings_page():
         return "Access denied. Admin only.", 403
     return render_template("settings.html", users=VALID_USERS)
 
-@app.route("/api/users", methods=["GET", "POST", "DELETE"])
+@app.route("/api/users", methods=["GET", "POST", "PUT", "DELETE"])
 @login_required
 def manage_users():
     if session.get("user") != "admin":
@@ -2270,6 +2341,21 @@ def manage_users():
         VALID_USERS[username] = password
         save_users()
         print(f"✅ Added new user: {username}")
+        return jsonify({"success": True, "users": VALID_USERS})
+
+    # --- PUT: update existing user's password
+    if request.method == "PUT":
+        data = request.get_json()
+        username = data.get("username")
+        password = data.get("password")
+        if not username or not password:
+            return jsonify({"error": "Missing fields"}), 400
+        if username not in VALID_USERS:
+            return jsonify({"error": "User not found"}), 404
+
+        VALID_USERS[username] = password
+        save_users()
+        print(f"🔑 Updated password for user: {username}")
         return jsonify({"success": True, "users": VALID_USERS})
 
     # --- DELETE: remove user
@@ -2551,6 +2637,272 @@ def api_data_availability():
         return jsonify({"error": str(e)}), 500
 
     return jsonify({"year": year, "month": month, "sites": results})
+
+@app.route("/api/bufrmap_full", methods=["GET","POST","PUT","DELETE"])
+@login_required
+def api_bufrmap_full():
+    import json, os
+
+    MAP_FILE = "bufr_mapping_full.json"
+
+    # --- Default mapping dari seluruh field di parse_bufr ---
+    default_mapping = {
+        "meta": [
+            {"original": "WMO BLOCK NUMBER", "variable": "wmo_block"},
+            {"original": "WMO STATION NUMBER", "variable": "wmo_station"},
+            {"original": "004001 YEAR", "variable": "year"},
+            {"original": "004002 MONTH", "variable": "month"},
+            {"original": "004003 DAY", "variable": "day"},
+            {"original": "004004 HOUR", "variable": "hour"},
+            {"original": "004005 MINUTE", "variable": "minute"},
+            {"original": "004006 SECOND", "variable": "second"},
+            {"original": "LATITUDE (HIGH ACCURACY)", "variable": "station_lat"},
+            {"original": "LONGITUDE (HIGH ACCURACY)", "variable": "station_lon"},
+            {"original": "HEIGHT OF STATION GROUND", "variable": "station_height_m"},
+            {"original": "RADIOSONDE SERIAL NUMBER", "variable": "radiosonde_serial_number"},
+            {"original": "RADIOSONDE ASCENSION NUMBER", "variable": "radiosonde_ascension_number"},
+            {"original": "RADIOSONDE RELEASE NUMBER", "variable": "radiosonde_release_number"},
+            {"original": "RADIOSONDE GROUND RECEIVING SYSTEM", "variable": "radiosonde_ground_rx_system"},
+            {"original": "RADIOSONDE OPERATING FREQUENCY", "variable": "radiosonde_operating_frequency"},
+            {"original": "BALLOON MANUFACTURER", "variable": "balloon_manufacturer"},
+            {"original": "WEIGHT OF BALLOON", "variable": "balloon_weight_kg"},
+            {"original": "TYPE OF GAS USED IN BALLOON", "variable": "balloon_gas_type"},
+            {"original": "TYPE OF PRESSURE SENSOR", "variable": "pressure_sensor_type"},
+            {"original": "TYPE OF TEMPERATURE SENSOR", "variable": "temperature_sensor_type"},
+            {"original": "TYPE OF HUMIDITY SENSOR", "variable": "humidity_sensor_type"},
+            {"original": "SOFTWARE IDENTIFICATION AND VERSION NUMBER", "variable": "software_version"},
+            {"original": "REASON FOR TERMINATION", "variable": "reason_for_termination"},
+            {"original": "TRACKING TECHNIQUE/STATUS OF SYSTEM USED", "variable": "system_status"}
+        ],
+        "level": [
+            {"original": "PRESSURE", "variable": "pressure_hPa"},
+            {"original": "GEOPOTENTIAL HEIGHT", "variable": "height_m"},
+            {"original": "TEMPERATURE/AIR TEMPERATURE", "variable": "temp_C"},
+            {"original": "DEW-POINT TEMPERATURE", "variable": "dewpoint_C"},
+            {"original": "WIND DIRECTION", "variable": "wind_dir_deg"},
+            {"original": "WIND SPEED", "variable": "wind_speed_mps"},
+            {"original": "LATITUDE DISPLACEMENT", "variable": "lat_disp"},
+            {"original": "LONGITUDE DISPLACEMENT", "variable": "lon_disp"},
+            {"original": "LONG TIME PERIOD OR DISPLACEMENT", "variable": "time_s"},
+            {"original": "EXTENDED VERTICAL SOUNDING SIGNIFICANCE", "variable": "status_flag"},
+        ]
+    }
+
+    # --- Load file mapping jika ada ---
+    if os.path.exists(MAP_FILE):
+        with open(MAP_FILE) as f:
+            mapping = json.load(f)
+    else:
+        mapping = default_mapping
+        with open(MAP_FILE, "w") as f:
+            json.dump(mapping, f, indent=2)
+
+    # === Handle Methods ===
+    if request.method == "GET":
+        return jsonify(mapping)
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing request body"}), 400
+
+    section = data.get("type")
+    if section not in ["meta", "level"]:
+        return jsonify({"error": "Invalid mapping type"}), 400
+
+    if request.method == "POST":
+        mapping[section].append({"original": data["original"], "variable": data["variable"]})
+
+    elif request.method == "PUT":
+        for m in mapping[section]:
+            if m["original"] == data["original"]:
+                m["variable"] = data["variable"]
+                break
+
+    elif request.method == "DELETE":
+        mapping[section] = [m for m in mapping[section] if m["original"] != data["original"]]
+
+    with open(MAP_FILE, "w") as f:
+        json.dump(mapping, f, indent=2)
+
+    return jsonify({"success": True})
+
+@app.route("/api/bufrmap/<site>", methods=["GET", "POST", "PUT", "DELETE"])
+@login_required
+def api_bufrmap_site(site):
+    """
+    CRUD API for BUFR mapping configuration per site.
+    - GET    → Get mapping for a given site (fallback to default)
+    - POST   → Add new mapping entry
+    - PUT    → Edit existing mapping entry
+    - DELETE → Remove a mapping entry
+    """
+
+    import os, json
+    from flask import request, jsonify
+    CONFIG_DIR = "config"
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+
+    # --- Normalized site key ---
+    site_key = str(site).lower().strip().replace(" ", "_")
+    site_file = os.path.join(CONFIG_DIR, f"bufr_mapping_{site_key}.json")
+    default_file = "bufr_mapping_full.json"
+
+    # --- Load default mapping ---
+    default_mapping = {
+        "meta": [
+            {"original": "WMO BLOCK NUMBER", "variable": "wmo_block"},
+            {"original": "WMO STATION NUMBER", "variable": "wmo_station"},
+            {"original": "004001 YEAR", "variable": "year"},
+            {"original": "004002 MONTH", "variable": "month"},
+            {"original": "004003 DAY", "variable": "day"},
+            {"original": "004004 HOUR", "variable": "hour"},
+            {"original": "004005 MINUTE", "variable": "minute"},
+            {"original": "004006 SECOND", "variable": "second"},
+            {"original": "LATITUDE (HIGH ACCURACY)", "variable": "station_lat"},
+            {"original": "LONGITUDE (HIGH ACCURACY)", "variable": "station_lon"},
+            {"original": "HEIGHT OF STATION GROUND", "variable": "station_height_m"},
+            {"original": "RADIOSONDE SERIAL NUMBER", "variable": "radiosonde_serial_number"},
+            {"original": "RADIOSONDE ASCENSION NUMBER", "variable": "radiosonde_ascension_number"},
+            {"original": "RADIOSONDE RELEASE NUMBER", "variable": "radiosonde_release_number"},
+            {"original": "RADIOSONDE GROUND RECEIVING SYSTEM", "variable": "radiosonde_ground_rx_system"},
+            {"original": "RADIOSONDE OPERATING FREQUENCY", "variable": "radiosonde_operating_frequency"},
+            {"original": "BALLOON MANUFACTURER", "variable": "balloon_manufacturer"},
+            {"original": "WEIGHT OF BALLOON", "variable": "balloon_weight_kg"},
+            {"original": "TYPE OF GAS USED IN BALLOON", "variable": "balloon_gas_type"},
+            {"original": "TYPE OF PRESSURE SENSOR", "variable": "pressure_sensor_type"},
+            {"original": "TYPE OF TEMPERATURE SENSOR", "variable": "temperature_sensor_type"},
+            {"original": "TYPE OF HUMIDITY SENSOR", "variable": "humidity_sensor_type"},
+            {"original": "SOFTWARE IDENTIFICATION AND VERSION NUMBER", "variable": "software_version"},
+            {"original": "REASON FOR TERMINATION", "variable": "reason_for_termination"},
+            {"original": "TRACKING TECHNIQUE/STATUS OF SYSTEM USED", "variable": "system_status"}
+        ],
+        "level": [
+            {"original": "PRESSURE", "variable": "pressure_hPa"},
+            {"original": "GEOPOTENTIAL HEIGHT", "variable": "height_m"},
+            {"original": "TEMPERATURE/AIR TEMPERATURE", "variable": "temp_C"},
+            {"original": "DEW-POINT TEMPERATURE", "variable": "dewpoint_C"},
+            {"original": "WIND DIRECTION", "variable": "wind_dir_deg"},
+            {"original": "WIND SPEED", "variable": "wind_speed_mps"},
+            {"original": "LATITUDE DISPLACEMENT", "variable": "lat_disp"},
+            {"original": "LONGITUDE DISPLACEMENT", "variable": "lon_disp"},
+            {"original": "LONG TIME PERIOD OR DISPLACEMENT", "variable": "time_s"},
+            {"original": "EXTENDED VERTICAL SOUNDING SIGNIFICANCE", "variable": "status_flag"}
+        ]
+    }
+
+    # --- Helper: Load mapping from JSON or fallback ---
+    def load_mapping():
+        if os.path.exists(site_file):
+            try:
+                with open(site_file, "r") as f:
+                    data = json.load(f)
+                    if "meta" in data and "level" in data:
+                        return data
+            except Exception:
+                pass
+        # fallback to global
+        if os.path.exists(default_file):
+            try:
+                with open(default_file, "r") as f:
+                    data = json.load(f)
+                    return data
+            except Exception:
+                pass
+        return default_mapping.copy()
+
+    # --- Helper: Save mapping safely ---
+    def save_mapping(data):
+        try:
+            with open(site_file, "w") as f:
+                json.dump(data, f, indent=2)
+            return True
+        except Exception as e:
+            print("❌ Error saving mapping:", e)
+            return False
+
+    mapping = load_mapping()
+
+    # =========================================================
+    # GET — Return mapping JSON
+    # =========================================================
+    if request.method == "GET":
+        return jsonify(mapping)
+
+    # =========================================================
+    # POST — Add new mapping entry
+    # =========================================================
+    elif request.method == "POST":
+        js = request.get_json(force=True)
+        section = js.get("type")  # "meta" or "level"
+        original = js.get("original", "").strip()
+        variable = js.get("variable", "").strip()
+
+        if section not in ("meta", "level"):
+            return jsonify({"error": "Invalid mapping type"}), 400
+        if not original or not variable:
+            return jsonify({"error": "Missing field(s)"}), 400
+
+        # prevent duplicates
+        if any(m["original"] == original for m in mapping[section]):
+            return jsonify({"error": f"Field '{original}' already exists"}), 400
+
+        mapping[section].append({"original": original, "variable": variable})
+        if save_mapping(mapping):
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to save mapping"}), 500
+
+    # =========================================================
+    # PUT — Update mapping variable
+    # =========================================================
+    elif request.method == "PUT":
+        js = request.get_json(force=True)
+        section = js.get("type")
+        original = js.get("original", "").strip()
+        variable = js.get("variable", "").strip()
+        if section not in ("meta", "level"):
+            return jsonify({"error": "Invalid mapping type"}), 400
+
+        updated = False
+        for m in mapping[section]:
+            if m["original"] == original:
+                m["variable"] = variable
+                updated = True
+                break
+
+        if not updated:
+            return jsonify({"error": f"Field '{original}' not found"}), 404
+
+        if save_mapping(mapping):
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to save mapping"}), 500
+
+    # =========================================================
+    # DELETE — Remove mapping entry
+    # =========================================================
+    elif request.method == "DELETE":
+        js = request.get_json(force=True)
+        section = js.get("type")
+        original = js.get("original", "").strip()
+
+        if section not in ("meta", "level"):
+            return jsonify({"error": "Invalid mapping type"}), 400
+
+        before = len(mapping[section])
+        mapping[section] = [m for m in mapping[section] if m["original"] != original]
+        after = len(mapping[section])
+
+        if before == after:
+            return jsonify({"error": f"Field '{original}' not found"}), 404
+
+        if save_mapping(mapping):
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to save mapping"}), 500
+
+
+@app.route("/release")
+@login_required
+def release_page():
+    return render_template("release_v1_0.html")
 
 @app.after_request
 def add_no_cache_headers(response):

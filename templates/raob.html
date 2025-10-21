@@ -30,8 +30,13 @@
       display: flex;
       align-items: center;
       gap: 18px;
-      margin: 30px 40px 15px;
+    
+      /* 🎯 Center align + same max width as .grid */
+      width: 100%;
+      max-width: 1400px;
+      margin: 30px auto 15px auto;   /* auto center horizontally */
     }
+
 
     .header-icon {
       width: 50px; height: 50px;
@@ -55,14 +60,19 @@
     /* === RAOB Title (Site + Time) === */
     .raob-title {
       text-align: center;
-      margin: 0 40px 25px;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 10px;
       padding: 12px 20px;
       box-shadow: 0 3px 10px rgba(0,0,0,0.25);
       backdrop-filter: blur(8px);
+    
+      /* 🎯 Centered like header & main content */
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto 25px auto;
     }
+
     .raob-title h2 {
       margin: 0;
       font-size: 22px;
@@ -220,7 +230,7 @@
 <body>
   <!-- Header -->
   <div class="header-box">
-    <div class="header-icon">🎈</div>
+    <div class="header-icon" style="filter:brightness(10) saturate(0.1);">🎈</div>
     <div class="header-text">
       <h1>Radiosonde Analysis</h1>
       <p>Thermodynamic and kinematic indices visualization</p>
@@ -323,6 +333,10 @@
       </div>
     </div>
   </main>
+  <!-- === Download PDF Button (above footer) === -->
+  <div style="text-align:center; margin:30px 0;">
+    <a href="#" class="btn" id="downloadPdfBtn">⬇ Download Full Page as PDF</a>
+  </div>
 
   <!-- Footer -->
   <div class="footer">
@@ -395,6 +409,49 @@
         colorCell(el,label,val);
       });
     });
+
   </script>
+<!-- === Library html2canvas === -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+  document.getElementById("downloadPdfBtn").innerText = "⬇ Download Full Page as PNG";
+
+  document.getElementById("downloadPdfBtn").addEventListener("click", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("downloadPdfBtn");
+    const footer = document.querySelector(".footer");
+
+    // Sembunyikan tombol sementara agar tidak ikut tertangkap
+    btn.style.display = "none";
+
+    // Sesuaikan footer biar tidak terlalu tebal
+    const oldHeight = footer.style.height;
+    footer.style.height = "24px";
+
+    try {
+      const canvas = await html2canvas(document.body, {
+        scale: 2,           // resolusi tinggi (tajam)
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#0a2a6b"
+      });
+
+      const image = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `RAOB_{{ site | upper }}.png`;
+      link.href = image;
+      link.click();
+
+    } catch (err) {
+      alert("❌ Error generating image: " + err);
+    } finally {
+      // Kembalikan tampilan
+      footer.style.height = oldHeight;
+      btn.style.display = "inline-block";
+    }
+  });
+</script>
+
 </body>
 </html>

@@ -6,17 +6,38 @@
   <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
   <style>
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: "Inter", sans-serif;
       background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
       color: white;
       padding: 40px;
+      min-height: 100vh;
     }
-    h1 { text-align: center; }
+
+    h1 { text-align: center; margin-bottom: 30px; }
+
+    .tab-container { text-align: center; margin-bottom: 30px; }
+    .tab-btn {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      padding: 10px 20px;
+      margin: 0 5px;
+      color: white;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .tab-btn.active { background: #38bdf8; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
 
     table {
-      width: 80%;
+      width: 85%;
       margin: 20px auto;
       border-collapse: collapse;
       background: rgba(255,255,255,0.1);
@@ -28,19 +49,15 @@
       border-bottom: 1px solid rgba(255,255,255,0.2);
       text-align: center;
     }
-    th {
-      background: rgba(255,255,255,0.2);
-      color: #fff;
-    }
+    th { background: rgba(255,255,255,0.2); color: #fff; }
 
-    input, button {
+    input, button, select {
       padding: 8px 12px;
       border-radius: 6px;
       border: none;
+      font-family: "Inter", sans-serif;
     }
-    input {
-      width: 150px;
-    }
+    select { background: rgba(255,255,255,0.1); color: white; }
     button {
       background: #38bdf8;
       color: white;
@@ -48,64 +65,126 @@
       font-weight: 600;
       transition: background 0.2s;
     }
-    button:hover {
-      background: #0284c7;
-    }
+    button:hover { background: #0284c7; }
 
-    .btn-edit {
-      background: #0d6efd;
-    }
-    .btn-edit:hover {
-      background: #0b5ed7;
-    }
-    .btn-del {
-      background: #dc3545;
-    }
-    .btn-del:hover {
-      background: #b02a37;
-    }
+    .btn-edit { background: #0d6efd; }
+    .btn-edit:hover { background: #0b5ed7; }
+    .btn-del { background: #dc3545; }
+    .btn-del:hover { background: #b02a37; }
 
-    .add-section {
+    .add-section { text-align: center; margin-top: 20px; }
+    h2 { text-align: center; margin-top: 40px; margin-bottom: 10px; }
+
+    footer {
       text-align: center;
-      margin-top: 20px;
+      font-size: 0.9em;
+      opacity: 0.8;
+      margin-top: 40px;
+    }
+
+    .site-select {
+      text-align: center;
+      margin: 15px 0 30px;
     }
   </style>
 </head>
 <body>
-  <h1>⚙️ User Settings (Admin Only)</h1>
+  <h1>⚙️ Settings Panel</h1>
 
-  <table id="userTable">
-    <thead>
-      <tr>
-        <th>Username</th>
-        <th>Password</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <div class="add-section">
-    <input type="text" id="newUser" placeholder="New username">
-    <input type="password" id="newPass" placeholder="Password">
-    <button onclick="addUser()">Add User</button>
+  <div class="tab-container">
+    <button class="tab-btn active" onclick="switchTab('users')">👥 User Management</button>
+    <button class="tab-btn" onclick="switchTab('bufr')">🧩 BUFR Mapping Configuration</button>
   </div>
 
+  <!-- ===== TAB 1: USERS ===== -->
+  <div id="tab-users" class="tab-content active">
+    <table id="userTable">
+      <thead>
+        <tr><th>Username</th><th>Password</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="add-section">
+      <input type="text" id="newUser" placeholder="New username">
+      <input type="password" id="newPass" placeholder="Password">
+      <button onclick="addUser()">Add User</button>
+    </div>
+  </div>
+
+  <!-- ===== TAB 2: BUFR MAPPING ===== -->
+  <div id="tab-bufr" class="tab-content">
+    <div class="site-select">
+      <label for="siteSelect"><b>📍 Select Site:</b></label>
+      <select id="siteSelect" onchange="changeSite()">
+        <option value="default">Default (All Sites)</option>
+        <option value="aceh">Aceh</option>
+        <option value="tarakan">Tarakan</option>
+        <option value="sorong">Sorong</option>
+        <option value="cilacap">Cilacap</option>
+        <option value="pangkalanbun">Pangkalanbun</option>
+        <option value="ranai">Ranai</option>
+      </select>
+    </div>
+
+    <h2>📘 Metadata Mapping</h2>
+    <table id="metaTable">
+      <thead>
+        <tr><th>Original Field (Keyword / Descriptor)</th><th>Variable Name</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="add-section">
+      <input type="text" id="newMetaField" placeholder="e.g. RADIOSONDE SERIAL NUMBER">
+      <input type="text" id="newMetaVar" placeholder="e.g. radiosonde_serial_number">
+      <button onclick="addMapping('meta')">Add Metadata</button>
+    </div>
+
+    <h2>📊 Per-Level Data Mapping</h2>
+    <table id="levelTable">
+      <thead>
+        <tr><th>Original Field (Keyword / Descriptor)</th><th>Variable Name</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="add-section">
+      <input type="text" id="newLevelField" placeholder="e.g. PRESSURE">
+      <input type="text" id="newLevelVar" placeholder="e.g. pressure_hPa">
+      <button onclick="addMapping('level')">Add Level Field</button>
+    </div>
+  </div>
+
+  <footer>
+    <p>© 2025 Radiosonde Monitoring · Powered by Terrindo · BMKG · Meteomodem</p>
+  </footer>
+
   <script>
+    let currentSite = "default";
+
+    // ===== TAB SWITCH =====
+    function switchTab(tab) {
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(div => div.classList.remove("active"));
+      document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add("active");
+      document.getElementById(`tab-${tab}`).classList.add("active");
+    }
+
+    // ===== USERS =====
     async function loadUsers() {
       const res = await fetch('/api/users');
       const users = await res.json();
       const tbody = document.querySelector("#userTable tbody");
       tbody.innerHTML = "";
-
-      Object.entries(users).forEach(([u, p]) => {
+      Object.entries(users).forEach(([u, _]) => {
         tbody.innerHTML += `
           <tr>
             <td>${u}</td>
-            <td>${"****"}</td>
+            <td>****</td>
             <td>
               ${u === "admin" ? "—" : `
-                <button class="btn-edit" onclick="editUser('${u}')">Ubah</button>
+                <button class="btn-edit" onclick="editUser('${u}')">Edit</button>
                 <button class="btn-del" onclick="deleteUser('${u}')">Delete</button>
               `}
             </td>
@@ -114,51 +193,121 @@
     }
 
     async function addUser() {
-      const username = document.getElementById("newUser").value.trim();
-      const password = document.getElementById("newPass").value.trim();
-      if (!username || !password) return alert("Please fill username and password.");
+      const username = newUser.value.trim();
+      const password = newPass.value.trim();
+      if (!username || !password) return alert("Please fill username and password");
       const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({username, password})
       });
       const json = await res.json();
-      if (json.success) {
-        alert("User added successfully.");
-        loadUsers();
-      } else alert(json.error || "Failed to add user");
-    }
-
-    async function deleteUser(username) {
-      if (!confirm(`Are you sure you want to delete user "${username}"?`)) return;
-      const res = await fetch('/api/users', {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username})
-      });
-      const json = await res.json();
-      if (json.success) {
-        alert("User deleted successfully.");
-        loadUsers();
-      } else alert(json.error || "Failed to delete user");
+      alert(json.success ? "✅ User added successfully" : json.error);
+      loadUsers();
     }
 
     async function editUser(username) {
       const newPass = prompt(`Enter new password for user "${username}":`);
       if (!newPass) return;
       const res = await fetch('/api/users', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({username, password: newPass})
       });
       const json = await res.json();
-      if (json.success) {
-        alert("Password updated successfully.");
-        loadUsers();
-      } else alert(json.error || "Failed to update password");
+      alert(json.success ? "🔐 Password updated" : json.error);
+      loadUsers();
     }
 
+    async function deleteUser(username) {
+      if (!confirm(`Delete user "${username}"?`)) return;
+      const res = await fetch('/api/users', {
+        method: 'DELETE', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username})
+      });
+      const json = await res.json();
+      alert(json.success ? "🗑️ User deleted" : json.error);
+      loadUsers();
+    }
+
+    // ===== BUFR MAPPING =====
+    async function changeSite() {
+      currentSite = document.getElementById("siteSelect").value;
+      loadMappings();
+    }
+
+    async function loadMappings() {
+      const res = await fetch(`/api/bufrmap/${currentSite}`);
+      const data = await res.json();
+      const metaBody = document.querySelector("#metaTable tbody");
+      const levelBody = document.querySelector("#levelTable tbody");
+      metaBody.innerHTML = ""; levelBody.innerHTML = "";
+
+      data.meta.forEach(m => {
+        metaBody.innerHTML += `
+          <tr>
+            <td>${m.original}</td>
+            <td>${m.variable}</td>
+            <td>
+              <button class="btn-edit" onclick="editMapping('meta','${m.original}','${m.variable}')">Edit</button>
+              <button class="btn-del" onclick="deleteMapping('meta','${m.original}')">Delete</button>
+            </td>
+          </tr>`;
+      });
+
+      data.level.forEach(l => {
+        levelBody.innerHTML += `
+          <tr>
+            <td>${l.original}</td>
+            <td>${l.variable}</td>
+            <td>
+              <button class="btn-edit" onclick="editMapping('level','${l.original}','${l.variable}')">Edit</button>
+              <button class="btn-del" onclick="deleteMapping('level','${l.original}')">Delete</button>
+            </td>
+          </tr>`;
+      });
+    }
+
+    async function addMapping(type) {
+      const field = document.getElementById(`new${type==='meta'?'Meta':'Level'}Field`).value.trim();
+      const variable = document.getElementById(`new${type==='meta'?'Meta':'Level'}Var`).value.trim();
+      if (!field || !variable) return alert("Please fill both fields.");
+      const res = await fetch(`/api/bufrmap/${currentSite}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, original: field, variable})
+      });
+      const json = await res.json();
+      alert(json.success ? "✅ Mapping added" : json.error);
+      loadMappings();
+    }
+
+    async function editMapping(type, original, variable) {
+      const newVar = prompt(`New variable name for "${original}":`, variable);
+      if (!newVar) return;
+      const res = await fetch(`/api/bufrmap/${currentSite}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, original, variable: newVar})
+      });
+      const json = await res.json();
+      alert(json.success ? "✏️ Mapping updated" : json.error);
+      loadMappings();
+    }
+
+    async function deleteMapping(type, original) {
+      if (!confirm(`Delete mapping for "${original}"?`)) return;
+      const res = await fetch(`/api/bufrmap/${currentSite}`, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, original})
+      });
+      const json = await res.json();
+      alert(json.success ? "🗑️ Mapping deleted" : json.error);
+      loadMappings();
+    }
+
+    // INIT
     loadUsers();
+    loadMappings();
   </script>
 </body>
 </html>
