@@ -1908,19 +1908,48 @@ def time_accuracy():
 @login_required
 def api_time_accuracy(site):
     """
-    Ambil data time accuracy dari file .bfr bulan berjalan untuk site tertentu.
-    🔹 Menggunakan SQLite cache:
-       - Cek di DB dulu, jika belum ada, ambil dari FTP dan decode.
-       - Kirim launch_time (real atau fallback dari filename) agar frontend bisa menghitung Preparation–Launch.
+    Ambil data time accuracy (.bfr) untuk site tertentu berdasarkan bulan & tahun.
+    🔹 Query param opsional: ?year=YYYY&month=MM
+    🔹 Default: bulan berjalan
     """
-    from datetime import datetime, timedelta
-    import pandas as pd
-    import re
+    from datetime import datetime, timedelta, timezone
+    import pandas as pd, re
 
-    now = datetime.utcnow()
-    start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    end_date = (start_date + timedelta(days=32)).replace(day=1)
+    # ==========================================================
+    # 🔹 Tangkap parameter dari query string (debug-friendly)
+    # ==========================================================
+    try:
+        year_str = request.args.get("year")
+        month_str = request.args.get("month")
 
+        if year_str and month_str:
+            year = int(year_str)
+            month = int(month_str)
+            print(f"🔹 Query params received: year={year}, month={month}")
+        else:
+            now = datetime.utcnow()
+            year, month = now.year, now.month
+            print(f"⚠️ No query params found — defaulting to {year}-{month:02d}")
+
+    except Exception as e:
+        now = datetime.utcnow()
+        year, month = now.year, now.month
+        print(f"⚠️ Error parsing query params: {e} → defaulting to {year}-{month:02d}")
+
+    # ==========================================================
+    # 🔹 Buat rentang tanggal UTC (bulan tersebut)
+    # ==========================================================
+    start_date = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    else:
+        end_date = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    print(f"📅 [TimeAccuracy] Fetching {site} for {year}-{month:02d} ({start_date.date()} → {end_date.date()})")
+
+    # ==========================================================
+    # 🔹 Helper ambil datetime dari nama file
+    # ==========================================================
     def extract_datetime_from_filename(fname: str):
         """Ambil datetime dari nama file (contoh: A202510050000.BFR -> 2025-10-05 00:00:00 UTC)."""
         match = re.search(r"(\d{10,14})", fname)
@@ -1936,7 +1965,9 @@ def api_time_accuracy(site):
 
     data = []
     try:
-        # Ambil semua file .bfr dari FTP (via cache fetch_all_sites)
+        # ==========================================================
+        # 🔹 Ambil semua file .bfr dari FTP (via cache fetch_all_sites)
+        # ==========================================================
         all_sites = fetch_all_sites(
             ext_filter=[".bfr"],
             with_meta=False,
@@ -1944,16 +1975,17 @@ def api_time_accuracy(site):
             end_date=end_date
         )
 
+        # Case-insensitive site match
         site_keys = {s.lower(): s for s in all_sites.keys()}
         site_key = site.lower()
         if site_key not in site_keys:
-            print(f"⚠️ Site {site} not found in FTP")
-            return jsonify({"site": site, "data": []})
+            print(f"⚠️ Site {site} not found in FTP list")
+            return jsonify({"site": site, "data": [], "year": year, "month": month})
 
         true_site = site_keys[site_key]
 
         # ==========================================================
-        # 🔁 Loop semua file .bfr bulan berjalan
+        # 🔁 Loop semua file .bfr di bulan & tahun terpilih
         # ==========================================================
         for f in all_sites[true_site]:
             fname = f["name"]
@@ -1962,13 +1994,17 @@ def api_time_accuracy(site):
                 if not file_dt:
                     continue
 
+                # Lewati jika file di luar range bulan yang diminta
+                if not (start_date <= file_dt.replace(tzinfo=timezone.utc) < end_date):
+                    continue
+
                 date_str = file_dt.strftime("%Y-%m-%d")
                 hour_label = f"{file_dt.hour:02d}Z"
                 if hour_label not in ["00Z", "12Z"]:
                     hour_label = "00Z" if file_dt.hour < 6 else "12Z"
 
                 # ======================================================
-                # 🔹 Ambil data dari cache atau FTP
+                # 🔹 Ambil data dari cache atau decode baru
                 # ======================================================
                 ftype = fname.split(".")[-1].lower()
                 if ftype not in ["bufr", "bfr", "bfh", "bin"]:
@@ -1989,17 +2025,11 @@ def api_time_accuracy(site):
                     continue
 
                 # ======================================================
-                # 🔹 Ambil launch_time (real atau fallback)
+                # 🔹 Ambil launch_time (real atau fallback dari filename)
                 # ======================================================
                 launch_time = None
                 if not df_meta.empty:
-                    possible_keys = [
-                        "launch_time",
-                        "launch_datetime",
-                        "time_of_launch",
-                        "launch_time_UTC"
-                    ]
-                    for key in possible_keys:
+                    for key in ["launch_time", "launch_datetime", "time_of_launch", "launch_time_UTC"]:
                         if key in df_meta.columns:
                             val = df_meta.iloc[0][key]
                             if pd.notna(val):
@@ -2009,20 +2039,17 @@ def api_time_accuracy(site):
                                 except Exception:
                                     pass
 
-                # fallback jika tidak ditemukan (biasanya kasus 00Z)
                 if launch_time is None:
-                    launch_time = file_dt
+                    launch_time = file_dt  # fallback
 
                 # ======================================================
-                # 🔹 Hitung waktu ke 100 & 30 hPa
+                # 🔹 Hitung waktu ke 100 hPa dan burst (≈ 30 hPa)
                 # ======================================================
                 t100 = df_levels.loc[df_levels["pressure_hPa"] <= 100, "time_s"].min()
                 t30 = df_levels.loc[df_levels["pressure_hPa"] <= 0, "time_s"].min()
                 if pd.isna(t30):
                     t30 = df_levels["time_s"].max()
-                # ======================================================
-                # 🔹 Simpan hasil
-                # ======================================================
+
                 if pd.notna(t100):
                     data.append({
                         "filename": fname,
@@ -2032,7 +2059,6 @@ def api_time_accuracy(site):
                         "AB": round(t100 / 60.0, 1),
                         "CD": round(t30 / 60.0, 1) if pd.notna(t30) else None
                     })
-                
 
             except Exception as e:
                 print(f"⚠️ Error parsing {fname}: {e}")
@@ -2047,7 +2073,9 @@ def api_time_accuracy(site):
         return (x["date"], 0 if x["hour"] == "00Z" else 1)
 
     data = sorted(data, key=sort_key)
-    return jsonify({"site": site, "data": data})
+    print(f"✅ Found {len(data)} records for {site} ({year}-{month:02d})")
+
+    return jsonify({"site": site, "data": data, "year": year, "month": month})
 
 @app.route("/height_reach")
 @login_required
@@ -2058,18 +2086,49 @@ def height_reach():
 @login_required
 def api_height_reach(site):
     """
-    Ambil data ketinggian maksimum & tekanan minimum balon (.bfr) per hari untuk bulan berjalan.
-    🔹 Menggunakan SQLite cache:
-       - Cek dari DB dulu, jika belum ada, baru download dari FTP dan decode.
+    Ambil data ketinggian maksimum & tekanan minimum balon (.bfr) per hari
+    untuk site tertentu berdasarkan bulan & tahun.
+    🔹 Query param opsional: ?year=YYYY&month=MM
+    🔹 Default: bulan berjalan (UTC)
+    🔹 Data diambil dari SQLite cache (jika tidak ada, unduh & decode dari FTP)
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     import pandas as pd, re
 
-    now = datetime.utcnow()
-    start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    end_date = (start_date + timedelta(days=32)).replace(day=1)
+    # ==========================================================
+    # 🔹 Tangkap parameter dari query string
+    # ==========================================================
+    try:
+        year_str = request.args.get("year")
+        month_str = request.args.get("month")
 
-    def extract_datetime_from_filename(fname):
+        if year_str and month_str:
+            year = int(year_str)
+            month = int(month_str)
+            print(f"🔹 Query params received: year={year}, month={month}")
+        else:
+            now = datetime.utcnow()
+            year, month = now.year, now.month
+            print(f"⚠️ No query params found — defaulting to {year}-{month:02d}")
+    except Exception as e:
+        now = datetime.utcnow()
+        year, month = now.year, now.month
+        print(f"⚠️ Error parsing query params: {e} → defaulting to {year}-{month:02d}")
+
+    # ==========================================================
+    # 🔹 Rentang tanggal UTC bulan tersebut
+    # ==========================================================
+    start_date = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    else:
+        end_date = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    print(f"📅 [HeightReach] Fetching {site} for {year}-{month:02d} ({start_date.date()} → {end_date.date()})")
+
+    # ==========================================================
+    # 🔹 Helper ekstrak datetime dari nama file
+    # ==========================================================
+    def extract_datetime_from_filename(fname: str):
         """Ambil datetime dari nama file (contoh: T2097502A202510050000.BFR)."""
         m = re.search(r"(\d{10,14})", fname)
         if not m:
@@ -2085,7 +2144,7 @@ def api_height_reach(site):
     data = []
     try:
         # ==========================================================
-        # 🔹 Ambil daftar semua file .bfr dari FTP
+        # 🔹 Ambil daftar file .bfr dari cache/FTP
         # ==========================================================
         all_sites = fetch_all_sites(
             ext_filter=[".bfr"],
@@ -2093,24 +2152,34 @@ def api_height_reach(site):
             start_date=start_date,
             end_date=end_date
         )
+
+        # Case-insensitive site match
         site_keys = {s.lower(): s for s in all_sites.keys()}
-        if site.lower() not in site_keys:
-            return jsonify({"site": site, "data": []})
-        true_site = site_keys[site.lower()]
+        site_key = site.lower()
+        if site_key not in site_keys:
+            print(f"⚠️ Site {site} not found in FTP list")
+            return jsonify({"site": site, "data": [], "year": year, "month": month})
+        true_site = site_keys[site_key]
 
         # ==========================================================
-        # 🔁 Loop semua file dalam bulan berjalan
+        # 🔁 Loop semua file dalam bulan terpilih
         # ==========================================================
         for f in all_sites[true_site]:
             fname = f["name"]
-            dt = extract_datetime_from_filename(fname)
-            if not dt:
-                continue
-            hour_label = "00Z" if dt.hour < 6 else "12Z"
-
             try:
+                file_dt = extract_datetime_from_filename(fname)
+                if not file_dt:
+                    continue
+
+                # Lewati jika di luar bulan target
+                if not (start_date <= file_dt.replace(tzinfo=timezone.utc) < end_date):
+                    continue
+
+                date_str = file_dt.strftime("%Y-%m-%d")
+                hour_label = "00Z" if file_dt.hour < 6 else "12Z"
+
                 # ======================================================
-                # 🔹 Ambil data dari DB cache atau FTP
+                # 🔹 Ambil data dari cache DB atau decode baru
                 # ======================================================
                 ftype = fname.split(".")[-1].lower()
                 if ftype not in ["bufr", "bfr", "bfh", "bin"]:
@@ -2134,40 +2203,41 @@ def api_height_reach(site):
                     )
                     print(f"[DB] 💾 cached {fname}")
 
-                # ======================================================
-                # 🔹 Proses data level
-                # ======================================================
-                if df_levels.empty or "height_m" not in df_levels.columns:
+                if df_levels.empty:
+                    continue
+                if "height_m" not in df_levels.columns or "pressure_hPa" not in df_levels.columns:
                     continue
 
-                # pastikan kolom tekanan ada
-                if "pressure_hPa" not in df_levels.columns:
-                    continue
-
-                # nilai maksimum dan minimum
+                # ======================================================
+                # 🔹 Ambil nilai maksimum & minimum
+                # ======================================================
                 max_height = df_levels["height_m"].max()
                 min_pres = df_levels["pressure_hPa"].min()
 
                 if pd.notna(max_height) and max_height > 0:
                     data.append({
                         "filename": fname,
-                        "date": dt.strftime("%Y-%m-%d"),
+                        "date": date_str,
                         "hour": hour_label,
                         "max_height": round(float(max_height), 0),
                         "end_pressure": round(float(min_pres), 1) if pd.notna(min_pres) else None
                     })
 
             except Exception as e:
-                print(f"⚠️ Skip file: {fname}", e)
+                print(f"⚠️ Error parsing {fname}: {e}")
 
     except Exception as e:
-        print("❌ Height reach fetch failed:", e)
+        print(f"❌ Height reach fetch failed for {site}: {e}")
 
     # ==========================================================
-    # 🔹 Urutkan hasil: tanggal + jam (00Z dulu, baru 12Z)
+    # 🔹 Urutkan hasil: tanggal + jam (00Z dulu, 12Z setelahnya)
     # ==========================================================
-    data = sorted(data, key=lambda x: (x["date"], 0 if x["hour"] == "00Z" else 1))
-    return jsonify({"site": site, "data": data})
+    def sort_key(x):
+        return (x["date"], 0 if x["hour"] == "00Z" else 1)
+    data = sorted(data, key=sort_key)
+
+    print(f"✅ Found {len(data)} records for {site} ({year}-{month:02d})")
+    return jsonify({"site": site, "data": data, "year": year, "month": month})
 
 @app.route("/settings")
 @login_required

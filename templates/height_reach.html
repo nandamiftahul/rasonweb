@@ -325,7 +325,13 @@
     <div class="selector">
       <label for="siteSelect">Site:</label>
       <select id="siteSelect"></select>
-
+    
+      <label for="monthSelect">Month:</label>
+      <select id="monthSelect"></select>
+    
+      <label for="yearSelect">Year:</label>
+      <select id="yearSelect"></select>
+    
       <label for="timeSelect">Launch Time:</label>
       <select id="timeSelect">
         <option value="ALL" selected>All</option>
@@ -364,229 +370,277 @@
     <span>Powered by</span>
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
   </div>
-  <script>
-    // Sidebar toggle
-    function toggleSidebar() {
-      const sidebar = document.getElementById("sidebar");
-      const main = document.getElementById("mainContent");
-      const btn = document.getElementById("toggleBtn");
-      sidebar.classList.toggle("hidden");
-      main.classList.toggle("expanded");
-      if (sidebar.classList.contains("hidden")) {
-        btn.textContent = "☰";
-        btn.classList.add("hidden-position");
-      } else {
-        btn.textContent = "❮";
-        btn.classList.remove("hidden-position");
-      }
+<script>
+  // ===== Sidebar toggle =====
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.getElementById("mainContent");
+    const btn = document.getElementById("toggleBtn");
+    sidebar.classList.toggle("hidden");
+    main.classList.toggle("expanded");
+    if (sidebar.classList.contains("hidden")) {
+      btn.textContent = "☰";
+      btn.classList.add("hidden-position");
+    } else {
+      btn.textContent = "❮";
+      btn.classList.remove("hidden-position");
+    }
+  }
+
+  // ===== Global references =====
+  const ctx = document.getElementById("heightChart").getContext("2d");
+  const loadingMsg = document.getElementById("loadingMsg");
+  const summaryDiv = document.getElementById("summary");
+  const siteSelect = document.getElementById("siteSelect");
+  const timeSelect = document.getElementById("timeSelect");
+  const monthSelect = document.getElementById("monthSelect");
+  const yearSelect = document.getElementById("yearSelect");
+  let chart = null;
+  let allData = [];
+
+  // ===== Utility =====
+  const monthName = m => new Date(0, m - 1).toLocaleString("en", { month: "long" });
+  const toYMD = d => d.toISOString().slice(0,10);
+
+  function getMonthRange(year, month) {
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    return { start: toYMD(start), end: toYMD(end) };
+  }
+
+  // ===== Init month & year dropdown =====
+  function initMonthYear() {
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1;
+
+    for (let m = 1; m <= 12; m++) {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = monthName(m);
+      if (m === currentMonth) opt.selected = true;
+      monthSelect.appendChild(opt);
     }
 
-    // Chart logic
-    const ctx = document.getElementById("heightChart").getContext("2d");
-    const loadingMsg = document.getElementById("loadingMsg");
-    const summaryDiv = document.getElementById("summary");
-    const siteSelect = document.getElementById("siteSelect");
-    const timeSelect = document.getElementById("timeSelect");
-    let chart = null;
-    let allData = [];
-
-    async function loadSites() {
-      loadingMsg.textContent = "Loading sites...";
-      const now = new Date();
-      const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-      const toYMD = d => d.toISOString().slice(0,10);
-      try {
-        const res = await fetch(`/api/sites?ext=.bfr&start_date=${toYMD(start)}&end_date=${toYMD(end)}`);
-        const siteMap = await res.json();
-        let sites = Object.keys(siteMap).sort();
-        if (sites.length === 0) {
-          siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
-          return;
-        }
-        siteSelect.innerHTML = "";
-        sites.forEach(s => {
-          const opt = document.createElement("option");
-          opt.value = s;
-          opt.textContent = s;
-          siteSelect.appendChild(opt);
-        });
-        siteSelect.value = sites[0];
-        loadHeightReach(sites[0]);
-      } catch (err) {
-        loadingMsg.textContent = "Failed to load sites.";
-      }
+    for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      if (y === currentYear) opt.selected = true;
+      yearSelect.appendChild(opt);
     }
+  }
 
-    async function loadHeightReach(site) {
-      loadingMsg.textContent = `Fetching data for ${site}...`;
-      summaryDiv.textContent = "";
-      try {
-        const res = await fetch(`/api/height_reach/${site}`);
-        const json = await res.json();
-        allData = json.data || [];
-        renderChart();
-      } catch (err) {
-        loadingMsg.textContent = "Failed to load data.";
+  // ===== Load available sites =====
+  async function loadSites() {
+    loadingMsg.textContent = "Loading sites...";
+    const year  = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const { start, end } = getMonthRange(year, month);
+    try {
+      const res = await fetch(`/api/sites?ext=.bfr&start_date=${start}&end_date=${end}`);
+      const siteMap = await res.json();
+      const sites = Object.keys(siteMap).sort();
+      if (sites.length === 0) {
+        siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
+        return;
       }
-    }
-
-    function renderChart() {
-      const filterTime = timeSelect.value;
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = now.getUTCMonth();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const labels = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString().padStart(2, "0"));
-      const map = {};
-      allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
-      const data00 = labels.map(day => {
-        const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_00Z`];
-        return entry ? entry.max_height : null;
+      siteSelect.innerHTML = "";
+      sites.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        siteSelect.appendChild(opt);
       });
-      const data12 = labels.map(day => {
-        const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_12Z`];
-        return entry ? entry.max_height : null;
+      siteSelect.value = sites[0];
+      await loadHeightReach(sites[0], year, month);
+    } catch {
+      loadingMsg.textContent = "Failed to load sites.";
+    }
+  }
+
+  // ===== Load data from API =====
+  async function loadHeightReach(site, year, month) {
+    loadingMsg.textContent = `Fetching data for ${site}...`;
+    summaryDiv.textContent = "";
+    try {
+      const res = await fetch(`/api/height_reach/${site}?year=${year}&month=${month}`);
+      const json = await res.json();
+      allData = json.data || [];
+      renderChart(year, month);
+    } catch {
+      loadingMsg.textContent = "Failed to load data.";
+    }
+  }
+
+  // ===== Render chart =====
+  function renderChart(year, month) {
+    const filterTime = timeSelect.value;
+    const dim = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const labels = Array.from({ length: dim }, (_, i) => String(i + 1).padStart(2, "0"));
+    const map = {};
+    allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+    const data00 = labels.map(day => {
+      const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_00Z`];
+      return entry ? entry.max_height : null;
+    });
+    const data12 = labels.map(day => {
+      const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_12Z`];
+      return entry ? entry.max_height : null;
+    });
+
+    loadingMsg.style.display = "none";
+
+    const datasets = [];
+    if (filterTime === "ALL" || filterTime === "00Z") {
+      datasets.push({
+        label: "00Z",
+        data: data00,
+        borderColor: "rgba(59,130,246,0.9)",
+        backgroundColor: "rgba(59,130,246,0.3)",
+        tension: 0.3,
+        fill: false,
+        pointRadius: 4,
+        pointHoverRadius: 6
       });
-      loadingMsg.style.display = "none";
-      const datasets = [];
-      if (filterTime === "ALL" || filterTime === "00Z") {
-        datasets.push({
-          label: "00Z",
-          data: data00,
-          borderColor: "rgba(59,130,246,0.9)",
-          backgroundColor: "rgba(59,130,246,0.3)",
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6
-        });
-      }
-      if (filterTime === "ALL" || filterTime === "12Z") {
-        datasets.push({
-          label: "12Z",
-          data: data12,
-          borderColor: "rgba(239,68,68,0.9)",
-          backgroundColor: "rgba(239,68,68,0.3)",
-          tension: 0.3,
-          fill: false,
-          pointRadius: 4,
-          pointHoverRadius: 6
-        });
-      }
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: "line",
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          interaction: { mode: "index", intersect: false },
-          scales: {
-            x: {
-              title: { display: true, text: "Tanggal (UTC)", color: "#fff" },
-              ticks: { color: "#fff" },
-              grid: { color: "rgba(255,255,255,0.1)" }
-            },
-            y: {
-              title: { display: true, text: "Ketinggian maksimum (m)", color: "#fff" },
-              ticks: { color: "#fff" },
-              grid: { color: "rgba(255,255,255,0.1)" },
-              beginAtZero: true,
-              max: 40000
-            }
+    }
+    if (filterTime === "ALL" || filterTime === "12Z") {
+      datasets.push({
+        label: "12Z",
+        data: data12,
+        borderColor: "rgba(239,68,68,0.9)",
+        backgroundColor: "rgba(239,68,68,0.3)",
+        tension: 0.3,
+        fill: false,
+        pointRadius: 4,
+        pointHoverRadius: 6
+      });
+    }
+
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: {
+            title: { display: true, text: "Day of Month (UTC)", color: "#fff" },
+            ticks: { color: "#fff" },
+            grid: { color: "rgba(255,255,255,0.1)" }
           },
-          plugins: {
-            legend: { labels: { color: "#fff" } },
-            title: {
-              display: true,
-              text: `Height Reach - ${siteSelect.value} (${filterTime})`,
-              color: "#fff",
-              font: { size: 18 }
-            },
-            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} m` } }
+          y: {
+            title: { display: true, text: "Maximum Height (m)", color: "#fff" },
+            ticks: { color: "#fff" },
+            grid: { color: "rgba(255,255,255,0.1)" },
+            beginAtZero: true,
+            suggestedMax: 40000
+          }
+        },
+        plugins: {
+          legend: { labels: { color: "#fff" } },
+          title: {
+            display: true,
+            text: `Height Reach - ${siteSelect.value} (${monthName(month)} ${year}, ${filterTime})`,
+            color: "#fff",
+            font: { size: 18 }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} m`
+            }
           }
         }
-      });
-      const allVals = [...data00, ...data12].filter(v => v != null);
-      const avg = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(0) : "-";
-      summaryDiv.textContent = `Average maximum height: ${avg} m`;
-      renderTable();
+      }
+    });
+
+    // Summary (average height)
+    const allVals = [...data00, ...data12].filter(v => v != null && !isNaN(v));
+    const avg = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(0) : "-";
+    summaryDiv.textContent = `Average maximum height: ${avg} m`;
+
+    renderTable(year, month);
+  }
+
+  // ===== Render table + summary =====
+  function renderTable(year, month) {
+    const tbody = document.querySelector("#heightTable tbody");
+    tbody.innerHTML = "";
+
+    const map = {};
+    allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
+
+    const dim = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const labels = [];
+    for (let i = 1; i <= dim; i++) {
+      const day = String(i).padStart(2, "0");
+      if (timeSelect.value === "ALL" || timeSelect.value === "00Z") labels.push(`${day} (00Z)`);
+      if (timeSelect.value === "ALL" || timeSelect.value === "12Z") labels.push(`${day} (12Z)`);
     }
 
-    function renderTable() {
-      const tbody = document.querySelector("#heightTable tbody");
-      if (!tbody) return;
-      tbody.innerHTML = "";
-    
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-    
-      // Map cepat date_hour → data
-      const map = {};
-      allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
-    
-      // Buat daftar label (00Z & 12Z)
-      const daysInMonth = new Date(year, now.getUTCMonth() + 1, 0).getDate();
-      const labels = [];
-      for (let i = 1; i <= daysInMonth; i++) {
-        const day = String(i).padStart(2, "0");
-        if (timeSelect.value === "ALL" || timeSelect.value === "00Z") labels.push(`${day} (00Z)`);
-        if (timeSelect.value === "ALL" || timeSelect.value === "12Z") labels.push(`${day} (12Z)`);
-      }
-    
-      labels.forEach(lbl => {
-        const [dayRaw, tagRaw] = lbl.split(" ");
-        const day = dayRaw.padStart(2, "0");
-        const hourZ = tagRaw.replace(/[()]/g, "");
-        const entry = map[`${year}-${month}-${day}_${hourZ}`];
-        if (!entry) return;
-    
-        const dateFmt = `${day}/${month} ${hourZ}`;
-        const pres = (entry.end_pressure && entry.end_pressure > 0)
-          ? entry.end_pressure.toFixed(1)
-          : "-";
-    
-        tbody.insertAdjacentHTML("beforeend", `
+    labels.forEach(lbl => {
+      const [dayRaw, tagRaw] = lbl.split(" ");
+      const day = dayRaw.padStart(2, "0");
+      const hourZ = tagRaw.replace(/[()]/g, "");
+      const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_${hourZ}`];
+      if (!entry) return;
+      const dateFmt = `${day}/${String(month).padStart(2,"0")} ${hourZ}`;
+      const pres = entry.end_pressure && entry.end_pressure > 0 ? entry.end_pressure.toFixed(1) : "-";
+      tbody.insertAdjacentHTML("beforeend", `
         <tr>
           <td>${dateFmt}</td>
           <td>${entry.max_height}</td>
           <td>${pres}</td>
         </tr>
-        `);
-      });
-      // === Hitung Max / Min untuk summary ===
-      const heights = allData.map(d => d.max_height).filter(v => v != null && !isNaN(v));
-      const pressures = allData.map(d => d.end_pressure).filter(v => v != null && !isNaN(v));
-    
-      const maxH = heights.length ? Math.max(...heights).toFixed(0) : "-";
-      const minH = heights.length ? Math.min(...heights).toFixed(0) : "-";
-      const maxP = pressures.length ? Math.max(...pressures).toFixed(1) : "-";
-      const minP = pressures.length ? Math.min(...pressures).toFixed(1) : "-";
-    
-      document.getElementById("tableSummary").innerHTML = `
-        <p>Max Height: ${maxH} m | Min Height: ${minH} m</p>
-        <p>Max Pressure: ${maxP} hPa | Min Pressure: ${minP} hPa</p>
-      `;
-    }
-    
+      `);
+    });
 
-    siteSelect.addEventListener("change", () => loadHeightReach(siteSelect.value));
-    timeSelect.addEventListener("change", renderChart);
-    loadSites();
-    // === UTC Clock ===
-    function updateUTCClock() {
-      const now = new Date();
-      const utcHours = String(now.getUTCHours()).padStart(2, "0");
-      const utcMinutes = String(now.getUTCMinutes()).padStart(2, "0");
-      const utcSeconds = String(now.getUTCSeconds()).padStart(2, "0");
-      const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" "); // contoh: Fri, 10 Oct 2025
-    
-      document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
-      document.getElementById("utcDate").textContent = dateStr;
-    }
-    updateUTCClock();
-    setInterval(updateUTCClock, 1000);
-  </script>
+    // Summary bawah tabel
+    const heights = allData.map(d => d.max_height).filter(v => v != null && !isNaN(v));
+    const pressures = allData.map(d => d.end_pressure).filter(v => v != null && !isNaN(v));
+    const maxH = heights.length ? Math.max(...heights).toFixed(0) : "-";
+    const minH = heights.length ? Math.min(...heights).toFixed(0) : "-";
+    const maxP = pressures.length ? Math.max(...pressures).toFixed(1) : "-";
+    const minP = pressures.length ? Math.min(...pressures).toFixed(1) : "-";
+    document.getElementById("tableSummary").innerHTML = `
+      <p>Max Height: ${maxH} m | Min Height: ${minH} m</p>
+      <p>Max Pressure: ${maxP} hPa | Min Pressure: ${minP} hPa</p>
+    `;
+  }
+
+  // ===== Event bindings =====
+  monthSelect.addEventListener("change", () =>
+    loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value))
+  );
+  yearSelect.addEventListener("change", () =>
+    loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value))
+  );
+  siteSelect.addEventListener("change", () =>
+    loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value))
+  );
+  timeSelect.addEventListener("change", () =>
+    renderChart(parseInt(yearSelect.value), parseInt(monthSelect.value))
+  );
+
+  // ===== Init =====
+  initMonthYear();
+  loadSites();
+
+  // ===== UTC clock =====
+  function updateUTCClock() {
+    const now = new Date();
+    const h = String(now.getUTCHours()).padStart(2,"0");
+    const m = String(now.getUTCMinutes()).padStart(2,"0");
+    const s = String(now.getUTCSeconds()).padStart(2,"0");
+    const dateStr = now.toUTCString().split(" ").slice(0,4).join(" ");
+    document.getElementById("utcClock").textContent = `${h}:${m}:${s} UTC`;
+    document.getElementById("utcDate").textContent = dateStr;
+  }
+  updateUTCClock();
+  setInterval(updateUTCClock, 1000);
+</script>
+
 </body>
 </html>

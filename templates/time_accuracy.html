@@ -313,7 +313,13 @@
     <div class="selector">
       <label for="siteSelect">Site:</label>
       <select id="siteSelect"></select>
-
+    
+      <label for="monthSelect">Month:</label>
+      <select id="monthSelect"></select>
+    
+      <label for="yearSelect">Year:</label>
+      <select id="yearSelect"></select>
+    
       <label for="timeSelect">Launch Time:</label>
       <select id="timeSelect">
         <option value="ALL" selected>All</option>
@@ -322,7 +328,6 @@
       </select>
     </div>
 
-    <!-- Chart -->
     <!-- Chart + Table side-by-side -->
     <div class="chart-container">
       <div class="chart-box">
@@ -347,331 +352,293 @@
     <span>Powered by</span>
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
   </div>
-  <script>
-    // Sidebar toggle
-    function toggleSidebar() {
-      const sidebar = document.getElementById("sidebar");
-      const main = document.getElementById("mainContent");
-      const btn = document.getElementById("toggleBtn");
-      sidebar.classList.toggle("hidden");
-      main.classList.toggle("expanded");
-      if (sidebar.classList.contains("hidden")) {
-        btn.textContent = "☰";
-        btn.classList.add("hidden-position");
-      } else {
-        btn.textContent = "❮";
-        btn.classList.remove("hidden-position");
-      }
-    }
-
-    // Chart logic (same as before)
-    const ctx = document.getElementById("timeAccuracyChart").getContext("2d");
-    const loadingMsg = document.getElementById("loadingMsg");
-    const summaryDiv = document.getElementById("summary");
-    const siteSelect = document.getElementById("siteSelect");
-    const timeSelect = document.getElementById("timeSelect");
-    let chart = null;
-    let allData = [];
-
-    async function loadSites() {
-      loadingMsg.textContent = "Loading sites...";
-      const now = new Date();
-      const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-      const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-      const toYMD = d => d.toISOString().slice(0,10);
-      try {
-        const res = await fetch(`/api/sites?ext=.bfr&start_date=${toYMD(start)}&end_date=${toYMD(end)}`);
-        const siteMap = await res.json();
-        let sites = Object.keys(siteMap).sort();
-        if (sites.length === 0) {
-          siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
-          return;
-        }
-        siteSelect.innerHTML = "";
-        sites.forEach(s => {
-          const opt = document.createElement("option");
-          opt.value = s;
-          opt.textContent = s;
-          siteSelect.appendChild(opt);
-        });
-        siteSelect.value = sites[0];
-        loadTimeAccuracy(sites[0]);
-      } catch (err) {
-        loadingMsg.textContent = "Failed to load sites.";
-      }
-    }
-
-    async function loadTimeAccuracy(site) {
-      loadingMsg.textContent = `Fetching data for ${site}...`;
-      summaryDiv.textContent = "";
-      try {
-        const res = await fetch(`/api/time_accuracy/${site}`);
-        const json = await res.json();
-        allData = json.data || [];
-        renderChart();
-      } catch (err) {
-        loadingMsg.textContent = "Failed to load data.";
-      }
-    }
-
-function renderChart() {
-  const filterTime = timeSelect.value;
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  let labels = [];
-  let AB = [];     // Launch → 100 hPa
-  let CD = [];     // Launch → 30 hPa (opsional)
-  let prep = [];   // Preparation → Launch (bar putih)
-  let redDiff = []; // 100 hPa → End (Burst)
-
-  // === helper hitung selisih waktu preparation–launch ===
-  // === helper hitung menit selisih (launch_time - waktu persiapan) ===
-  function prepDiff(entry) {
-    if (!entry || !entry.launch_time) return null;
-  
-    // ubah format agar bisa diparse semua browser
-    const launch = new Date(entry.launch_time.replace(" ", "T") + "Z");
-    if (isNaN(launch)) return null;
-  
-    // patokan dasar (jam persiapan)
-    const base = new Date(launch);
-    if (entry.hour === "00Z") {
-      // untuk 00Z → 23:30 hari yang sama (bukan mundur sehari)
-      base.setUTCHours(23, 30, 0, 0);
-    } else if (entry.hour === "12Z") {
-      // untuk 12Z → 11:30 hari yang sama
-      base.setUTCHours(11, 30, 0, 0);
+<script>
+  // ===== Sidebar toggle =====
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.getElementById("mainContent");
+    const btn = document.getElementById("toggleBtn");
+    sidebar.classList.toggle("hidden");
+    main.classList.toggle("expanded");
+    if (sidebar.classList.contains("hidden")) {
+      btn.textContent = "☰";
+      btn.classList.add("hidden-position");
     } else {
-      // fallback
-      base.setUTCHours(launch.getUTCHours() - 1, 30, 0, 0);
+      btn.textContent = "❮";
+      btn.classList.remove("hidden-position");
     }
-  
-    const diffMin = (launch - base) / 60000.0; // menit
-    // terima nilai positif kecil hingga 6 jam
-    return diffMin >= 0 && diffMin < 360 ? diffMin : null;
   }
 
+  // ===== Global references =====
+  const ctx = document.getElementById("timeAccuracyChart").getContext("2d");
+  const loadingMsg = document.getElementById("loadingMsg");
+  const summaryDiv = document.getElementById("summary");
+  const siteSelect = document.getElementById("siteSelect");
+  const timeSelect = document.getElementById("timeSelect");
+  const monthSelect = document.getElementById("monthSelect");
+  const yearSelect  = document.getElementById("yearSelect");
+  let chart = null, allData = [];
 
-  // === Bangun label dan ambil data dari JSON ===
-  if (filterTime === "ALL") {
-    for (let d = 1; d <= daysInMonth; d++) {
-      const day = d.toString().padStart(2, "0");
-      labels.push(`${day} (00Z)`);
-      labels.push(`${day} (12Z)`);
+  // ===== Utility functions =====
+  const monthName = m => new Date(0, m - 1).toLocaleString("en", { month: "long" });
+  const toYMD = d => d.toISOString().slice(0,10);
+  function getMonthRange(year, month) {
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    return { start: toYMD(start), end: toYMD(end) };
+  }
+
+  // ===== Initialize dropdowns =====
+  function initMonthYear() {
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1;
+
+    for (let m = 1; m <= 12; m++) {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = monthName(m);
+      if (m === currentMonth) opt.selected = true;
+      monthSelect.appendChild(opt);
     }
 
+    for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      if (y === currentYear) opt.selected = true;
+      yearSelect.appendChild(opt);
+    }
+  }
+
+  // ===== Load available sites =====
+  async function loadSites() {
+    loadingMsg.textContent = "Loading sites...";
+    const year  = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value);
+    const { start, end } = getMonthRange(year, month);
+
+    try {
+      const res = await fetch(`/api/sites?ext=.bfr&start_date=${start}&end_date=${end}`);
+      const siteMap = await res.json();
+      const sites = Object.keys(siteMap).sort();
+      if (sites.length === 0) {
+        siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
+        return;
+      }
+      siteSelect.innerHTML = "";
+      sites.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        siteSelect.appendChild(opt);
+      });
+      siteSelect.value = sites[0];
+      await loadTimeAccuracy(sites[0], year, month);
+    } catch {
+      loadingMsg.textContent = "Failed to load sites.";
+    }
+  }
+
+  // ===== Single source of truth =====
+  async function loadTimeAccuracy(site, year, month) {
+    loadingMsg.textContent = `Fetching data for ${site}...`;
+    summaryDiv.textContent = "";
+    try {
+      const res = await fetch(`/api/time_accuracy/${site}?year=${year}&month=${month}`);
+      const json = await res.json();
+      allData = json.data || [];
+      renderChart(year, month);
+    } catch {
+      loadingMsg.textContent = "Failed to load data.";
+    }
+  }
+
+  // ===== Chart & table =====
+  function renderChart(year, month) {
+    const filterTime = timeSelect.value;
+    const dim = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const map = {};
     allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
 
-    AB = labels.map(lbl => {
-      const [day, tag] = lbl.split(" ");
-      const h = tag.replace(/[()]/g, "");
-      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
-      return entry ? entry.AB : null;
-    });
+    function prepDiff(entry) {
+      if (!entry || !entry.launch_time) return null;
+      const launch = new Date(entry.launch_time.replace(" ", "T") + "Z");
+      const base = new Date(launch);
+      if (entry.hour === "00Z") base.setUTCHours(23, 30);
+      else if (entry.hour === "12Z") base.setUTCHours(11, 30);
+      else base.setUTCHours(launch.getUTCHours() - 1, 30);
+      const diff = (launch - base) / 60000;
+      return diff >= 0 && diff < 360 ? diff : null;
+    }
 
-    CD = labels.map(lbl => {
-      const [day, tag] = lbl.split(" ");
-      const h = tag.replace(/[()]/g, "");
-      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
-      return entry ? entry.CD : null;
-    });
+    let labels = [], AB=[], CD=[], prep=[], redDiff=[];
+    if (filterTime === "ALL") {
+      for (let d = 1; d <= dim; d++) {
+        const day = String(d).padStart(2,"0");
+        labels.push(`${day} (00Z)`, `${day} (12Z)`);
+      }
+      AB = labels.map(lbl => {
+        const [day, tag] = lbl.split(" ");
+        const h = tag.replace(/[()]/g,"");
+        const e = map[`${year}-${String(month).padStart(2,"0")}-${day}_${h}`];
+        return e ? e.AB : null;
+      });
+      CD = labels.map(lbl => {
+        const [day, tag] = lbl.split(" ");
+        const h = tag.replace(/[()]/g,"");
+        const e = map[`${year}-${String(month).padStart(2,"0")}-${day}_${h}`];
+        return e ? e.CD : null;
+      });
+      prep = labels.map(lbl => {
+        const [day, tag] = lbl.split(" ");
+        const h = tag.replace(/[()]/g,"");
+        const e = map[`${year}-${String(month).padStart(2,"0")}-${day}_${h}`];
+        return prepDiff(e);
+      });
+      redDiff = CD.map((c,i)=> (c && AB[i]) ? Math.max(c-AB[i],0):null);
+    } else {
+      for (let d=1; d<=dim; d++) labels.push(String(d).padStart(2,"0"));
+      AB = labels.map(day=>{
+        const e = map[`${year}-${String(month).padStart(2,"0")}-${day}_${filterTime}`];
+        return e ? e.AB : null;
+      });
+      CD = labels.map(day=>{
+        const e = map[`${year}-${String(month).padStart(2,"0")}-${day}_${filterTime}`];
+        return e ? e.CD : null;
+      });
+      prep = labels.map(day=>{
+        const e = map[`${year}-${String(month).padStart(2,"0")}-${day}_${filterTime}`];
+        return prepDiff(e);
+      });
+      redDiff = CD.map((c,i)=> (c && AB[i]) ? Math.max(c-AB[i],0):null);
+    }
 
-    prep = labels.map(lbl => {
-      const [day, tag] = lbl.split(" ");
-      const h = tag.replace(/[()]/g, "");
-      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${h}`];
-      return prepDiff(entry);
-    });
+    // average
+    const avg = arr => {
+      const v = arr.filter(x=>x!==null&&isFinite(x));
+      return v.length? v.reduce((a,b)=>a+b,0)/v.length : NaN;
+    };
+    const avgPrep=avg(prep), avgAB=avg(AB), avgCD=avg(CD);
+    summaryDiv.textContent =
+      `Avg Prep–Launch: ${isFinite(avgPrep)?avgPrep.toFixed(1):"-"} min | `+
+      `Avg Launch–AB: ${isFinite(avgAB)?avgAB.toFixed(1):"-"} min | `+
+      `Avg AB–End: ${isFinite(avgCD)?avgCD.toFixed(1):"-"} min`;
 
-    redDiff = CD.map((c, i) => (c && AB[i]) ? Math.max(c - AB[i], 0) : null);
-
-  } else {
-    for (let d = 1; d <= daysInMonth; d++) labels.push(d.toString().padStart(2, "0"));
-    const map = {};
-    allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
-
-    AB = labels.map(day => {
-      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
-      return entry ? entry.AB : null;
-    });
-
-    CD = labels.map(day => {
-      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
-      return entry ? entry.CD : null;
-    });
-
-    prep = labels.map(day => {
-      const entry = map[`${year}-${(month+1).toString().padStart(2,"0")}-${day}_${filterTime}`];
-      return prepDiff(entry);
-    });
-
-    redDiff = CD.map((c, i) => (c && AB[i]) ? Math.max(c - AB[i], 0) : null);
-  }
-
-  // === Hitung rata-rata ===
-  const avgPrep = prep.filter(v => v !== null).reduce((a,b)=>a+b,0) / (prep.filter(v => v !== null).length || 1);
-  const avgAB = AB.filter(v => v !== null).reduce((a,b)=>a+b,0) / (AB.filter(v => v !== null).length || 1);
-  const avgCD = CD.filter(v => v !== null).reduce((a,b)=>a+b,0) / (CD.filter(v => v !== null).length || 1);
-
-  summaryDiv.textContent =
-    `Avg Prep–Launch: ${isFinite(avgPrep)?avgPrep.toFixed(1):"-"} min | ` +
-    `Avg Launch–AB: ${isFinite(avgAB)?avgAB.toFixed(1):"-"} min | ` +
-    `Avg AB–End: ${isFinite(avgCD)?avgCD.toFixed(1):"-"} min`;
-
-  // === Render Chart ===
-  loadingMsg.style.display = "none";
-  if (chart) chart.destroy();
-
-  chart = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Preparation–Launch",
-          data: prep,
-          backgroundColor: "rgba(255,255,255,0.9)",
-          stack: "stack1"
-        },
-        {
-          label: "Launch–AB (100 hPa)",
-          data: AB,
-          backgroundColor: "rgba(59,130,246,0.85)",
-          stack: "stack1"
-        },
-        {
-          label: "AB–End (Burst)",
-          data: redDiff,
-          backgroundColor: "rgba(239,68,68,0.85)",
-          stack: "stack1"
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: "index", intersect: false },
-      scales: {
-        x: {
-          title: { display: true, text: "Tanggal (UTC)", color: "#fff" },
-          ticks: { color: "#fff" },
-          grid: { color: "rgba(255,255,255,0.1)" },
-          stacked: true
-        },
-        y: {
-          title: { display: true, text: "Waktu (menit)", color: "#fff" },
-          ticks: { color: "#fff" },
-          grid: { color: "rgba(255,255,255,0.1)" },
-          beginAtZero: true,
-          max: 240
-        }
+    // chart
+    loadingMsg.style.display="none";
+    if (chart) chart.destroy();
+    chart = new Chart(ctx,{
+      type:"bar",
+      data:{labels,
+        datasets:[
+          {label:"Preparation–Launch",data:prep,backgroundColor:"rgba(255,255,255,0.9)",stack:"s1"},
+          {label:"Launch–AB (100 hPa)",data:AB,backgroundColor:"rgba(59,130,246,0.85)",stack:"s1"},
+          {label:"AB–End (Burst)",data:redDiff,backgroundColor:"rgba(239,68,68,0.85)",stack:"s1"}
+        ]
       },
-      plugins: {
-        legend: { labels: { color: "#fff" } },
-        title: {
-          display: true,
-          text: `Time Accuracy - ${siteSelect.value} (${filterTime})`,
-          color: "#fff",
-          font: { size: 18 }
+      options:{
+        responsive:true,
+        interaction:{mode:"index",intersect:false},
+        scales:{
+          x:{ticks:{color:"#fff"},grid:{color:"rgba(255,255,255,0.1)"},stacked:true},
+          y:{ticks:{color:"#fff"},grid:{color:"rgba(255,255,255,0.1)"},beginAtZero:true,max:240}
         },
-        tooltip: {
-          callbacks: {
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} menit`
+        plugins:{
+          legend:{labels:{color:"#fff"}},
+          title:{
+            display:true,
+            text:`Time Accuracy - ${siteSelect.value} (${monthName(month)} ${year}, ${filterTime})`,
+            color:"#fff",font:{size:18}
           }
         }
       }
-    }
-  });
-  renderTable(labels, AB, CD);
-}
+    });
 
-function renderTable(labels, AB, CD) {
-  const tbody = document.querySelector("#dataTable tbody");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-
-  // Buat peta cepat
-  const map = {};
-  allData.forEach(d => map[`${d.date}_${d.hour}`] = d);
-
-  // Tambahkan menit ke waktu UTC (berdasarkan launch_time string)
-  function addMinutesToLaunch(launchStr, addMin) {
-    if (!launchStr || addMin == null || isNaN(addMin)) return "-";
-    try {
-      // ambil jam dan menit dari string "YYYY-MM-DD HH:MM:SS UTC"
-      const m = launchStr.match(/\b(\d{2}):(\d{2})/);
-      if (!m) return "-";
-      let hour = parseInt(m[1]);
-      let minute = parseInt(m[2]);
-  
-      // tambahkan menit
-      let totalMin = hour * 60 + minute + Number(addMin);
-      totalMin = ((totalMin % 1440) + 1440) % 1440; // wrap 24 jam
-  
-      const hh = String(Math.floor(totalMin / 60)).padStart(2, "0");
-      const mm = String(Math.floor(totalMin % 60)).padStart(2, "0");
-      return `${hh}:${mm}`;
-    } catch {
-      return "-";
-    }
+    renderTable(year, month, labels, map);
   }
 
-
-  // Ambil HH:MM langsung dari backend string
-  function getLaunchHHMM(str) {
-    if (!str) return "-";
-    const m = str.match(/\b(\d{2}):(\d{2})/);
-    return m ? `${m[1]}:${m[2]}` : "-";
+  function renderTable(year, month, labels, map) {
+    const tbody = document.querySelector("#dataTable tbody");
+    tbody.innerHTML = "";
+  
+    // 🔧 Fungsi helper untuk menambah menit ke jam peluncuran
+    function addMinutesToLaunch(launchStr, addMin) {
+      if (!launchStr || addMin == null || isNaN(addMin)) return "-";
+      try {
+        // Ambil jam & menit dari "YYYY-MM-DD HH:MM:SS"
+        const match = launchStr.match(/\b(\d{2}):(\d{2})/);
+        if (!match) return "-";
+  
+        let hour = parseInt(match[1]);
+        let minute = parseInt(match[2]);
+        let totalMin = hour * 60 + minute + Math.round(Number(addMin)); // dibulatkan ke menit
+        totalMin = ((totalMin % 1440) + 1440) % 1440; // wrap 24 jam
+  
+        const hh = String(Math.floor(totalMin / 60)).padStart(2, "0");
+        const mm = String(totalMin % 60).padStart(2, "0");
+        return `${hh}:${mm}`;
+      } catch {
+        return "-";
+      }
+    }
+  
+    // 🔧 Ambil hanya jam:menit dari string backend
+    function getLaunchHHMM(str) {
+      if (!str) return "-";
+      const m = str.match(/\b(\d{2}):(\d{2})/);
+      return m ? `${m[1]}:${m[2]}` : "-";
+    }
+  
+    labels.forEach(lbl => {
+      const [dayRaw, tagRaw] = lbl.includes("(") ? lbl.split(" ") : [lbl, "00Z"];
+      const day = dayRaw.padStart(2, "0");
+      const hourZ = tagRaw.replace(/[()]/g, "") || "00Z";
+  
+      const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_${hourZ}`];
+      if (!entry) return;
+  
+      const dateFmt = `${day}/${String(month).padStart(2,"0")} ${hourZ}`;
+      const launchHHMM = getLaunchHHMM(entry.launch_time);
+      const abUTC = addMinutesToLaunch(entry.launch_time, entry.AB);
+      const burstUTC = addMinutesToLaunch(entry.launch_time, entry.CD);
+  
+      tbody.insertAdjacentHTML("beforeend", `
+        <tr>
+          <td>${dateFmt}</td>
+          <td>${launchHHMM}</td>
+          <td>${abUTC}</td>
+          <td>${burstUTC}</td>
+        </tr>
+      `);
+    });
   }
 
-  labels.forEach(lbl => {
-    const [dayRaw, tagRaw] = lbl.includes("(") ? lbl.split(" ") : [lbl, "00Z"];
-    const day = dayRaw.padStart(2, "0");
-    const hourZ = tagRaw.replace(/[()]/g, "") || "00Z";
-
-    const entry = map[`${year}-${month}-${day}_${hourZ}`];
-    if (!entry) return;
-
-    const dateFmt = `${day}/${month} ${hourZ}`;
-    const launchHHMM = getLaunchHHMM(entry.launch_time);       // ⏱ ambil langsung dari backend
-    const abUTC = addMinutesToLaunch(entry.launch_time, entry.AB);
-    const burstUTC = addMinutesToLaunch(entry.launch_time, entry.CD);
-
-    tbody.insertAdjacentHTML("beforeend", `
-      <tr>
-        <td>${dateFmt}</td>
-        <td>${launchHHMM}</td>
-        <td>${abUTC}</td>
-        <td>${burstUTC}</td>
-      </tr>
-    `);
+  // ===== Event bindings =====
+  monthSelect.addEventListener("change", loadSites);
+  yearSelect.addEventListener("change", loadSites);
+  siteSelect.addEventListener("change",()=>{
+    loadTimeAccuracy(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value));
   });
-}
+  timeSelect.addEventListener("change",()=>{
+    renderChart(parseInt(yearSelect.value), parseInt(monthSelect.value));
+  });
 
+  // ===== Init =====
+  initMonthYear();
+  loadSites();
 
-    siteSelect.addEventListener("change", () => loadTimeAccuracy(siteSelect.value));
-    timeSelect.addEventListener("change", renderChart);
-    loadSites();
-    // === UTC Clock ===
-    function updateUTCClock() {
-      const now = new Date();
-      const utcHours = String(now.getUTCHours()).padStart(2, "0");
-      const utcMinutes = String(now.getUTCMinutes()).padStart(2, "0");
-      const utcSeconds = String(now.getUTCSeconds()).padStart(2, "0");
-      const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" "); // contoh: Fri, 10 Oct 2025
-    
-      document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
-      document.getElementById("utcDate").textContent = dateStr;
-    }
-    updateUTCClock();
-    setInterval(updateUTCClock, 1000);
-  </script>
+  // ===== UTC clock =====
+  function updateUTCClock(){
+    const now=new Date();
+    const h=String(now.getUTCHours()).padStart(2,"0");
+    const m=String(now.getUTCMinutes()).padStart(2,"0");
+    const s=String(now.getUTCSeconds()).padStart(2,"0");
+    const dateStr=now.toUTCString().split(" ").slice(0,4).join(" ");
+    document.getElementById("utcClock").textContent=`${h}:${m}:${s} UTC`;
+    document.getElementById("utcDate").textContent=dateStr;
+  }
+  updateUTCClock(); setInterval(updateUTCClock,1000);
+</script>
 </body>
 </html>
