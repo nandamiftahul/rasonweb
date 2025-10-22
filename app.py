@@ -1466,9 +1466,55 @@ def rason_value():
 @login_required
 def rason_metadata():
     store = get_user_store()
-    if not store["metadata"]:
+    meta = store.get("metadata", {})
+    levels = store.get("levels", [])
+
+    if not meta:
         return jsonify({"error": "No metadata"}), 404
-    return jsonify(store["metadata"])
+
+    import pandas as pd, numpy as np
+    from geopy.distance import geodesic
+
+    if levels:
+        df = pd.DataFrame(levels)
+
+        # --- End pressure ---
+        if "end_pressure" not in meta or meta["end_pressure"] in ("-", None, ""):
+            if "pressure_hPa" in df:
+                end_p = df["pressure_hPa"].dropna().min()
+                if pd.notna(end_p):
+                    meta["end_pressure"] = f"{end_p:.1f} hPa"
+
+        # --- Max height ---
+        if "max_height" not in meta or meta["max_height"] in ("-", None, ""):
+            if "height_m" in df:
+                max_h = df["height_m"].dropna().max()
+                if pd.notna(max_h):
+                    meta["max_height"] = f"{max_h:.0f} m"
+
+        # --- End distance ---
+        if "end_distance" not in meta or meta["end_distance"] in ("-", None, ""):
+            if {"latitude", "longitude"} <= set(df.columns) and \
+               meta.get("station_lat") and meta.get("station_lon"):
+                try:
+                    last_lat = df["latitude"].dropna().iloc[-1]
+                    last_lon = df["longitude"].dropna().iloc[-1]
+                    st_lat = float(meta["station_lat"])
+                    st_lon = float(meta["station_lon"])
+                    dist = geodesic((st_lat, st_lon), (last_lat, last_lon)).km
+                    meta["end_distance"] = f"{dist:.1f} km"
+                except Exception:
+                    pass
+
+        # --- Avg ascent rate ---
+        if "avg_ascent_rate" not in meta or meta["avg_ascent_rate"] in ("-", None, ""):
+            if {"height_m", "time_s"} <= set(df.columns):
+                elapsed = df["time_s"].max() - df["time_s"].min()
+                max_h = df["height_m"].dropna().max()
+                if pd.notna(max_h) and elapsed and elapsed > 0:
+                    meta["avg_ascent_rate"] = f"{(max_h/elapsed):.2f} m/s"
+
+    return jsonify(meta)
 
 @app.route("/all_levels")
 @login_required
@@ -1818,26 +1864,37 @@ def raob_analysis(site, filename):
         except Exception:
             pass
 
-        # --- Tropopause ---
-        tropopause_level = "-"
+        # --- Tropopause detection (Lapse-rate + Cold-point) ---
+        tropopause_LRT = "-"
+        tropopause_CPT = "-"
         try:
             if {"height_m", "temp_C", "pressure_hPa"} <= set(thermo.columns):
-                T_vals = thermo["temp_C"].values
-                Z_vals = thermo["height_m"].values
-                P_vals = thermo["pressure_hPa"].values
-                mask = P_vals < 500
-                T_vals, Z_vals, P_vals = T_vals[mask], Z_vals[mask], P_vals[mask]
-                if len(T_vals) > 5:
-                    lapse_rate = np.gradient(T_vals, Z_vals) * 1000.0
-                    for i in range(len(Z_vals)):
-                        if lapse_rate[i] <= 2.0:
-                            z_top = Z_vals[i] + 2000.0
-                            mask2 = (Z_vals >= Z_vals[i]) & (Z_vals <= z_top)
-                            if np.any(mask2) and np.mean(lapse_rate[mask2]) <= 2.0:
-                                tropopause_level = f"{P_vals[i]:.0f} hPa"
+                T_vals = thermo["temp_C"].to_numpy()
+                Z_vals = thermo["height_m"].to_numpy()
+                P_vals = thermo["pressure_hPa"].to_numpy()
+        
+                # --- Cold Point Tropopause (minimum T) ---
+                i_min = np.argmin(T_vals)
+                Tmin = T_vals[i_min]
+                Zmin = Z_vals[i_min]
+                Pmin = P_vals[i_min]
+                tropopause_CPT = f"{Pmin:.0f} hPa ({Zmin/1000:.1f} km, Tmin = {Tmin:.1f} °C)"
+        
+                # --- Lapse Rate Tropopause (WMO definition) ---
+                mask = (P_vals < 400) & (P_vals > 30)
+                if np.count_nonzero(mask) > 5:
+                    Tm, Zm, Pm = T_vals[mask], Z_vals[mask], P_vals[mask]
+                    lapse = -np.gradient(Tm, Zm) * 1000  # °C/km
+                    for i in range(len(Zm) - 1):
+                        if lapse[i] <= 2.0:
+                            z_top = Zm[i] + 2000
+                            m2 = (Zm >= Zm[i]) & (Zm <= z_top)
+                            if np.mean(lapse[m2]) <= 2.0:
+                                tropopause_LRT = f"{Pm[i]:.0f} hPa ({Zm[i]/1000:.1f} km)"
                                 break
         except Exception as e:
             print("Tropopause calc failed:", e)
+        
 
         # ==========================================================
         # 🔹 Generate plots (Skew-T + Hodograph)
@@ -1911,7 +1968,8 @@ def raob_analysis(site, filename):
             "SRH 0–1 km (m²/s²)": scalar_str(srh_0_1km),
             "SRH 0–3 km (m²/s²)": scalar_str(srh_0_3km),
             "Freezing Level": freezing_level,
-            "Tropopause": tropopause_level,
+            "Tropopause LRT": tropopause_LRT,
+            "Tropopause CPT": tropopause_CPT,
         }
 
         analysis_text = generate_weather_analysis(df)

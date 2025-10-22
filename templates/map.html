@@ -868,9 +868,7 @@
       })
       .catch(() => {});
 
- 
-    // --- Load all levels ---
-    initLevels();
+
 
     async function initLevels() {
       try {
@@ -888,7 +886,7 @@
         }
       } catch {}
       // Fallback using server-side total + /value?frame=
-      const srvTotal = {{ total|default(0) }};
+      const srvTotal = parseInt("{{ total|default(0) }}", 10) || 0;
       if (srvTotal > 0) {
         const promises = [];
         for (let i = 0; i < srvTotal; i++) {
@@ -904,6 +902,9 @@
         }
       }
     }
+
+    // --- Load all levels ---
+    initLevels();
 
     function isFiniteNumber(x) {
       return typeof x === 'number' && Number.isFinite(x);

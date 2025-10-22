@@ -298,67 +298,108 @@ async function loadTrajectory(){
   }catch(e){st.textContent="❌ Gagal load trajectory: "+e.message;}
 }
 
-function start3DMap(d){
-  const {TripsLayer,IconLayer,LineLayer,PolygonLayer,ColumnLayer,MapboxOverlay}=deck;
-  const t0=Math.min(...d.trip.timestamps),ts=d.trip.timestamps.map(t=>t-t0);
-  const path=d.trip.path,dur=Math.max(...ts),stn=d.station;
-  const map=new maplibregl.Map({
-    container:"map",
-    style:{version:8,sources:{
-      osm:{type:"raster",tiles:["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256},
-      esri:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256},
-      google:{type:"raster",tiles:["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"],tileSize:256}},
-      layers:[
-        {id:"esri",type:"raster",source:"esri",layout:{visibility:"visible"}}, // ✅ default visible
-        {id:"osm",type:"raster",source:"osm",layout:{visibility:"none"}},
-        {id:"google",type:"raster",source:"google",layout:{visibility:"none"}}
-      ]},
-    center:[stn.lon,stn.lat],zoom:8,pitch:60,bearing:20,antialias:true});
+function start3DMap(d) {
+  const { TripsLayer, IconLayer, LineLayer, PolygonLayer, ColumnLayer, MapboxOverlay } = deck;
 
-  const baseSel=document.getElementById("basemapSelect");
-  baseSel.onchange=()=>{["osm","esri","google"].forEach(id=>{
-    const vis=id===baseSel.value?"visible":"none";
-    if(map.getLayer(id))map.setLayoutProperty(id,"visibility",vis);
-    else map.addLayer({id,type:"raster",source:id});
-  });};
+  const t0 = Math.min(...d.trip.timestamps);
+  const ts = d.trip.timestamps.map(t => t - t0);
+  let path = d.trip.path;
+  const dur = Math.max(...ts);
+  const stn = d.station;
 
-  const minZ=Math.min(...path.map(p=>p[2])),maxZ=Math.max(...path.map(p=>p[2]));
-  const color=h=>[Math.min(255,255*(h-minZ)/(maxZ-minZ)),50,255*(1-(h-minZ)/(maxZ-minZ))];
-  const allLines=[];let mark=0;
-  for(let i=1;i<path.length;i++){const z=path[i][2];if(z-mark>=200){mark=z;allLines.push({source:[path[i][0],path[i][1],0],target:[path[i][0],path[i][1],z]});}}
+  // ✅ Selalu skip titik & level terakhir (biasanya error saat burst)
+  if (path.length > 1) {
+    path = path.slice(0, -1);
+    ts.pop();
+  }
+  if (Array.isArray(allLevels) && allLevels.length > 1) {
+    allLevels = allLevels.slice(0, -1);
+  }
+  console.warn("⏩ Skipped last point and level (burst cleanup)");
 
-  let cur=0,play=false,spd=1,pos={lon:path[0][0],lat:path[0][1],alt:path[0][2]};
+  const map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      sources: {
+        osm: { type: "raster", tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256 },
+        esri: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256 },
+        google: { type: "raster", tiles: ["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"], tileSize: 256 }
+      },
+      layers: [
+        { id: "esri", type: "raster", source: "esri", layout: { visibility: "visible" } },
+        { id: "osm", type: "raster", source: "osm", layout: { visibility: "none" } },
+        { id: "google", type: "raster", source: "google", layout: { visibility: "none" } }
+      ]
+    },
+    center: [stn.lon, stn.lat],
+    zoom: 8,
+    pitch: 60,
+    bearing: 20,
+    antialias: true
+  });
+
+  const baseSel = document.getElementById("basemapSelect");
+  baseSel.onchange = () => {
+    ["osm", "esri", "google"].forEach(id => {
+      const vis = id === baseSel.value ? "visible" : "none";
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+    });
+  };
+
+  const minZ = Math.min(...path.map(p => p[2]));
+  const maxZ = Math.max(...path.map(p => p[2]));
+  const color = h => [Math.min(255, 255 * (h - minZ) / (maxZ - minZ)), 50, 255 * (1 - (h - minZ) / (maxZ - minZ))];
+
+  const allLines = [];
+  let mark = 0;
+  for (let i = 1; i < path.length; i++) {
+    const z = path[i][2];
+    if (z - mark >= 200) {
+      mark = z;
+      allLines.push({
+        source: [path[i][0], path[i][1], 0],
+        target: [path[i][0], path[i][1], z]
+      });
+    }
+  }
+
+  let cur = 0, play = false, spd = 1;
+  let pos = { lon: path[0][0], lat: path[0][1], alt: path[0][2] };
+
   // === Freezing layer state ===
-  let freezeZ = getFreezingZ(allLevels);   // hitung sekali dari profil
-  let showFreeze = false;                  // default off (checkbox belum dicentang)  
+  let freezeZ = getFreezingZ(allLevels);
+  let showFreeze = false;
   let shearData = computeShearLevels(allLevels);
-  let showShear = false;  
-  const getPos=t=>{
-    if(t<=0)return{lon:path[0][0],lat:path[0][1],alt:path[0][2]};
-    if(t>=dur)return{lon:path.at(-1)[0],lat:path.at(-1)[1],alt:path.at(-1)[2]};
-    for(let i=1;i<ts.length;i++)if(ts[i]>=t){
-      const r=(t-ts[i-1])/(ts[i]-ts[i-1]);
-      return{lon:path[i-1][0]+r*(path[i][0]-path[i-1][0]),
-             lat:path[i-1][1]+r*(path[i][1]-path[i-1][1]),
-             alt:path[i-1][2]+r*(path[i][2]-path[i-1][2])};
+  let showShear = false;
+
+  const getPos = t => {
+    if (t <= 0) return { lon: path[0][0], lat: path[0][1], alt: path[0][2] };
+    if (t >= dur) return { lon: path.at(-1)[0], lat: path.at(-1)[1], alt: path.at(-1)[2] };
+    for (let i = 1; i < ts.length; i++) if (ts[i] >= t) {
+      const r = (t - ts[i - 1]) / (ts[i] - ts[i - 1]);
+      return {
+        lon: path[i - 1][0] + r * (path[i][0] - path[i - 1][0]),
+        lat: path[i - 1][1] + r * (path[i][1] - path[i - 1][1]),
+        alt: path[i - 1][2] + r * (path[i][2] - path[i - 1][2])
+      };
     }
   };
 
-  function updateLevelInfo(t){
-    if(!allLevels.length)return;
-    const idx=Math.min(Math.floor((t/dur)*allLevels.length),allLevels.length-1);
-    const lv=allLevels[idx];
-    let html="";
-    for(const [k,v] of Object.entries(lv)){
-      if(v==null)continue;
-      html+=`<div class="row"><div class="label">${k}</div><div class="val">${typeof v==="number"?v.toFixed(2):v}</div></div>`;
+  function updateLevelInfo(t) {
+    if (!allLevels.length) return;
+    const idx = Math.min(Math.floor((t / dur) * allLevels.length), allLevels.length - 1);
+    const lv = allLevels[idx];
+    let html = "";
+    for (const [k, v] of Object.entries(lv)) {
+      if (v == null) continue;
+      html += `<div class="row"><div class="label">${k}</div><div class="val">${typeof v === "number" ? v.toFixed(2) : v}</div></div>`;
     }
-    document.getElementById("levelContent").innerHTML=html||"No data";
+    document.getElementById("levelContent").innerHTML = html || "No data";
   }
 
-  function makeFreezingLayer(zMeters){
-    if(!Number.isFinite(zMeters)) return [];
-    // bikin “karpet” kecil 0.25° x 0.25° di sekitar stasiun (sekitar 25 km)
+  function makeFreezingLayer(zMeters) {
+    if (!Number.isFinite(zMeters)) return [];
     const lon0 = d.station.lon, lat0 = d.station.lat;
     const span = 0.25;
     const corners = [
@@ -369,27 +410,21 @@ function start3DMap(d){
     ];
     return [
       new PolygonLayer({
-        id: 'freeze-layer',
+        id: "freeze-layer",
         data: [{ polygon: corners }],
         getPolygon: f => f.polygon,
         filled: true,
         extruded: false,
-        getFillColor: [0,180,255,80],    // biru transparan
-        getLineColor: [0,120,255,180],
+        getFillColor: [0, 180, 255, 80],
+        getLineColor: [0, 120, 255, 180],
         lineWidthMinPixels: 2,
         pickable: false
       })
     ];
   }
 
-
-
-  
-  function makeLayers(){
-    // --- filter garis vertikal yang sudah terlewati ---
+  function makeLayers() {
     const visLines = allLines.filter(l => l.target[2] <= pos.alt);
-  
-    // --- layer dasar: lintasan, garis vertikal, dan ikon balon ---
     const base = [
       new TripsLayer({
         id: "trip",
@@ -401,25 +436,22 @@ function start3DMap(d){
         trailLength: dur,
         currentTime: cur
       }),
-  
       new LineLayer({
         id: "lines",
         data: visLines,
         getSourcePosition: d => d.source,
         getTargetPosition: d => d.target,
-        getColor: [0,122,255],
+        getColor: [0, 122, 255],
         getWidth: 1.5
       }),
-  
       new LineLayer({
         id: "dyn",
-        data: [{ source:[pos.lon,pos.lat,0], target:[pos.lon,pos.lat,pos.alt] }],
+        data: [{ source: [pos.lon, pos.lat, 0], target: [pos.lon, pos.lat, pos.alt] }],
         getSourcePosition: d => d.source,
         getTargetPosition: d => d.target,
-        getColor: [0,122,255],
+        getColor: [0, 122, 255],
         getWidth: 2
       }),
-  
       new IconLayer({
         id: "icon",
         data: [pos],
@@ -435,103 +467,96 @@ function start3DMap(d){
         getSize: 4
       })
     ];
-  
-    // --- gabungkan semua optional layer ---
+
     return base
       .concat(showShear ? makeWindBarbLayer(allLevels) : [])
       .concat(showFreeze && Number.isFinite(freezeZ) ? makeFreezingLayer(freezeZ) : []);
-    console.log("Layers:", {
-      base: base.length,
-      shear: showShear ? shearData.length : 0,
-      freeze: showFreeze ? freezeZ : null
-    });
   }
 
-
-
-  map.on("load",()=>{
-    const overlay=new MapboxOverlay({layers:makeLayers(),interleaved:true});
+  map.on("load", () => {
+    const overlay = new MapboxOverlay({ layers: makeLayers(), interleaved: true });
     map.addControl(overlay);
-    const deckgl=overlay._deck;
-    // === Toggle UI untuk Freezing Layer ===
+    const deckgl = overlay._deck;
+
+    // === Toggle UI: Freezing Layer ===
     const chkFreeze = document.getElementById("chk-freeze");
-    if(chkFreeze){
+    if (chkFreeze) {
       chkFreeze.onchange = () => {
         showFreeze = chkFreeze.checked;
-        // kalau belum ada 0°C, coba hitung ulang
-        if(showFreeze && !Number.isFinite(freezeZ)){
+        if (showFreeze && !Number.isFinite(freezeZ)) {
           freezeZ = getFreezingZ(allLevels);
           const st = document.getElementById("upload-status");
-          if(!Number.isFinite(freezeZ)){
-            if(st) st.textContent = "⚠️ Freezing layer tidak ditemukan pada profil ini.";
+          if (!Number.isFinite(freezeZ)) {
+            if (st) st.textContent = "⚠️ Freezing layer tidak ditemukan pada profil ini.";
             showFreeze = false;
             chkFreeze.checked = false;
           } else {
-            if(st) st.textContent = "❄️ Freezing level ≈ " + Math.round(freezeZ) + " m";
+            if (st) st.textContent = "❄️ Freezing level ≈ " + Math.round(freezeZ) + " m";
           }
         }
-        deckgl.setProps({layers: makeLayers()});
+        deckgl.setProps({ layers: makeLayers() });
       };
-
-      // info awal (kalau mau langsung kasih hint)
-      if(Number.isFinite(freezeZ)){
+      if (Number.isFinite(freezeZ)) {
         const st = document.getElementById("upload-status");
-        if(st) st.textContent = "ℹ️ Freezing level terdeteksi ≈ " + Math.round(freezeZ) + " m";
+        if (st) st.textContent = "ℹ️ Freezing level terdeteksi ≈ " + Math.round(freezeZ) + " m";
       }
     }
-    // === Toggle UI untuk Wind Shear Zones ===
-    const chkShear=document.getElementById("chk-shear");
-    if(chkShear){
-      chkShear.onchange=()=>{
+
+    // === Toggle UI: Wind Shear Layer ===
+    const chkShear = document.getElementById("chk-shear");
+    if (chkShear) {
+      chkShear.onchange = () => {
         showShear = chkShear.checked;
-        const st=document.getElementById("upload-status");
-        if(showShear){
-          if(!shearData.length){
-            shearData = computeShearLevels(allLevels);
-          }
-          const maxShear=Math.max(...shearData.map(d=>d.shear));
-          if(st) st.textContent=`💨 Max shear: ${maxShear.toFixed(1)} m/s/km`;
+        const st = document.getElementById("upload-status");
+        if (showShear) {
+          if (!shearData.length) shearData = computeShearLevels(allLevels);
+          const maxShear = Math.max(...shearData.map(d => d.shear));
+          if (st) st.textContent = `💨 Max shear: ${maxShear.toFixed(1)} m/s/km`;
         }
-        deckgl.setProps({layers:makeLayers()});
+        deckgl.setProps({ layers: makeLayers() });
       };
     }
 
-    const el=document.getElementById("st-elap"),
-          pl=document.getElementById("btn-play"),
-          pa=document.getElementById("btn-pause"),
-          spdR=document.getElementById("speed"),
-          spv=document.getElementById("sp-val"),
-          prog=document.getElementById("prog");
-    spdR.oninput=e=>{spd=parseFloat(e.target.value);spv.textContent=(spd>=10?Math.round(spd):spd.toFixed(1))+"×";};
-    pl.onclick=()=>{play=true;pl.disabled=true;pa.disabled=false;};
-    pa.onclick=()=>{play=false;pl.disabled=false;pa.disabled=true;};
-    prog.oninput=e=>{cur=parseFloat(e.target.value)/100*dur;pos=getPos(cur);
-      el.textContent=Math.round(cur)+" s";updateLevelInfo(cur);deckgl.setProps({layers:makeLayers()});};
-    let last=performance.now();
-    (function tick(now){
-      const dt=(now-last)/1000;last=now;
-      if(play){
-        cur+=dt*spd;
-        if(cur>=dur){              // ✅ stop di akhir, no loop
-          cur=dur; play=false;
-          pl.disabled=false; pa.disabled=true;
-        }
-        pos=getPos(cur);
-        el.textContent=Math.round(cur)+" s";
-        prog.value=(cur/dur)*100;
+    // === Control UI (play/pause/progress) ===
+    const el = document.getElementById("st-elap"),
+          pl = document.getElementById("btn-play"),
+          pa = document.getElementById("btn-pause"),
+          spdR = document.getElementById("speed"),
+          spv = document.getElementById("sp-val"),
+          prog = document.getElementById("prog");
+    spdR.oninput = e => { spd = parseFloat(e.target.value); spv.textContent = (spd >= 10 ? Math.round(spd) : spd.toFixed(1)) + "×"; };
+    pl.onclick = () => { play = true; pl.disabled = true; pa.disabled = false; };
+    pa.onclick = () => { play = false; pl.disabled = false; pa.disabled = true; };
+    prog.oninput = e => {
+      cur = parseFloat(e.target.value) / 100 * dur;
+      pos = getPos(cur);
+      el.textContent = Math.round(cur) + " s";
+      updateLevelInfo(cur);
+      deckgl.setProps({ layers: makeLayers() });
+    };
+
+    let last = performance.now();
+    (function tick(now) {
+      const dt = (now - last) / 1000; last = now;
+      if (play) {
+        cur += dt * spd;
+        if (cur >= dur) { cur = dur; play = false; pl.disabled = false; pa.disabled = true; }
+        pos = getPos(cur);
+        el.textContent = Math.round(cur) + " s";
+        prog.value = (cur / dur) * 100;
         updateLevelInfo(cur);
-        deckgl.setProps({layers:makeLayers()});
-        deckgl.setProps({layers:makeLayers()});
+        deckgl.setProps({ layers: makeLayers() });
       }
       requestAnimationFrame(tick);
     })(last);
     updateLevelInfo(0);
   });
-  // === Arah Utara indikator sederhana ===
+
+  // === Kompas Utara (North Indicator) ===
   const northArrow = document.getElementById("northArrow");
   map.on("rotate", () => {
-    const bearing = map.getBearing(); // derajat rotasi
-    northArrow.style.transform = `rotate(${-bearing}deg)`; // jarum tetap menunjuk utara
+    const bearing = map.getBearing();
+    northArrow.style.transform = `rotate(${-bearing}deg)`;
   });
 }
 

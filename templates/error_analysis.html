@@ -247,7 +247,7 @@
     <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
     <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
     <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
-    <a href="{{ url_for('error_analysis_page') }}"><b>❗ Error Analysis</b></a>
+    <a href="{{ url_for('error_analysis_page') }}">❗ Error Analysis</a>
     <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
     <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
   </div>
@@ -461,6 +461,43 @@
       Caveats:
       - Some manual cutoffs or heavy payloads may terminate early by design.
       
+
+      7) RH Anomaly & Cloud Interaction
+      ---------------------------------
+      What it detects:
+      Abnormally high or saturated relative humidity values across large portions of the flight,
+      used to distinguish between realistic cloud penetration and possible humidity sensor malfunction.
+
+      Trigger logic:
+      - Condition A (sensor error): T < −40 °C AND RH > 90 %
+      - Condition B (cloud/rain):  H < 3 km AND T > 0 °C AND RH ≥ 99 %
+      - Condition C (convective slowdown): significant reduction in ascent rate (ΔH smaller than 50 % of mean for >10 % of profile)
+
+      Actions:
+      - A → “💦 RH sensor likely saturated or frozen (RH>90% while T<−40 °C) → unrealistic humidity, possible sensor error.”
+      - B → “☁️ High RH (>99%) with T>0 °C below 3 km → balloon likely passed through cloud or rainfall layer.”
+      - C → “🌧️ Ascent rate slowed significantly → possible deep convective cloud crossing (Cumulonimbus).”
+
+      Why it matters:
+      - Differentiates between true atmospheric saturation (cloud or precipitation) and sensor wetting/freeze errors.
+      - Helps identify conditions that degrade humidity sensor performance or distort upper-air humidity profiles.
+      - Indicates potential convective environments that can affect balloon motion and measurement stability.
+
+      Typical context/altitude:
+      - Cloud or rainfall layers: 0–3 km with warm, moist conditions.
+      - Frozen sensor response: above 10–12 km where T < −40 °C.
+      - Deep convective (CB) zones: ascent slowdown between 3–12 km.
+
+      Example that triggers:
+      - RH ≈ 100 % from surface to 5 km, T ≈ +20 °C → cloud or rainfall layer (☁️)
+      - RH ≈ 100 % while T = −60 °C at 15 km → sensor freeze error (💦)
+      - Sudden slowdown in ascent speed around 8–10 km → cumulonimbus crossing (🌧️)
+
+      Caveats:
+      - Sensor wetting can persist for several kilometers even after exiting clouds.
+      - Frozen polymer sensors may remain at 100 % RH until warmed by sunlight post-burst.
+      - Requires supporting temperature and vertical-velocity data for full interpretation.
+
       ------------------------------------------------------
       End of file — Radiosonde Deep Physics Analysis (Rason Monitoring)
           </pre>
@@ -846,9 +883,21 @@ function renderTable(levels,RH,WS,WD){
       const Pmin = Math.min(...P.filter(v=>v!=null));
     
       // === 1. Cold point tropopause ===
-      if (Tmin < -75)
-        (flightOK?notes:issues).push("🧊 Strong cold point (<−75 °C) — tropopause region.");
-    
+      const validT = T.filter(v => v != null && !isNaN(v));
+      if (validT.length > 0) {
+        const Tmin = Math.min(...validT);
+        const iMin = T.indexOf(Tmin);
+      
+        if (Tmin < -75 && iMin !== -1) {
+          const h = H[iMin] ?? null;
+          const p = P[iMin] ?? null;
+          const msg = (h && p)
+            ? `🧊 Strong cold point (<−75 °C) — tropopause region at ${(h/1000).toFixed(1)} km (~${p.toFixed(0)} hPa).`
+            : `🧊 Strong cold point (<−75 °C) — tropopause region (Tmin = ${Tmin.toFixed(1)} °C).`;
+          (flightOK ? notes : issues).push(msg);
+        }
+      }
+
       // === 2. RH freeze-out ===
       for (let i=0;i<T.length;i++){
         if(T[i]<-40 && RH[i]<5){
@@ -936,7 +985,69 @@ function renderTable(levels,RH,WS,WD){
       // === 6. Burst low ===
       if(Pmin>100 && !flightOK)
         issues.push("🎯 Balloon burst below 100 hPa → premature termination.");
-    
+
+      // === 7. RH sensor saturation check ===
+      try {
+        let rhSensorError = false;
+        let possibleCloud = false;
+        let throughCumulonimbus = false;
+      
+        const RH_valid = RH.map(v => (v != null ? v : null));
+        const T_valid  = T.map(v => (v != null ? v : null));
+        const P_valid  = P.map(v => (v != null ? v : null));
+        const H_valid  = H.map(v => (v != null ? v : null));
+      
+        // --- 1️⃣ Sensor freeze / unrealistic RH (cold & humid) ---
+        for (let i = 0; i < RH_valid.length; i++) {
+          if (T_valid[i] != null && RH_valid[i] != null && T_valid[i] < -40 && RH_valid[i] > 90) {
+            rhSensorError = true;
+            break;
+          }
+        }
+      
+        // --- 2️⃣ Realistic saturated air near surface (warm & humid) ---
+        for (let i = 0; i < RH_valid.length; i++) {
+          if (
+            H_valid[i] != null && T_valid[i] != null && RH_valid[i] != null &&
+            H_valid[i] < 3000 && T_valid[i] > 0 && RH_valid[i] >= 99
+          ) {
+            possibleCloud = true;
+            break;
+          }
+        }
+      
+        // --- 3️⃣ Ascent rate anomaly (possible cloud crossing) ---
+        // hitung vertical ascent rate dari tinggi antar level (jika tersedia)
+        const ascent = [];
+        for (let i = 1; i < H_valid.length; i++) {
+          const dh = H_valid[i] - H_valid[i - 1];
+          if (dh > 0 && dh < 10) continue; // skip noise kecil
+          ascent.push(dh);
+        }
+      
+        if (ascent.length > 10) {
+          const meanAscent = ascent.reduce((a, b) => a + b, 0) / ascent.length;
+          const slowSegments = ascent.filter(v => v < 0.5 * meanAscent);
+          if (slowSegments.length / ascent.length > 0.1) {
+            throughCumulonimbus = true; // perlambatan signifikan
+          }
+        }
+      
+        // --- 4️⃣ Interpretasi hasil ---
+        if (rhSensorError) {
+          issues.push("💦 RH sensor likely saturated or frozen (RH>90% while T<−40 °C) → unrealistic humidity, possible sensor error.");
+        }
+        if (possibleCloud) {
+          notes.push("☁️ High RH (>99%) with T>0 °C below 3 km → balloon likely passed through cloud or rainfall layer.");
+        }
+        if (throughCumulonimbus) {
+          notes.push("🌧️ Ascent rate slowed significantly → possible deep convective cloud crossing (Cumulonimbus).");
+        }
+      
+      } catch (err) {
+        console.warn("RH/cloud detection failed:", err);
+      }
+
       // === Summary render ===
       let html="<h3>🧠 Physical Interpretation</h3>";
       if(!issues.length && !notes.length)

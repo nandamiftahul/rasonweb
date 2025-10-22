@@ -176,34 +176,56 @@
       align-items: flex-start;
     }
     
-    .table-box {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px;
-      padding: 15px;
-      max-height: 500px;
-      overflow-y: auto;
-      flex: 0 0 300px; /* lebar tetap */
-      color: #fff;
-    }
-    
-    .table-box table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    
-    .table-box th, .table-box td {
-      border-bottom: 1px solid rgba(255,255,255,0.2);
-      padding: 6px 8px;
-      text-align: center;
-      white-space: nowrap;
-    }
-    
-    .table-box th {
-      background: rgba(255,255,255,0.15);
-      font-weight: 600;
-    }
+  /* === Table container === */
+  .table-box {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 10px;
+    padding: 15px;
+    max-height: 500px;
+    overflow-y: auto;
+    flex: 0 0 320px;              /* agak lebar sedikit */
+    color: #fff;
+    position: relative;
+  }
+
+  /* === Table core === */
+  .table-box table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  /* === Sticky header === */
+  .table-box thead th {
+    position: sticky;
+    top: 0;
+    background: #1e3a8a;          /* solid navy-blue background */
+    color: #ffffff;
+    font-weight: 700;
+    border-bottom: 2px solid #60a5fa;
+    text-align: center;
+    z-index: 2;                   /* supaya di atas konten */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+  }
+
+  /* === Cells === */
+  .table-box th, .table-box td {
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    white-space: nowrap;          /* biar tidak patah baris */
+  }
+
+  /* === Alternating rows === */
+  .table-box tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .table-box tbody tr:hover {
+    background: rgba(255,255,255,0.15);
+    transition: 0.2s;
+  }
     .table-summary {
       margin-top: 10px;
       padding-top: 8px;
@@ -296,7 +318,7 @@
     <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
     <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
     <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
-    <a href="{{ url_for('error_analysis_page') }}"><b>❗ Error Analysis</b></a>
+    <a href="{{ url_for('error_analysis_page') }}">❗ Error Analysis</a>
     <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
     <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
   </div>
