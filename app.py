@@ -2402,11 +2402,13 @@ def manage_users():
 @app.route("/api/sites_config", methods=["GET", "POST", "DELETE"])
 @login_required
 def manage_sites():
-    if session.get("user") != "admin":
-        return jsonify({"error": "Unauthorized"}), 403
-
+    # --- Semua user boleh GET ---
     if request.method == "GET":
         return jsonify({"sites": SITE_LIST})
+
+    # --- Hanya admin boleh ubah ---
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized (admin only)"}), 403
 
     data = request.get_json(force=True)
     name = data.get("name", "").strip().lower()

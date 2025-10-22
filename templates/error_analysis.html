@@ -193,6 +193,42 @@
     .footer span { color: #333; font-weight: 500; margin-right: 6px; font-size: 12px; opacity: 0.8; }
     .footer img { height: 28px; opacity: 0.85; margin: 0 6px; filter: saturate(90%); }
     .main.expanded ~ .footer { left: 0; width: 100%; }
+    /* === Deep Physics Explanation Box === */
+    .explanation-box {
+      margin-top: 25px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    
+    .explanation-box h3 {
+      margin-top: 0;
+      font-size: 20px;
+      color: #fff;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      padding-bottom: 6px;
+    }
+    
+    .scroll-area {
+      max-height: 400px;              /* 🔥 tinggi fix, biar scrollable */
+      overflow-y: auto;
+      background: rgba(0,0,0,0.45);   /* solid readable background */
+      border-radius: 6px;
+      padding: 15px;
+      color: #e0e7ff;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .scroll-area::-webkit-scrollbar {
+      width: 8px;
+    }
+    .scroll-area::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.4);
+      border-radius: 4px;
+    }
   </style>
 </head>
 
@@ -261,10 +297,239 @@
       <canvas id="chartWindSpeed"></canvas>
     </div>
 
-    <table id="levelTable" style="display:none;">
-      <thead><tr><th>Pressure</th><th>Height</th><th>Temp</th><th>Dewpoint</th><th>RH</th><th>Wind Speed</th><th>Dir</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <!-- === Enhanced Scrollable Table === -->
+    <div class="table-container">
+      <table id="levelTable">
+        <thead>
+          <tr>
+            <th>Pressure<br><small>(hPa)</small></th>
+            <th>Height<br><small>(m)</small></th>
+            <th>Temp<br><small>(°C)</small></th>
+            <th>Dewpoint<br><small>(°C)</small></th>
+            <th>RH<br><small>(%)</small></th>
+            <th>Wind Speed<br><small>(m/s)</small></th>
+            <th>Wind Dir<br><small>(°)</small></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+      <!-- === Scrollable Explanation Box === -->
+      <div class="explanation-box">
+        <h3>🧠 Radiosonde Deep Physics Analysis — Detailed Explanation</h3>
+      
+        <div class="scroll-area">
+          <pre>
+      1) Cold Point Tropopause (Very Low Temperature Layer)
+      ------------------------------------------------------
+      What it detects:
+      The coldest layer in the profile (the “cold point”), which typically marks the tropopause. Extremely low temperatures here indicate a sharp troposphere–stratosphere transition.
+      
+      Trigger logic:
+      - Condition: Tmin < -75 °C
+      - Action: add note/issue: “🧊 Strong cold point (<−75 °C) — tropopause region.”
+      
+      Why it matters:
+      - A very cold tropopause (≤ −75 °C) is common in the tropics and strongly tied to deep convection and radiative cooling.
+      - Helps QC: a realistic cold point supports vertical consistency; an absent cold point may hint at profile truncation or sensor bias.
+      
+      Typical context/altitude:
+      - Tropical tropopause: ~16–18 km (100–70 hPa).
+      - Midlat/high latitudes: lower/warmer tropopauses.
+      
+      Example that triggers:
+      - Minimum temperature = −78 °C at ~17 km → triggers.
+      
+      Caveats:
+      - If the flight doesn’t reach the tropopause, Tmin may be warmer (no trigger).
+      
+      
+      2) RH Freeze-Out (Extremely Dry Upper Layer)
+      ---------------------------------------------
+      What it detects:
+      An ultra-dry upper-tropospheric layer consistent with ice supersaturation and dehydration above cirrus anvils.
+      
+      Trigger logic:
+      - Condition: T < -40 °C and RH < 5 %
+      - Action: “💧 Very dry upper layer (<5 % RH below −40 °C).”
+      
+      Why it matters:
+      - Indicates dehydration layers near the cold point tropopause.
+      - Helps identify cirrus outflow levels and UTLS dryness.
+      
+      Typical context/altitude:
+      - 10–15 km (250–150 hPa), near the tropopause.
+      
+      Example that triggers:
+      - T = −55 °C, RH = 2 % at ~14.5 km → triggers.
+      
+      Caveats:
+      - Sensor lag or RH definition (liquid vs ice) can affect readings.
+      
+      
+      3) Pressure Anomaly (Physically Impossible Reversal)
+      ----------------------------------------------------
+      What it detects:
+      A pressure increase with height, which cannot happen in the free atmosphere and flags sensor/decoding issues.
+      
+      Trigger logic:
+      - Condition: P[i] > P[i−1]
+      - Action: “⚠️ Pressure reversal detected → barometric sensor glitch.”
+      
+      Why it matters:
+      - Pressure should monotonically decrease as the balloon ascends.
+      - Indicates data corruption or bad level ordering.
+      
+      Typical context/altitude:
+      - Can occur anywhere, especially during noisy transitions.
+      
+      Example that triggers:
+      - 600 hPa → 605 hPa → triggers.
+      
+      Caveats:
+      - Tiny reversals may be rounding artifacts.
+      
+      
+      4) Strong Vertical Wind Shear (Speed Gradient)
+      -----------------------------------------------
+      What it detects:
+      Layers where wind speed changes rapidly with height — turbulent or jet layers.
+      
+      Trigger logic:
+      - Condition: ΔWS / ΔH > 10 m/s per km
+      - Action: “🌪️ Strong vertical wind shear (>10 m/s per km).”
+      
+      Why it matters:
+      - Indicates mechanical turbulence, jet streams, or frontal zones.
+      - Important for balloon stability and aviation hazard detection.
+      
+      Typical context/altitude:
+      - 2–4 km: low-level jets.
+      - 9–12 km: subtropical jet streams.
+      
+      Example that triggers:
+      - Wind speed rises from 10 m/s at 4 km to 25 m/s at 5 km → triggers.
+      
+      Caveats:
+      - Noisy wind data can cause false positives.
+      
+      
+      5) Directional Wind Shear (Turning with Height)
+      -----------------------------------------------
+      What it detects:
+      Large changes in wind direction over a short vertical distance — frontal or jet transition zones.
+      
+      Trigger logic:
+      - Condition: ΔWD / ΔH > 60° per km (for 300–1500 m layer)
+      - Action: “🌀 Rapid directional shift (>60°/km).”
+      
+      Why it matters:
+      - Marks veering/backing winds, frontal transitions, or jet curvature.
+      - Important for detecting dynamic instability and air mass boundaries.
+      
+      Typical context/altitude:
+      - 2–4 km: low-level jets and fronts.
+      - 10–12 km: jet curvature regions.
+      
+      Example that triggers:
+      - Wind turns from 90° (east) at 3 km to 210° (southwest) at 4 km → triggers.
+      
+      Caveats:
+      - Handled circularly using angDiff() to avoid 360° wrap errors.
+      
+      
+      6) Low Burst Altitude (Premature Balloon Termination)
+      -----------------------------------------------------
+      What it detects:
+      A flight that ended prematurely — balloon failed to reach normal burst altitude (~25–35 km).
+      
+      Trigger logic:
+      - Condition: Pmin > 100 hPa AND flight not OK
+      - Action: “🎯 Balloon burst below 100 hPa → premature termination.”
+      
+      Why it matters:
+      - Indicates balloon leakage, underfilling, or early cutoff.
+      - Affects completeness of upper-level data.
+      
+      Typical context/altitude:
+      - Normal burst: 20–30 hPa (~25–35 km).
+      - Faulty flight: >100 hPa (<16 km).
+      
+      Example that triggers:
+      - Minimum pressure 150 hPa, flight failed → triggers.
+      
+      Caveats:
+      - Some manual cutoffs or heavy payloads may terminate early by design.
+      
+      ------------------------------------------------------
+      End of file — Radiosonde Deep Physics Analysis (Rason Monitoring)
+          </pre>
+        </div>
+      </div>
+    <style>
+      /* Scrollable table */
+      .table-container {
+        max-height: 420px;
+        overflow-y: auto;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.25);
+        margin-top: 25px;
+        background: rgba(255,255,255,0.05);
+      }
+      
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      
+      /* ✅ Header solid background (tidak transparan) */
+      thead th {
+        position: sticky;
+        top: 0;
+        background: #1e3a8a;                /* 🔵 solid navy (bisa diganti sesuai tema) */
+        color: #ffffff;
+        font-weight: 600;
+        text-align: center;
+        padding: 10px 6px;
+        border-bottom: 2px solid rgba(255,255,255,0.3);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      }
+      
+      /* Body cells */
+      tbody td {
+        text-align: center;
+        padding: 6px 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+      }
+      
+      tbody tr:nth-child(even) {
+        background: rgba(255,255,255,0.08);
+      }
+      
+      /* Highlighted anomaly row */
+      .row-anomaly {
+        background: rgba(255, 90, 90, 0.45) !important;
+        font-weight: 600;
+        color: #fff;
+      }
+      .row-warning {
+        background: rgba(255, 210, 80, 0.4) !important;
+        font-weight: 600;
+        color: #222;
+      }
+      
+      /* Scrollbar styling */
+      .table-container::-webkit-scrollbar {
+        width: 10px;
+      }
+      .table-container::-webkit-scrollbar-thumb {
+        background-color: rgba(255,255,255,0.3);
+        border-radius: 10px;
+      }
+
+    </style>
+
   </div>
 
   <!-- Footer -->
@@ -326,25 +591,107 @@
 
     const rhFromT_Td=(T,Td)=>{if(T==null||Td==null)return null;const a=17.625,b=243.04;const gT=(a*T)/(b+T),gTd=(a*Td)/(b+Td);let rh=100*Math.exp(gTd-gT);return Math.min(100,Math.max(0,rh));};
     let cT,cRH,cWS,cWD;
-
+    
     function loadAnalysis(){
-      $.getJSON("/metadata",m=>{
-        $("#summary").html(`<h3>${m.radiosonde_serial_number||'-'}</h3>
-        <p>Launch: ${m.launch_time||'-'} | Max Height: ${m.max_height||'-'}</p>`);
+      let meta = {};
+      
+      $.getJSON("/metadata", m => { meta = m; }).then(() => {
+        $.getJSON("/all_levels", levels => {
+          if(!levels.length){
+            $("#summary").html("<p>⚠️ No level data available.</p>");
+            return;
+          }
+    
+          // --- Fallback computed values dari level ---
+          const H = levels.map(l => l.height_m);
+          const T = levels.map(l => l.temp_C);
+          const Td = levels.map(l => l.dewpoint_C);
+          const RH = levels.map(l => rhFromT_Td(l.temp_C,l.dewpoint_C));
+          const P = levels.map(l => l.pressure_hPa);
+          const WS = levels.map(l => l.wind_speed_mps || Math.sqrt((l.wind_u||0)**2 + (l.wind_v||0)**2) || null);
+          const WD = levels.map(l => l.wind_dir_deg || null);
+    
+          const maxH = Math.max(...H.filter(v => v != null && !isNaN(v)));
+          const minP = Math.min(...P.filter(v => v != null && !isNaN(v)));
+          const endTimeLevel = levels[levels.length-1]?.time_utc || null;
+    
+          // --- Helper formatters ---
+          function fmtTime(iso) {
+            if (!iso || iso === "-" || iso === "null") return "N/A";
+            const d = new Date(iso);
+            if (isNaN(d)) return "N/A";
+            const dd = String(d.getUTCDate()).padStart(2,"0");
+            const mm = d.toLocaleString('en', { month: 'short' });
+            const yyyy = d.getUTCFullYear();
+            const h = String(d.getUTCHours()).padStart(2,"0");
+            const mi = String(d.getUTCMinutes()).padStart(2,"0");
+            const s = String(d.getUTCSeconds()).padStart(2,"0");
+            return `${dd} ${mm} ${yyyy} ${h}:${mi}:${s} UTC`;
+          }
+    
+          function fmtNum(v, unit="") {
+            if (v == null || isNaN(v)) return "—";
+            return `${Number(v).toFixed(1)}${unit}`;
+          }
+    
+          // --- Ambil meta atau fallback dari level ---
+          const launch = fmtTime(meta.launch_time);
+          // Jika end_time kosong, ambil dari level terakhir dengan waktu berbeda signifikan
+          let end = "N/A";
+          if (meta.end_time) end = fmtTime(meta.end_time);
+          else {
+            const last = levels[levels.length-1];
+            if (last && last.time_utc) end = fmtTime(last.time_utc);
+          }
+          const hmax = meta.max_height && meta.max_height > 0 ? fmtNum(meta.max_height/1000, " km") : fmtNum(maxH/1000, " km");
+          const pmin = meta.end_pressure && meta.end_pressure > 0 ? fmtNum(meta.end_pressure, " hPa") : fmtNum(minP, " hPa");
+          // --- Termination code human readable (tanpa ubah backend) ---
+          const termCode = Number(meta.reason_for_termination);
+          let termTxt = "—";
+          switch(termCode){
+            case 0: termTxt = "Not specified"; break;
+            case 1: termTxt = "Balloon Burst"; break;
+            case 2: termTxt = "Battery Exhausted"; break;
+            case 3: termTxt = "Ascent Stop"; break;
+            case 4: termTxt = "Telemetry Interrupted"; break;
+            case 5: termTxt = "Manual Termination"; break;
+            case 6: termTxt = "Other"; break;
+            case 11: termTxt = "Temperature KO"; break;
+            default:
+              termTxt = inferTermination(H, WS, RH, P); // fallback analisis otomatis
+          }
+          
+          const term = `${termCode || ""} – ${termTxt}`;
+    
+    
+          // --- tampilkan summary ---
+          let html = `
+            <h3>${meta.radiosonde_serial_number || "Unknown Serial"}</h3>
+            <p>
+              <b>Launch:</b> ${launch}<br>
+              <b>Max Height:</b> ${hmax} | <b>End Pressure:</b> ${pmin}<br>
+              <b>Termination:</b> ${term}
+            </p>
+          `;
+          $("#summary").html(html);
+    
+          // --- lanjutkan chart & analisis ---
+          drawCharts(H, T, Td, RH, WS, WD);
+          renderTable(levels, RH, WS, WD);
+          deepPhysics(levels, RH, WS);
+        });
       });
-
-      $.getJSON("/all_levels",levels=>{
-        if(!levels.length){$("#summary").append("<p>⚠️ No data</p>");return;}
-        const H=levels.map(l=>l.height_m),
-              T=levels.map(l=>l.temp_C),
-              Td=levels.map(l=>l.dewpoint_C),
-              RH=levels.map(l=>rhFromT_Td(l.temp_C,l.dewpoint_C)),
-              WS=levels.map(l=>l.wind_speed_mps||Math.sqrt((l.wind_u||0)**2+(l.wind_v||0)**2)||null),
-              WD=levels.map(l=>l.wind_dir_deg||null);
-        drawCharts(H,T,Td,RH,WS,WD);
-        renderTable(levels,RH,WS,WD);
-        deepPhysics(levels,RH,WS);
-      });
+    }
+    
+    // 🔍 Deteksi jenis termination berdasarkan profil terakhir
+    function inferTermination(H, WS, RH, P){
+      const maxH = Math.max(...H.filter(v=>v!=null));
+      const minP = Math.min(...P.filter(v=>v!=null));
+      if (minP > 100) return "🎯 Burst below 100 hPa (early termination)";
+      if (maxH < 10000) return "⚠️ Early stop (<10 km)";
+      if (RH.slice(-5).every(v=>v<5)) return "💧 Sensor freeze-out (dry cutoff)";
+      if (WS.slice(-5).every(v=>v<1)) return "🪁 Balloon drift stop (signal lost)";
+      return "✅ Normal burst";
     }
 
     function drawCharts(H,T,Td,RH,WS,WD){
@@ -440,115 +787,175 @@
       cWD.update();
     }
 
-    function renderTable(levels,RH,WS,WD){
-      const tb=$("#levelTable tbody");tb.empty();
-      levels.forEach((l,i)=>tb.append(`<tr>
-        <td>${l.pressure_hPa?.toFixed?.(1)||'-'}</td>
-        <td>${l.height_m?.toFixed?.(0)||'-'}</td>
-        <td>${l.temp_C?.toFixed?.(1)||'-'}</td>
-        <td>${l.dewpoint_C?.toFixed?.(1)||'-'}</td>
-        <td>${RH[i]?.toFixed?.(1)||'-'}</td>
-        <td>${WS[i]?.toFixed?.(1)||'-'}</td>
-        <td>${WD[i]?.toFixed?.(0)||'-'}</td>`));
-      $("#levelTable").show();
+function renderTable(levels,RH,WS,WD){
+  const tb=$("#levelTable tbody");
+  tb.empty();
+
+  for(let i=0;i<levels.length;i++){
+    const l=levels[i];
+    const p=l.pressure_hPa;
+    const h=l.height_m;
+    const t=l.temp_C;
+    const td=l.dewpoint_C;
+    const rh=RH[i];
+    const ws=WS[i];
+    const wd=WD[i];
+
+    // === Deteksi Anomali ===
+    let cls="";
+    if(t!=null && t<-75) cls="row-anomaly";                    // cold point ekstrem
+    else if(rh!=null && rh<5) cls="row-warning";               // kelembapan rendah banget
+    else if(i>0 && ws!=null && WS[i-1]!=null && Math.abs(ws-WS[i-1])>10)
+      cls="row-warning";                                       // lonjakan angin mendadak
+    else if(i>0 && wd!=null && WD[i-1]!=null){
+      const dwd=Math.abs(((wd-WD[i-1]+540)%360)-180);
+      if(dwd>60) cls="row-warning";                            // perubahan arah besar
     }
 
-function deepPhysics(levels, RH, WS) {
-  const H = levels.map(l => l.height_m || null);
-  const T = levels.map(l => l.temp_C || null);
-  const P = levels.map(l => l.pressure_hPa || null);
-  const WD = levels.map(l => l.wind_dir_deg || null);
-
-  const issues = [];
-  const meanRH = RH.reduce((a,b)=>a+(b||0),0)/RH.length;
-  const Tmin = Math.min(...T.filter(v => v!=null));
-  const Tmax = Math.max(...T.filter(v => v!=null));
-  const shear = Math.max(...WS) - Math.min(...WS);
-
-  // === 1. Cold point tropopause
-  if (Tmin < -75) issues.push("❄️ Strong cold point (< −75°C) → clear tropopause, possible thermistor stress region.");
-
-  // === 2. Lapse rate inversion
-  for (let i=1; i<T.length; i++) {
-    if (T[i]!=null && T[i-1]!=null && H[i]!=null && H[i-1]!=null) {
-      const lapse = (T[i]-T[i-1]) / ((H[i]-H[i-1])/1000);
-      if (H[i] < 1500 && lapse > 0.8) {
-        issues.push("🌫️ Surface inversion detected → possible trapped moisture or night-time cooling.");
-        break;
-      }
-    }
+    tb.append(`
+      <tr class="${cls}">
+        <td>${p?.toFixed?.(1) || '-'}</td>
+        <td>${h?.toFixed?.(0) || '-'}</td>
+        <td>${t?.toFixed?.(1) || '-'}</td>
+        <td>${td?.toFixed?.(1) || '-'}</td>
+        <td>${rh?.toFixed?.(1) || '-'}</td>
+        <td>${ws?.toFixed?.(1) || '-'}</td>
+        <td>${wd?.toFixed?.(0) || '-'}</td>
+      </tr>
+    `);
   }
 
-  // === 3. RH freeze-out
-  for (let i=0; i<T.length; i++) {
-    if (T[i] < -40 && RH[i] < 5) {
-      issues.push("💧 RH near 0% below −40°C → possible humidity sensor desensitization or icing.");
-      break;
-    }
-  }
-
-  // === 4. Pressure anomaly
-  for (let i=1; i<P.length; i++) {
-    if (P[i]!=null && P[i-1]!=null && P[i] > P[i-1]) {
-      issues.push("⚠️ Pressure reversal detected → barometric sensor glitch or GPS noise.");
-      break;
-    }
-  }
-
-  // === 5. Ascent deceleration
-  const ascent = levels.map((l,i)=> i>0 ? (H[i]-H[i-1]) : null);
-  const last10 = ascent.slice(-10).filter(v=>v!=null);
-  if (last10.length>5 && last10.every(v=>v<5))
-    issues.push("🎈 Ascent deceleration before burst → possible gas leak or wind drag.");
-
-  // === 6. Strong shear layer
-  for (let i=1; i<WS.length; i++) {
-    if (H[i]!=null && H[i-1]!=null && WS[i]!=null && WS[i-1]!=null) {
-      const grad = Math.abs(WS[i]-WS[i-1]) / ((H[i]-H[i-1])/1000);
-      if (grad > 10) {
-        issues.push("🌪️ Strong vertical wind shear (>10 m/s/km) → potential string vibration.");
-        break;
-      }
-    }
-  }
-
-  // === 7. Directional shear
-  for (let i=1; i<WD.length; i++) {
-    if (WD[i]!=null && WD[i-1]!=null && H[i]!=null && H[i-1]!=null) {
-      const dwd = Math.abs(WD[i]-WD[i-1]);
-      if (dwd > 60 && (H[i]-H[i-1]) < 1000)
-        issues.push("🌀 Rapid directional shift (>60°/km) → frontal zone or GPS orientation issue.");
-    }
-  }
-
-  // === 8. RH vs T mismatch
-  for (let i=1; i<RH.length; i++) {
-    if (T[i]!=null && T[i-1]!=null && RH[i]!=null && RH[i-1]!=null) {
-      if ((RH[i]-RH[i-1]) > 15 && (T[i]-T[i-1]) > -0.5)
-        issues.push("⚗️ RH rise without cooling → possible condensation on sensor film.");
-    }
-  }
-
-  // === 9. Burst low
-  const Pmin = Math.min(...P.filter(v=>v!=null));
-  if (Pmin > 100) issues.push("🎯 Balloon burst below 100 hPa → premature termination.");
-
-  // === 10. Ground bias
-  if (T[0]!=null && (T[0] < 20 || T[0] > 35))
-    issues.push("🌡️ Ground temp out of expected range (20–35°C) → possible calibration drift.");
-
-  // === Summary render
-  let html = "<h3>🧠 Extended Physical Interpretation</h3>";
-  if (!issues.length)
-    html += "<p class='status-ok'>✅ No significant anomalies detected.</p>";
-  else {
-    html += "<ul>";
-    issues.forEach(i => html += `<li class='status-err'>${i}</li>`);
-    html += "</ul>";
-  }
-  $("#analysisBox").html(html);
+  $("#levelTable").show();
 }
 
-  </script>
+
+    async function deepPhysics(levels, RH, WS) {
+      const meta = await $.getJSON("/metadata");
+      const flightOK = !(meta.flight_issues && meta.flight_issues.length);
+    
+      const H  = levels.map(l => l.height_m || null);
+      const T  = levels.map(l => l.temp_C || null);
+      const P  = levels.map(l => l.pressure_hPa || null);
+      const WD = levels.map(l => l.wind_dir_deg || null);
+    
+      function angDiff(a,b){ return Math.abs(((a - b + 540) % 360) - 180); }
+    
+      const issues=[], notes=[];
+      const meanRH = RH.reduce((a,b)=>a+(b||0),0)/RH.length;
+      const Tmin = Math.min(...T.filter(v=>v!=null));
+      const Pmin = Math.min(...P.filter(v=>v!=null));
+    
+      // === 1. Cold point tropopause ===
+      if (Tmin < -75)
+        (flightOK?notes:issues).push("🧊 Strong cold point (<−75 °C) — tropopause region.");
+    
+      // === 2. RH freeze-out ===
+      for (let i=0;i<T.length;i++){
+        if(T[i]<-40 && RH[i]<5){
+          (flightOK?notes:issues).push("💧 Very dry upper layer (<5 % RH below −40 °C).");
+          break;
+        }
+      }
+    
+      // === 3. Pressure anomaly (filter out post-burst reversals) ===
+      const totalLevels = P.length;
+      const cutoffIndex = Math.max(0, totalLevels - 10); // ignore last ~10 levels (burst descent phase)
+      
+      for (let i = 1; i < cutoffIndex; i++) {
+        if (P[i] != null && P[i - 1] != null && P[i] > P[i - 1]) {
+          const hMid = ((H[i] || 0) + (H[i - 1] || 0)) / 2;
+          // hindari false alarm karena rounding kecil (<0.5 hPa)
+          if (P[i] - P[i - 1] < 0.5) continue;
+      
+          const msg = `⚠️ Pressure reversal detected (${P[i - 1].toFixed(1)} → ${P[i].toFixed(1)} hPa) at ~${(hMid / 1000).toFixed(1)} km → barometric sensor glitch.`;
+          issues.push(msg);
+        }
+      }
+
+    
+      // === Helper untuk buat rentang (km) dari daftar tinggi ===
+      function compressHeights(arr){
+        if(!arr.length) return "";
+        arr.sort((a,b)=>a-b);
+        const km=arr.map(v=>v/1000);
+        const groups=[[km[0]]];
+        for(let i=1;i<km.length;i++){
+          const lastGroup=groups[groups.length-1];
+          if(km[i]-lastGroup[lastGroup.length-1] <= 1.0) lastGroup.push(km[i]);
+          else groups.push([km[i]]);
+        }
+        return groups.map(g=>{
+          const a=g[0].toFixed(1), b=g[g.length-1].toFixed(1);
+          return (Math.abs(b-a)<0.2)?`${a} km`:`${a}–${b} km`;
+        }).join(", ");
+      }
+    
+      // === 4. Strong vertical wind shear (smoothed & filtered) ===
+      const shearHeights=[];
+      const win=5; // jendela perataan ~500 m
+      for(let i=win;i<WS.length;i++){
+        if(H[i]==null||H[i-win]==null) continue;
+        const dH=(H[i]-H[i-win])/1000;        // km
+        if(dH<=0.3) continue;                 // minimal 300 m
+        const dWS=Math.abs(WS[i]-WS[i-win]);
+        const grad=dWS/dH;                    // m/s per km
+        if(grad>10) shearHeights.push((H[i]+H[i-win])/2);
+      }
+      // hapus noise (kurangi duplikat <0.5 km)
+      const filteredShear=[];
+      for(let i=0;i<shearHeights.length;i++){
+        if(i==0 || (shearHeights[i]-shearHeights[i-1])>500) filteredShear.push(shearHeights[i]);
+      }
+      if(filteredShear.length){
+        const where=compressHeights(filteredShear);
+        const msg=`🌪️ Strong vertical wind shear (>10 m/s per km) at ${where} — turbulent or jet layer.`;
+        (flightOK?notes:issues).push(msg);
+      }
+      
+      // === 5. Directional shear (filtered) ===
+      const dirShiftHeights=[];
+      for(let i=win;i<WD.length;i++){
+        if(WD[i]==null||WD[i-win]==null||H[i]==null||H[i-win]==null) continue;
+        const dh=H[i]-H[i-win];
+        if(dh<=300||dh>=1500) continue;
+        const dwd=angDiff(WD[i],WD[i-win]);
+        const rate=dwd/(dh/1000);
+        if(rate>60) dirShiftHeights.push((H[i]+H[i-win])/2);
+      }
+      const filteredDir=[];
+      for(let i=0;i<dirShiftHeights.length;i++){
+        if(i==0 || (dirShiftHeights[i]-dirShiftHeights[i-1])>500) filteredDir.push(dirShiftHeights[i]);
+      }
+      if(filteredDir.length){
+        const where=compressHeights(filteredDir);
+        const msg=`🌀 Rapid directional shift (>60°/km) at ${where} — frontal or jet-transition zone.`;
+        (flightOK?notes:issues).push(msg);
+      }
+    
+    
+      // === 6. Burst low ===
+      if(Pmin>100 && !flightOK)
+        issues.push("🎯 Balloon burst below 100 hPa → premature termination.");
+    
+      // === Summary render ===
+      let html="<h3>🧠 Physical Interpretation</h3>";
+      if(!issues.length && !notes.length)
+        html+="<p class='status-ok'>✅ Stable flight and normal atmospheric profile.</p>";
+      else{
+        if(issues.length){
+          html+="<h4 style='color:#ff6e6e;'>⚠️ Potential Operational Issues</h4><ul>";
+          issues.forEach(i=>html+=`<li>${i}</li>`);
+          html+="</ul>";
+        }
+        if(notes.length){
+          html+="<h4 style='color:#6eff9e;'>🌍 Atmospheric Features</h4><ul>";
+          notes.forEach(i=>html+=`<li>${i}</li>`);
+          html+="</ul>";
+        }
+      }
+      $("#analysisBox").html(html);
+    }
+ 
+ </script>
 </body>
 </html>
