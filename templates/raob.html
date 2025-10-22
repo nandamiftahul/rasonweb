@@ -201,6 +201,15 @@
       color: #e0e7ff;
     }
 
+    .indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-left: 6px;
+      vertical-align: middle;
+      box-shadow: 0 0 6px rgba(255,255,255,0.3);
+    }
     /* === Footer === */
     .footer {
       background: #ffffff;
@@ -236,7 +245,8 @@
       <p>Thermodynamic and kinematic indices visualization</p>
     </div>
     <div class="header-logos">
-      <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+      <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG"
+     style="height: 55px; width: auto;">
     </div>
   </div>
 
@@ -316,7 +326,7 @@
           <div class="legend">
             <div class="legend-item"><span style="background:red;"></span> Severe</div>
             <div class="legend-item"><span style="background:orange;"></span> Strong</div>
-            <div class="legend-item"><span style="background:green;"></span> Moderate</div>
+            <div class="legend-item"><span style="background:#3BFFB3;"></span> Moderate</div>
             <div class="legend-item"><span style="background:black;"></span> Neutral</div>
           </div>
 
@@ -371,23 +381,39 @@
     }
 
     function colorCell(cell, label, val) {
+      let color = null;
+    
       if (label.includes("CAPE") && !isNaN(val)) {
-        if (val > 2000) cell.style.color = "red";
-        else if (val > 1000) cell.style.color = "orange";
-        else if (val > 500) cell.style.color = "green";
+        if (val > 2000) color = "red";
+        else if (val > 1000) color = "orange";
+        else if (val > 500) color = "#3BFFB3";
       }
       if (label.includes("SRH") && !isNaN(val)) {
-        if (val > 300) cell.style.color = "red";
-        else if (val > 150) cell.style.color = "orange";
-        else if (val > 100) cell.style.color = "green";
+        if (val > 300) color = "red";
+        else if (val > 150) color = "orange";
+        else if (val > 100) color = "#3BFFB3";
       }
       if (label.includes("Shear") && !isNaN(val)) {
-        if (val > 40) cell.style.color = "red";
-        else if (val > 20) cell.style.color = "orange";
+        if (val > 40) color = "red";
+        else if (val > 20) color = "orange";
+        else if (val > 10) color = "#3BFFB3";
       }
       if (label.includes("Lifted Index") && !isNaN(val)) {
-        if (val < -6) cell.style.color = "red";
-        else if (val < -3) cell.style.color = "orange";
+        if (val < -6) color = "red";
+        else if (val < -3) color = "orange";
+        else color = "#3BFFB3";
+      }
+    
+      // Hapus indikator lama (kalau ada)
+      const old = cell.querySelector(".indicator");
+      if (old) old.remove();
+    
+      // Tambahkan lingkaran baru kalau ada warna
+      if (color) {
+        const circle = document.createElement("span");
+        circle.className = "indicator";
+        circle.style.background = color;
+        cell.appendChild(circle);
       }
     }
 

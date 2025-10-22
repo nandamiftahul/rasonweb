@@ -35,7 +35,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;   /* ✅ tambahkan agar isi tidak menempel ke atas */
-      padding: 40px 10px 20px;       /* ✅ ubah padding atas jadi 40px biar posisi turun */
+      padding: 57px 10px 20px;       /* ✅ ubah padding atas jadi 40px biar posisi turun */
       position: fixed;
       top: 0;
       left: 0;
@@ -351,7 +351,8 @@
             <div id="utcClock">--:--:-- UTC</div>
             <div id="utcDate" style="font-size:12px; opacity:0.8;">-- --- ----</div>
           </div>
-          <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+          <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG"
+     style="height: 55px; width: auto;">
         </div>
     </div>
 
@@ -457,9 +458,31 @@
 
       for (const [site, files] of Object.entries(sites)) {
         files.forEach(f => {
-          let issues = Array.isArray(f.flight_issues) ? f.flight_issues.join(", ") : f.flight_issues || "-";
-          let statusClass = (issues.includes("Ascent Stop") || issues.includes("Not reaching")) ? "status-warn"
-                            : (issues !== "OK" && issues !== "-") ? "status-issues" : "status-ok";
+          let issues = Array.isArray(f.flight_issues) ? f.flight_issues.join(", ") : (f.flight_issues || "-");
+          let statusClass = "status-ok";
+          
+          // pastikan string
+          if (typeof issues === "string" && issues !== "-") {
+            // 🔴 prioritas tertinggi: Not reaching 100
+            if (issues.includes("Not reaching 100 hPa")) {
+              statusClass = "status-issues";
+              // hilangkan "Not reaching 30 hPa" agar tidak muncul dobel
+              issues = issues.replace("Not reaching 30 hPa", "").trim();
+              issues = issues.replace(",", "").trim();
+            }
+            // 🟠 Not reaching 30 tanpa 100
+            else if (issues.includes("Not reaching 30 hPa")) {
+              statusClass = "status-warn";
+            }
+            // 🟠 Ascent Stop
+            else if (issues.includes("Ascent Stop")) {
+              statusClass = "status-warn";
+            }
+            // 🔴 error lain
+            else if (issues !== "OK") {
+              statusClass = "status-issues";
+            }
+          }
 
           html += `<tr>
             <td>${site}</td>
