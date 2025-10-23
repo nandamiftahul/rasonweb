@@ -109,7 +109,7 @@
   <div id="tab-users" class="tab-content active">
     <table id="userTable">
       <thead>
-        <tr><th>Username</th><th>Password</th><th>Action</th></tr>
+        <tr><th>Username</th><th>Password</th><th>Status</th><th>Action</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -118,6 +118,12 @@
       <input type="text" id="newUser" placeholder="New username">
       <input type="password" id="newPass" placeholder="Password">
       <button onclick="addUser()">Add User</button>
+    </div>
+    <!-- 🔒 Force Logout All Users (hanya untuk admin) -->
+    <div class="add-section" id="adminLogoutSection" style="margin-top:25px; display:none;">
+      <button id="btnLogoutAll" style="background:#ef4444; color:white; font-weight:600;">
+        🚪 Force Logout All Users
+      </button>
     </div>
   </div>
 
@@ -211,23 +217,43 @@
 
     // ===== USERS =====
     async function loadUsers() {
-      const res = await fetch('/api/users');
-      const users = await res.json();
-      const tbody = document.querySelector("#userTable tbody");
-      tbody.innerHTML = "";
-      Object.entries(users).forEach(([u, _]) => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${u}</td>
-            <td>****</td>
-            <td>
-              ${u === "admin" ? "—" : `
-                <button class="btn-edit" onclick="editUser('${u}')">Edit</button>
-                <button class="btn-del" onclick="deleteUser('${u}')">Delete</button>
-              `}
-            </td>
-          </tr>`;
-      });
+      try {
+        // Ambil semua user + user yang sedang aktif
+        const [resUsers, resActive] = await Promise.all([
+          fetch('/api/users'),
+          fetch('/api/active_users')
+        ]);
+    
+        const users = await resUsers.json();
+        const activeData = await resActive.json();
+        const activeUsers = activeData.active || [];
+    
+        const tbody = document.querySelector("#userTable tbody");
+        tbody.innerHTML = "";
+    
+        Object.entries(users).forEach(([u, _]) => {
+          const isActive = activeUsers.includes(u);
+          const statusBadge = isActive
+            ? `<span style="color:#4ade80; font-weight:600;">🟢 Active</span>`
+            : `<span style="color:#9ca3af;">⚪ Offline</span>`;
+    
+          tbody.innerHTML += `
+            <tr>
+              <td>${u}</td>
+              <td>****</td>
+              <td>${statusBadge}</td>
+              <td>
+                ${u === "admin" ? "—" : `
+                  <button class="btn-edit" onclick="editUser('${u}')">Edit</button>
+                  <button class="btn-del" onclick="deleteUser('${u}')">Delete</button>
+                  <button class="btn-logout" style="background:#f97316;" onclick="logoutUser('${u}')">Logout</button>
+                `}
+              </td>
+            </tr>`;
+        });
+      } catch (err) {
+        console.error("❌ Error loading users:", err);
+      }
     }
 
     async function addUser() {
@@ -468,6 +494,78 @@
       } catch (err) {
         console.error(err);
         resultDiv.innerHTML = `<p style='color:#fca5a5;'>❌ Error fetching serial data.</p>`;
+      }
+    }
+
+    // ===== 🧩 ADMIN: Force Logout All Users =====
+    async function showLogoutAllButton() {
+      try {
+        const res = await fetch('/api/users');
+        if (!res.ok) return;
+        const users = await res.json();
+    
+        // Cek apakah sesi saat ini adalah admin
+        if (users && Object.keys(users).includes("admin")) {
+          // aktifkan tombol hanya jika session user adalah admin
+          const resWho = await fetch('/api/whoami');
+          if (!resWho.ok) return;
+          const me = await resWho.json();
+          if (me.user === "admin") {
+            document.getElementById('adminLogoutSection').style.display = "block";
+          }
+        }
+      } catch (e) {
+        console.warn("Cannot determine user role", e);
+      }
+    }
+    
+    // Jalankan saat halaman load
+    showLogoutAllButton();
+    
+    // Event handler tombol logout all
+    const btnLogoutAll = document.getElementById('btnLogoutAll');
+    if (btnLogoutAll) {
+      btnLogoutAll.addEventListener('click', async () => {
+        const ok = confirm("⚠️ Are you sure? This will force all users (including you) to be logged out on their next request.");
+        if (!ok) return;
+        btnLogoutAll.disabled = true;
+        btnLogoutAll.textContent = "Processing...";
+    
+        try {
+          const res = await fetch('/admin/logout_all', { method: 'POST', credentials: 'same-origin' });
+          const json = await res.json();
+          if (json.success) {
+            alert("✅ Success — all users will be logged out on their next request!");
+            location.reload();
+          } else {
+            alert("❌ Failed to logout all users.");
+          }
+        } catch (err) {
+          console.error(err);
+          alert("❌ Network or server error.");
+        } finally {
+          btnLogoutAll.disabled = false;
+          btnLogoutAll.textContent = "🚪 Force Logout All Users";
+        }
+      });
+    }
+    
+    async function logoutUser(username) {
+      if (!confirm(`Force logout user "${username}"?`)) return;
+      try {
+        const res = await fetch(`/admin/logout_user/${username}`, {
+          method: 'POST',
+          credentials: 'same-origin'
+        });
+        const json = await res.json();
+        if (json.success) {
+          alert(`✅ User "${username}" has been logged out successfully.`);
+        } else {
+          alert(`❌ Failed to logout ${username}: ${json.error || 'unknown error'}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert(`❌ Network error when logging out ${username}.`);
       }
     }
 

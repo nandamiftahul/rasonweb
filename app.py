@@ -112,6 +112,22 @@ app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 
+ACTIVE_USERS = set()
+
+# === 🧩 Global session versioning (logout-all control) ===
+GLOBAL_SESSION_VERSION = 1  # default awal, naikkan untuk memaksa logout semua
+
+def get_global_session_version():
+    global GLOBAL_SESSION_VERSION
+    return GLOBAL_SESSION_VERSION
+
+def bump_global_session_version():
+    """Naikkan versi sesi global → semua user auto logout."""
+    global GLOBAL_SESSION_VERSION
+    GLOBAL_SESSION_VERSION += 1
+    print(f"🔒 Global session version bumped to {GLOBAL_SESSION_VERSION}")
+
+
 # In-memory per-user store (username -> {"metadata": {...}, "levels": [...]})
 USER_STATE = defaultdict(lambda: {"metadata": {}, "levels": []})
 
@@ -196,8 +212,33 @@ load_users()
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # 🚪 Tidak ada sesi login
         if "user" not in session:
             return redirect(url_for("login"))
+
+        # 🌍 Global logout: semua user dipaksa keluar
+        if session.get("session_version") != get_global_session_version():
+            session.clear()
+            return redirect(url_for("login"))
+
+        # 👤 Per-user logout: token mismatch (admin force logout)
+        global USER_SESSION_TOKENS, ACTIVE_USERS
+        if "USER_SESSION_TOKENS" in globals():
+            user = session.get("user")
+            token = session.get("user_token")
+            current_token = USER_SESSION_TOKENS.get(user)
+
+            if current_token and token != current_token:
+                # 🔹 Hapus user dari daftar aktif
+                if "ACTIVE_USERS" in globals() and user in ACTIVE_USERS:
+                    ACTIVE_USERS.discard(user)
+                    print(f"🔒 User '{user}' token mismatch → logged out")
+
+                # 🔹 Bersihkan sesi dan redirect ke login
+                session.clear()
+                return redirect(url_for("login"))
+
+        # ✅ Semua aman, lanjut ke route
         return f(*args, **kwargs)
     return decorated_function
 
@@ -208,6 +249,19 @@ def login():
         password = request.form.get("password")
         if username in VALID_USERS and check_password_hash(VALID_USERS[username], password):
             session["user"] = username
+            session["session_version"] = get_global_session_version()
+        
+            # 🧩 Tambahan: generate token unik untuk user ini
+            global USER_SESSION_TOKENS
+            if "USER_SESSION_TOKENS" not in globals():
+                USER_SESSION_TOKENS = {}
+            import secrets
+            token = USER_SESSION_TOKENS.get(username) or secrets.token_hex(8)
+            USER_SESSION_TOKENS[username] = token
+            session["user_token"] = token
+            ACTIVE_USERS.add(username)
+            print(f"✅ User logged in: {username} (active now: {list(ACTIVE_USERS)})")
+
             return redirect(url_for("main_page"))
         else:
             return render_template("login.html", error="Invalid credentials")
@@ -215,9 +269,61 @@ def login():
 
 @app.route("/logout")
 def logout():
-    clear_user_store()
-    session.pop("user", None)
-    return redirect(url_for("login"))
+    user = session.get("user")
+
+    # 🧩 Hapus user dari daftar aktif
+    global ACTIVE_USERS
+    if "ACTIVE_USERS" in globals() and user in ACTIVE_USERS:
+        ACTIVE_USERS.discard(user)
+        print(f"👋 User logged out manually: {user}")
+
+    # 🧩 Bersihkan session token user (tidak mengubah global token)
+    session.clear()
+
+    # 🧩 Hapus session cookie
+    resp = redirect(url_for("login"))
+    resp.set_cookie('session', '', expires=0)
+    return resp
+
+@app.route("/admin/logout_all", methods=["POST"])
+@login_required
+def logout_all_users():
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+    bump_global_session_version()
+    return jsonify({"success": True, "new_version": get_global_session_version()})
+
+@app.route("/admin/logout_user/<username>", methods=["POST"])
+@login_required
+def logout_user(username):
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    # 🧩 Gunakan per-user session token cache
+    # Buat dict global jika belum ada
+    global USER_SESSION_TOKENS
+    if "USER_SESSION_TOKENS" not in globals():
+        USER_SESSION_TOKENS = {}
+
+    # Set token user ke random baru → invalidate sesi mereka
+    import secrets
+    USER_SESSION_TOKENS[username] = secrets.token_hex(8)
+
+    print(f"🔒 User {username} forced logout.")
+    return jsonify({"success": True, "user": username})
+
+@app.route("/api/active_users")
+@login_required
+def api_active_users():
+    # Hanya admin yang boleh melihat daftar login aktif
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+    return jsonify({"active": sorted(list(ACTIVE_USERS))})
+
+@app.route("/api/whoami")
+@login_required
+def whoami():
+    return jsonify({"user": session.get("user", None)})
 
 # --- BUFR decode ---
 def decode_bufr(filepath):
