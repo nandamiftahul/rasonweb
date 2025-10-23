@@ -229,12 +229,8 @@ def login_required(f):
             current_token = USER_SESSION_TOKENS.get(user)
 
             if current_token and token != current_token:
-                # 🔹 Hapus user dari daftar aktif
-                if "ACTIVE_USERS" in globals() and user in ACTIVE_USERS:
-                    ACTIVE_USERS.discard(user)
-                    print(f"🔒 User '{user}' token mismatch → logged out")
-
-                # 🔹 Bersihkan sesi dan redirect ke login
+                # 🟢 Jangan hapus dari ACTIVE_USERS — user masih aktif di session baru
+                print(f"🔄 Session replaced for user '{user}' (device switched)")
                 session.clear()
                 return redirect(url_for("login"))
 
@@ -251,17 +247,19 @@ def login():
             session["user"] = username
             session["session_version"] = get_global_session_version()
         
-            # 🧩 Tambahan: generate token unik untuk user ini
+            # 🧩 Generate token baru setiap kali login → invalidate sesi lama
             global USER_SESSION_TOKENS
             if "USER_SESSION_TOKENS" not in globals():
                 USER_SESSION_TOKENS = {}
             import secrets
-            token = USER_SESSION_TOKENS.get(username) or secrets.token_hex(8)
-            USER_SESSION_TOKENS[username] = token
-            session["user_token"] = token
+            new_token = secrets.token_hex(8)
+            USER_SESSION_TOKENS[username] = new_token   # overwrite token lama
+            session["user_token"] = new_token
+        
+            # 🧩 Tandai user aktif
             ACTIVE_USERS.add(username)
-            print(f"✅ User logged in: {username} (active now: {list(ACTIVE_USERS)})")
-
+            print(f"✅ User logged in: {username} (active: {list(ACTIVE_USERS)})")
+        
             return redirect(url_for("main_page"))
         else:
             return render_template("login.html", error="Invalid credentials")

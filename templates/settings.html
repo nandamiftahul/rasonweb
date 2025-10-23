@@ -214,18 +214,20 @@
       document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add("active");
       document.getElementById(`tab-${tab}`).classList.add("active");
     }
-
+    
     // ===== USERS =====
     async function loadUsers() {
       try {
         // Ambil semua user + user yang sedang aktif
-        const [resUsers, resActive] = await Promise.all([
+        const [resUsers, resActive, resWho] = await Promise.all([
           fetch('/api/users'),
-          fetch('/api/active_users')
+          fetch('/api/active_users'),
+          fetch('/api/whoami')
         ]);
     
         const users = await resUsers.json();
         const activeData = await resActive.json();
+        const me = await resWho.json();
         const activeUsers = activeData.active || [];
     
         const tbody = document.querySelector("#userTable tbody");
@@ -233,9 +235,15 @@
     
         Object.entries(users).forEach(([u, _]) => {
           const isActive = activeUsers.includes(u);
-          const statusBadge = isActive
-            ? `<span style="color:#4ade80; font-weight:600;">🟢 Active</span>`
-            : `<span style="color:#9ca3af;">⚪ Offline</span>`;
+          const isCurrent = me.user === u; // session yang sedang digunakan
+    
+          // 🟢 Kalau user sedang login di mana pun, tetap hijau
+          // 🔵 Kalau ini user yang sedang buka halaman (device aktif sekarang)
+          const statusBadge = isCurrent
+            ? `<span style="color:#60a5fa; font-weight:600;">🔵 Current Session</span>`
+            : (isActive
+                ? `<span style="color:#4ade80; font-weight:600;">🟢 Active</span>`
+                : `<span style="color:#9ca3af;">⚪ Offline</span>`);
     
           tbody.innerHTML += `
             <tr>
@@ -255,6 +263,7 @@
         console.error("❌ Error loading users:", err);
       }
     }
+
 
     async function addUser() {
       const username = newUser.value.trim();
