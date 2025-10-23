@@ -31,6 +31,7 @@ load_dotenv()
 
 # === Database SQLite for Radiosonde Cache ===
 import sqlite3
+from werkzeug.security import check_password_hash
 
 DB_PATH = "rason_data.db"
 
@@ -152,6 +153,20 @@ def save_sites():
 
 load_sites()
 
+# --- Authentication ---
+USERS_FILE = "users.json"
+
+def load_users_from_file():
+    """Load hashed users from JSON."""
+    try:
+        with open(USERS_FILE, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print("⚠️ Failed to read users.json:", e)
+        return {}
+
+VALID_USERS = load_users_from_file()
+
 USER_FILE = "users.json"
 
 def load_users():
@@ -176,18 +191,6 @@ def save_users():
     except Exception as e:
         print("⚠️ Failed to save users.json:", e)
 
-# --- Authentication ---
-VALID_USERS = {
-    "admin": "meteomodem",
-    "trial1": "trialpass",
-    "trial2": "12345",
-    "guest": "guest123",
-    "user1": "user123",
-    "user2": "user123",
-    "user3": "user123",
-    "bmkg" : "Bmkg2025$"
-}
-
 load_users()
 
 def login_required(f):
@@ -203,7 +206,7 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
-        if username in VALID_USERS and VALID_USERS[username] == password:
+        if username in VALID_USERS and check_password_hash(VALID_USERS[username], password):
             session["user"] = username
             return redirect(url_for("main_page"))
         else:
@@ -465,6 +468,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                     start_date=None, end_date=None):
     """
     Fetch list of radiosonde files from FTP or (if cached) from local SQLite DB.
+    Untuk file hari ini dan kemarin, data selalu diambil langsung dari FTP (bypass cache).
     """
     _tz = None  # fallback (pakai UTC kalau zoneinfo tidak ada)
 
@@ -532,7 +536,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                         }
 
                         # ==========================================================
-                        # 🔹 Jika with_meta=True, gunakan DB cache
+                        # 🔹 Jika with_meta=True, gunakan DB cache (kecuali hari ini & kemarin)
                         # ==========================================================
                         if with_meta:
                             try:
@@ -540,13 +544,24 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                 if ftype not in ["bufr", "bfr", "bfh", "bin"]:
                                     ftype = "bufr"
 
-                                # --- Cek di database dulu ---
-                                cached = db_get(ftype, site, fname)
+                                # --- Tentukan apakah file hari ini atau kemarin ---
+                                use_cache = True
+                                try:
+                                    file_dt = datetime.strptime(extract_date_from_filename(fname), "%Y-%m-%d %H:%M:%S UTC")
+                                    now_utc = datetime.utcnow()
+                                    yesterday_utc = now_utc - timedelta(days=1)
+                                    if file_dt.date() in (now_utc.date(), yesterday_utc.date()):
+                                        use_cache = False
+                                except Exception:
+                                    pass
+
+                                # --- Cek di database hanya jika bukan hari ini/kemarin ---
+                                cached = db_get(ftype, site, fname) if use_cache else None
                                 if cached:
                                     df_meta, df_levels = cached
                                     print(f"[DB] ✅ fetch_all cache hit for {fname}")
                                 else:
-                                    # --- Jika belum ada di DB, ambil dari FTP ---
+                                    # --- Ambil baru dari FTP ---
                                     local_path = os.path.join(app.config["UPLOAD_FOLDER"], fname)
                                     with open(local_path, "wb") as f:
                                         ftp.retrbinary(f"RETR " + fname, f.write)
@@ -629,7 +644,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
                                         if pd.notna(max_height):
                                             item["max_height"] = round(float(max_height), 0)
 
-                                        # End time (consistent with launch_time UTC)
+                                        # End time
                                         if "time_s" in df_levels and not df_meta.empty:
                                             if "launch_time" in item and item["launch_time"] != "-":
                                                 try:
