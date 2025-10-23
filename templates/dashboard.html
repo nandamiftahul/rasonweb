@@ -373,6 +373,7 @@
         <input type="date" id="endDate">
         <button type="submit">Apply</button>
         <button type="button" onclick="showMetadata()">Show Metadata</button>
+        <button type="button" id="btnCsv" disabled>Generate CSV</button>
       </form>
     </div>
 
@@ -441,7 +442,7 @@
 
     function renderTable(sites, withMeta) {
       let html = `<table id='dataTable' class='display nowrap' style='width:100%'><thead><tr>
-      <th>Site</th><th>File</th><th>Data Date</th>`;
+      <th>Site</th><th>File</th><th>Data Date<br><small>(UTC)</small></th>`;
       if (withMeta)
         html += `
           <th>Launch<br><small>(UTC)</small></th>
@@ -449,6 +450,7 @@
           <th>Status</th>
           <th>Reason</th>
           <th>Serial</th>
+          <th>Manufactured</th>
           <th>Pressure<br><small>(hPa)</small></th>
           <th>Height<br><small>(m)</small></th>
           <th>Distance<br><small>(km)</small></th>
@@ -483,26 +485,32 @@
               statusClass = "status-issues";
             }
           }
-
+          const dataDate = (f.file_date || "-").replace(/\s*UTC\s*$/, "");
           html += `<tr>
             <td>${site}</td>
             <td><a href='/load_from_ftp/${site}/${f.name}' target='_blank'>📄</a></td>
-            <td>${f.file_date || "-"}</td>`;
-          if (withMeta) html += `
-            <td>${f.launch_time || "-"}</td>
-            <td>${f.end_time || "-"}</td>
-            <td class='${statusClass}'>${issues}</td>
-            <td>${f.reason_for_termination || "-"}</td>
-            <td>${f.radiosonde_serial_number || "-"}</td>
-            <td>${f.end_pressure || "-"}</td>
-            <td>${f.max_height || "-"}</td>
-            <td>${f.end_distance || "-"}</td>
-            <td>${f.avg_ascent_rate || "-"}</td>`;
-          html += `
-            <td><a href='/download/${site}/${f.name}' target='_blank'>⬇</a></td>
-            <td><a href='/download_wmo/${site}/${f.name}' target='_blank'>⬇</a></td>
-            <td><a href='/raob/${site}/${f.name}' target='_blank'>📊</a></td>
-          </tr>`;
+            <td>${dataDate}</td>`;
+            if (withMeta) {
+              const cleanLaunch = (f.launch_time || "-").replace(/\s*UTC\s*$/, "");
+              const cleanEnd = (f.end_time || "-").replace(/\s*UTC\s*$/, "");
+            
+              html += `
+                <td>${cleanLaunch}</td>
+                <td>${cleanEnd}</td>
+                <td class='${statusClass}'>${issues}</td>
+                <td>${f.reason_for_termination || "-"}</td>
+                <td>${f.radiosonde_serial_number || "-"}</td>
+                <td>${f.manufactured || "-"}</td>
+                <td>${f.end_pressure || "-"}</td>
+                <td>${f.max_height || "-"}</td>
+                <td>${f.end_distance || "-"}</td>
+                <td>${f.avg_ascent_rate || "-"}</td>`;
+            }
+            html += `
+              <td><a href='/download/${site}/${f.name}' target='_blank'>⬇</a></td>
+              <td><a href='/download_wmo/${site}/${f.name}' target='_blank'>⬇</a></td>
+              <td><a href='/raob/${site}/${f.name}' target='_blank'>📊</a></td>
+            </tr>`;
         });
       }
 
@@ -517,6 +525,9 @@
         order: [[2, "desc"]],
         initComplete: () => $('.dataTables_scrollHead, .dataTables_scrollBody').css('width', '100%')
       });
+      // Enable/disable tombol CSV: hanya aktif setelah "Show Metadata"
+      const btnCsv = document.getElementById('btnCsv');
+      btnCsv.disabled = !withMeta;
     }
 
     document.getElementById("filterForm").addEventListener("submit", async e => {
@@ -542,8 +553,76 @@
       document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
       document.getElementById("utcDate").textContent = dateStr;
     }
+
+function generateCSV() {
+  if (!$.fn.DataTable.isDataTable('#dataTable')) {
+    alert('Tabel belum tersedia.');
+    return;
+  }
+
+  const dt = $('#dataTable').DataTable();
+
+  // === Ambil semua header ===
+  const headersAll = Array.from(document.querySelectorAll('#dataTable thead th'))
+    .map(th => th.innerText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim());
+
+  // 🔹 Hapus kolom File (index ke-1) dan 3 terakhir (.bfr, WMO, Analysis)
+  const headers = headersAll.filter((_, i) => i !== 1 && i < headersAll.length - 3);
+
+  // 🔹 Tambahkan kolom Nomor di paling kiri
+  headers.unshift("No");
+
+  // Helper escape CSV
+  const csvEscape = (val) => {
+    if (val == null) val = '';
+    val = String(val);
+    if (/[",\n\r]/.test(val)) val = '"' + val.replace(/"/g, '""') + '"';
+    return val;
+  };
+
+  // === Ambil baris aktif dari DataTable ===
+  const nodes = dt.rows({ search: 'applied' }).nodes().toArray();
+  const lines = [];
+  lines.push(headers.map(csvEscape).join(','));
+
+  nodes.forEach((tr, idx) => {
+    const tds = Array.from(tr.querySelectorAll('td'));
+    const validCells = tds.filter((_, i) => i !== 1 && i < tds.length - 3);
+
+    const row = validCells.map(td => {
+      const text = td.textContent.trim();
+      return csvEscape(text);
+    });
+
+    // 🔹 Tambah nomor urut di kolom paling kiri
+    row.unshift(idx + 1);
+
+    lines.push(row.join(','));
+  });
+
+  const csv = lines.join('\r\n');
+
+  const ext = (document.getElementById('ext').value || '').replace('.', '') || 'all';
+  const start = document.getElementById('startDate').value || 'all';
+  const end   = document.getElementById('endDate').value   || 'all';
+  const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g, '-');
+  const filename = `rason_resume_${ext}_${start}_${end}_${ts}.csv`;
+
+  const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
     updateUTCClock();
     setInterval(updateUTCClock, 1000);
+    // === Export CSV ===
+    document.getElementById('btnCsv').addEventListener('click', generateCSV);
   </script>
 </body>
 </html>

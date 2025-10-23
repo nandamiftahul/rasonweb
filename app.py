@@ -732,6 +732,17 @@ def api_sites_with_meta():
         start_date=start_dt,
         end_date=end_dt
     )
+    # 🔹 Merge manufactured info from MODEM_LOOKUP based on serial number
+    for site, files in sites.items():
+        for f in files:
+            serial_raw = f.get("radiosonde_serial_number")
+            
+            sn_int = parse_serial_to_int(serial_raw)
+            if sn_int and sn_int in MODEM_LOOKUP:
+                f["manufactured"] = MODEM_LOOKUP[sn_int]
+            else:
+                f["manufactured"] = "-"
+    
     return jsonify(sites)
 
 @app.route("/api/latest_status")
@@ -1328,6 +1339,63 @@ def download_from_ftp(site, filename):
     except Exception as e:
         raise RuntimeError(f"FTP download error: {e}")
     return local_path
+
+# --- helper: ambil angka saja, aman untuk "12345", "12345.0", "SN-12345", dll.
+def parse_serial_to_int(val):
+    if val is None:
+        return None
+    s = str(val).strip()
+    # kalau float "12345.0" → "12345"
+    try:
+        f = float(s)
+        return int(f)
+    except:
+        pass
+    # jika format campur huruf, ambil digitnya
+    digits = re.sub(r"\D", "", s)
+    return int(digits) if digits.isdigit() else None
+
+# --- load JSON list modem → dict {serial_int: manufactured_str}
+def load_modem_lookup(json_path="list_data_modem.json"):
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    lookup = {}
+    for row in data:
+        low = {str(k).strip().lower(): v for k, v in row.items()}
+
+        serial_raw = (
+            low.get("nomor serial")
+            or low.get("serial")
+            or low.get("no seri")
+            or low.get("sn")
+        )
+        manufactured_raw = (
+            low.get("manufactured")
+            or low.get("tanggal manufactured")
+            or low.get("tgl manufactured")
+            or low.get("mfg")
+        )
+
+        sn_int = parse_serial_to_int(serial_raw)
+        manufactured_str = excel_date_to_str(manufactured_raw)
+        if sn_int:
+            lookup[sn_int] = manufactured_str
+    return lookup
+
+def excel_date_to_str(val):
+    """Konversi nilai Excel float (misal 45680.0) menjadi YYYY-MM-DD."""
+    try:
+        if isinstance(val, (int, float)) and val > 30000:
+            base = datetime(1899, 12, 30)
+            return (base + timedelta(days=int(val))).strftime("%Y-%m-%d")
+        if isinstance(val, str):
+            return val.strip()
+    except Exception:
+        pass
+    return "-"
+
+MODEM_LOOKUP = load_modem_lookup("list_data_modem.json")
 
 @app.route("/download/<site>/<filename>")
 @login_required
@@ -3044,6 +3112,20 @@ def api_bufrmap_site(site):
 @login_required
 def error_analysis_page():
     return render_template("error_analysis.html")
+
+# ===================================================
+# 🎈 RAOB / Radiosonde Analysis Page
+# ===================================================
+
+@app.route("/analysis")
+@login_required
+def analysis_page():
+    """
+    Halaman RAOB Analysis — menampilkan Skew-T & Hodograph
+    dengan filter site / tanggal / file.
+    """
+    return render_template("analysis.html")
+
 
 @app.route("/release")
 @login_required

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Rason Analysis - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Inter",sans-serif;display:flex;min-height:100vh;flex-direction:row;
+         background:linear-gradient(to bottom right,#0a2a6b,#004aad,#0078d7);color:#fff}
+    /* === Sidebar (identik) === */
+    .sidebar{width:230px;background:rgba(255,255,255,.08);backdrop-filter:blur(8px);
+      border-right:1px solid rgba(255,255,255,.15);display:flex;flex-direction:column;align-items:center;
+      padding:40px 10px 20px;position:fixed;left:0;top:0;height:100vh;z-index:10;transition:transform .3s}
+    .sidebar.hidden{transform:translateX(-240px)}
+    .sidebar h2{font-size:20px;margin-bottom:30px;color:#e0f2fe;text-align:center;font-weight:700;
+      letter-spacing:1.2px;text-transform:uppercase;text-shadow:0 0 6px rgba(255,255,255,.3);
+      border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:8px}
+    .sidebar a{display:block;text-decoration:none;color:#fff;width:100%;padding:12px 15px;border-radius:8px;margin:8px 0}
+    .sidebar a:hover{background:rgba(255,255,255,.15)}
+    .logout{margin-top:auto;background:rgba(255,255,255,.1);border-radius:6px;color:#fca5a5;padding:8px 14px;text-decoration:none}
+    .logout:hover{background:rgba(255,255,255,.2)}
+    /* Toggle */
+    .toggle-btn{position:fixed;top:50%;left:220px;transform:translateY(-50%);width:28px;height:28px;border:none;
+      border-radius:50%;background:rgba(255,255,255,.25);color:#fff;cursor:pointer;z-index:50;display:flex;align-items:center;justify-content:center}
+    .toggle-btn.hidden-position{left:10px}
+    /* Main */
+    .main{flex:1;display:flex;flex-direction:column;margin-left:230px;padding:40px 40px 60px}
+    .main.expanded{margin-left:0}
+    /* Header (identik) */
+    .header-box{position:relative;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:12px;
+      padding:20px 30px;box-shadow:0 6px 25px rgba(0,0,0,.3);backdrop-filter:blur(10px);display:flex;align-items:center;gap:18px;margin-bottom:35px}
+    .header-icon{width:50px;height:50px;background:rgba(255,255,255,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;color:#dbeafe}
+    .header-text h1{margin:0;font-size:26px;font-weight:600}
+    .header-text p{margin:4px 0 0;font-size:14px;color:#dbeafe;opacity:.9}
+    .header-logos{position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:12px}
+    .header-logos img{height:36px;opacity:.9}
+    .header-clock{display:flex;flex-direction:column;align-items:flex-end;font-size:18px;font-weight:600}
+    /* Filter bar */
+    .filter-bar{background:rgba(255,255,255,.1);padding:12px 16px;border-radius:10px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+    .filter-bar select,.filter-bar input,.filter-bar button{background:rgba(255,255,255,.1);color:#fff;border:0;border-radius:8px;padding:8px 10px}
+    .filter-bar button{background:#0078d7;cursor:pointer}
+    #fileList button{background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:6px;padding:6px 10px;margin:3px 0;cursor:pointer}
+    #fileList button:hover{background:rgba(255,255,255,.25)}
+    /* Cards / Tabs */
+    .card{position:relative;background:rgba(255,255,255,.05);border-radius:10px;padding:12px;box-shadow:0 6px 18px rgba(0,0,0,.35);margin-top:12px}
+    .tabs{position:absolute;top:12px;right:12px;display:flex;gap:6px}
+    .tabs button{padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
+    .tabs button.active{background:rgba(0,200,255,.3)}
+    .toolbar{display:flex;gap:8px;margin:6px 0 8px 0}
+    canvas{width:100%;height:720px;border-radius:8px;background:linear-gradient(#071a3b,#04284f)}
+    /* Footer (identik) */
+    .footer{position:fixed;bottom:0;left:230px;width:calc(100% - 230px);height:38px;background:#fff;display:flex;justify-content:center;align-items:center;border-top:1px solid #d1d5db}
+    .main.expanded~.footer{left:0;width:100%}
+    .footer span{color:#333;font-weight:500;margin-right:6px;font-size:12px;opacity:.8}
+    .footer img{height:28px;opacity:.85;margin:0 6px}
+    .meta-panel {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #e8f5ff;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .meta-panel b { color:#fff; font-weight:600; }
+
+  </style>
+</head>
+<body>
+
+<button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
+
+<div class="sidebar" id="sidebar">
+  <h2>RASON PANEL</h2>
+  <a href="{{ url_for('main_page') }}">🏠 Main Page</a>
+  <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
+  <a href="{{ url_for('analysis_page') }}">📈 Rason Analysis</a>
+  <a href="{{ url_for('map_view') }}" target="_blank">🗺️ Map</a>
+  <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
+  <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
+  <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
+  <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
+  <a href="{{ url_for('error_analysis_page') }}">❗ Error Analysis</a>
+  <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
+  <a href="{{ url_for('logout') }}" class="logout">🚪 Logout</a>
+</div>
+
+<div class="main" id="mainContent">
+  <div class="header-box">
+    <div class="header-icon">🎈</div>
+    <div class="header-text">
+      <h1>Rason Analysis</h1>
+      <p>Skew-T Log-P & Hodograph (classic RAOB style)</p>
+    </div>
+    <div class="header-logos">
+      <div class="header-clock">
+        <div id="utcClock">--:--:-- UTC</div>
+        <div id="utcDate" style="font-size:12px;opacity:.8">-- --- ----</div>
+      </div>
+      <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG">
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar">
+    <label>Site:</label><select id="siteSelect"></select>
+    <label>Date:</label><input type="date" id="dateSelect">
+    <label>Hour:</label>
+    <select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
+    <label>File Type:</label>
+    <select id="ftypeSelect">
+      <option value="bfr">BFR</option><option value="bufr">BUFR</option>
+      <option value="bfh">BFH</option><option value="bin">BIN</option>
+    </select>
+    <button id="applyBtn">Apply</button>
+  </div>
+
+  <div id="fileList"></div>
+
+  <!-- Tabs + Canvas -->
+  <div class="card">
+    <div class="tabs">
+      <button id="tabSkewT" class="active">Skew-T</button>
+      <button id="tabHodo">Hodograph</button>
+    </div>
+    
+    <div class="toolbar">
+      <label><input type="checkbox" id="showDry" checked> Dry adiabat</label>
+      <label><input type="checkbox" id="showIsoT" checked> Isotherm</label>
+      <label><input type="checkbox" id="showMix" checked> Mix-ratio (approx)</label>
+      <button id="exportBtn">Export PNG</button>
+    </div>
+    <canvas id="skewtCanvas" width="1100" height="720"></canvas>
+  
+    <!-- harus di sini -->
+    <div class="meta-panel" id="metaPanel">
+      <div><b>Station:</b> <span id="metaStation">–</span></div>
+      <div><b>Launch:</b> <span id="metaLaunch">–</span></div>
+      <div><b>Max Height:</b> <span id="metaHeight">–</span></div>
+      <div><b>Top Pressure:</b> <span id="metaPress">–</span></div>
+      <div><b>Termination:</b> <span id="metaTerm">–</span></div>
+    </div>
+  </div>
+
+
+
+<div class="footer">
+  <span>Powered by</span>
+  <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem">
+</div>
+
+<script>
+/* ====== Layout helpers ====== */
+function toggleSidebar(){
+  const s=document.getElementById("sidebar"),m=document.getElementById("mainContent"),b=document.getElementById("toggleBtn");
+  s.classList.toggle("hidden");m.classList.toggle("expanded");
+  if(s.classList.contains("hidden")){b.textContent="☰";b.classList.add("hidden-position");}
+  else{b.textContent="❮";b.classList.remove("hidden-position");}
+}
+function updateUTCClock(){
+  const now=new Date();const hh=String(now.getUTCHours()).padStart(2,"0"),
+        mm=String(now.getUTCMinutes()).padStart(2,"0"),ss=String(now.getUTCSeconds()).padStart(2,"0");
+  document.getElementById("utcClock").textContent=`${hh}:${mm}:${ss} UTC`;
+  document.getElementById("utcDate").textContent=now.toUTCString().split(" ").slice(0,4).join(" ");
+}
+updateUTCClock();setInterval(updateUTCClock,1000);
+(function(){document.getElementById("hourSelect").value=(new Date().getUTCHours()<12)?"00":"12";})();
+
+/* ====== Data flow (ikuti error_analysis) ====== */
+$.getJSON("/api/sites_config",d=>{
+  const sel=$("#siteSelect"); sel.empty(); d.sites.forEach(s=>sel.append(`<option value="${s}">${s}</option>`));
+});
+
+$("#applyBtn").click(()=>{
+  const site=$("#siteSelect").val(),date=$("#dateSelect").val(),hour=$("#hourSelect").val(),ftype=$("#ftypeSelect").val();
+  if(!date){alert("Please select date!");return;}
+  $("#fileList").html("⏳ Searching...");
+  $.post("/api/filter",{site,date,hour,ftype:"."+ftype},res=>{
+    if(res.status!=="ok"){ $("#fileList").html("<b style='color:#ff6e6e'>No files found.</b>"); return; }
+    let html="<h3>Available Files:</h3>";
+    res.files.forEach(f=>html+=`<div><button class="loadBtn" data-site="${site}" data-file="${f}">📄 ${f}</button></div>`);
+    $("#fileList").html(html);
+  },"json");
+});
+
+let activeTab="skewt"; // tabs
+$("#tabSkewT").click(()=>{activeTab="skewt";$("#tabSkewT").addClass("active");$("#tabHodo").removeClass("active");drawAll();});
+$("#tabHodo").click(()=>{activeTab="hodo";$("#tabHodo").addClass("active");$("#tabSkewT").removeClass("active");drawAll();});
+
+$("#exportBtn").click(()=>{
+  const link=document.createElement('a');
+  link.download=`raob_${activeTab}.png`;
+  link.href=document.getElementById('skewtCanvas').toDataURL('image/png'); link.click();
+});
+
+/* ====== Load chosen file, then /metadata + /all_levels ====== */
+let LEVELS=[], META={};
+$(document).on("click",".loadBtn",function(){
+  const site=$(this).data("site"), file=$(this).data("file");
+  $("#fileList").html("⏳ Loading "+file+"...");
+  $.post("/upload_bufr",{remote_site:site,remote_file:file},res=>{
+    if(!res.success){ $("#fileList").html("<b style='color:#ff6e6e'>Error: "+(res.error||"upload failed")+"</b>"); return; }
+    $.getJSON("/metadata", m => { META=m; }).then(()=>{
+      $.getJSON("/all_levels", lv=>{
+        LEVELS = lv || [];
+        $("#fileList").html(`<b>Loaded:</b> ${file} – Levels: ${LEVELS.length}`);
+        updateMetaMini();
+        drawAll();
+      });
+    });
+  },"json");
+});
+
+/* ====== Meta mini ====== */
+function updateMetaMini(){
+  if(!LEVELS.length){ 
+    $("#metaPanel span").text("–"); 
+    return; 
+  }
+  const site = META.station || $("#siteSelect").val() || "–";
+  const launch = META.launch_time ? new Date(META.launch_time).toUTCString().replace(" GMT","") : "–";
+  const hmax = Math.max(...LEVELS.map(l=>l.height_m||0));
+  const pmin = Math.min(...LEVELS.map(l=>l.pressure_hPa||1e9));
+  const termCode = META.reason_for_termination || "-";
+  const termTxt = META.flight_issues?.length ? META.flight_issues.join(", ") : termCode;
+  $("#metaStation").text(site.toUpperCase());
+  $("#metaLaunch").text(launch);
+  $("#metaHeight").text(`${(hmax/1000).toFixed(1)} km`);
+  $("#metaPress").text(`${pmin.toFixed(0)} hPa`);
+  $("#metaTerm").text(termTxt);
+}
+
+/* ====== Skew-T & Hodograph renderer (classic) ====== */
+const canvas=document.getElementById("skewtCanvas"), ctx=canvas.getContext("2d");
+function clear(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="rgba(255,255,255,0.02)";ctx.fillRect(0,0,canvas.width,canvas.height);}
+
+const pad = { L: 80, R: 200, T: 40, B: 40 }; 
+const pRange={min:100,max:1050};
+const tRange={min:-40,max:40}; // °C shown horizontally before skew
+
+function pToY(p){const h=canvas.height-pad.T-pad.B;return pad.T+(Math.log(pRange.max)-Math.log(p))/(Math.log(pRange.max)-Math.log(pRange.min))*h;}
+function skewShiftForP(p){ // how much to shift right for higher levels (classic skew)
+  const frac=(Math.log(p)-Math.log(pRange.min))/(Math.log(pRange.max)-Math.log(pRange.min)); // 0..1
+  return (1-frac)*(canvas.width-pad.L-pad.R)*0.18; // 18% width tilt
+}
+function tToX_atP(t,p){
+  const w=canvas.width-pad.L-pad.R;
+  const frac=(t - tRange.min)/(tRange.max - tRange.min);
+  return pad.L + frac*w + skewShiftForP(p);
+}
+
+/* ---- Grid: isobars, isotherms, dry adiabats, mixing ratio (approx) ---- */
+function drawGrid(){
+  // frame
+  ctx.strokeStyle="rgba(255,255,255,0.25)"; ctx.lineWidth=1;
+  ctx.strokeRect(pad.L,pad.T,canvas.width-pad.L-pad.R,canvas.height-pad.T-pad.B);
+
+  // isobars
+  const P=[1050,1000,925,900,850,800,750,700,650,600,550,500,450,400,350,300,250,200,150,100];
+  ctx.font="12px Inter"; ctx.fillStyle="#e6f0ff"; ctx.textAlign="right";
+  P.forEach(p=>{
+    if(p<pRange.min||p>pRange.max)return;
+    const y=pToY(p);
+    ctx.strokeStyle="rgba(255,255,255,0.08)"; ctx.beginPath(); ctx.moveTo(pad.L,y); ctx.lineTo(canvas.width-pad.R,y); ctx.stroke();
+    ctx.fillText(`${p} hPa`, pad.L-8, y+4);
+  });
+
+  // isotherms (skewed) every 10°C
+  if(document.getElementById('showIsoT').checked){
+    ctx.strokeStyle="rgba(255,200,190,0.18)"; ctx.lineWidth=1;
+    for(let t=-80;t<=50;t+=10){
+      ctx.beginPath(); let first=true;
+      for(let p= pRange.max; p>=pRange.min; p = (p>300? p-25 : p-10)){
+        const x=tToX_atP(t,p), y=pToY(p);
+        if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // dry adiabats (Poisson) — start at 1000 hPa with T0 grid −40..+40
+  if(document.getElementById('showDry').checked){
+    const k=0.286; // R/cp
+    ctx.strokeStyle="rgba(255,255,255,0.12)"; ctx.lineWidth=1;
+    for(let T0=-40; T0<=40; T0+=5){
+      ctx.beginPath(); let first=true;
+      for(let p=1000; p>=pRange.min; p-=10){
+        const TK=(T0+273.15)*Math.pow(p/1000,k); // along constant theta line back-compute T at p
+        const tC=TK-273.15;
+        const x=tToX_atP(tC,p), y=pToY(p);
+        if(first){ctx.moveTo(x,y);first=false;} else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // mixing ratio (approx isolines) — light cyan
+  if(document.getElementById('showMix').checked){
+    // Use simple constant RH-locus proxy for look (not exact): Td = f(p, w)
+    // We'll just draw gentle slanted lines to mimic w=2,4,8,12,16 g/kg look.
+    const wVals=[2,4,8,12,16];
+    ctx.strokeStyle="rgba(0,220,255,0.12)"; ctx.lineWidth=1;
+    wVals.forEach((widx,i)=>{
+      ctx.beginPath(); let first=true;
+      for(let p=1000; p>=pRange.min; p-=10){
+        // crude Td curve: Td ≈ 243.5*(ln(w*p/6.112) / (17.67 - ln(w*p/6.112)))  (visual proxy only)
+        const e = widx*p/6.112; const ln = Math.log(Math.max(1e-6,e));
+        const Td = 243.5*(ln)/(17.67 - ln); // °C
+        const x=tToX_atP(Td,p), y=pToY(p);
+        if(first){ctx.moveTo(x,y);first=false;} else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    });
+  }
+
+  // axis titles
+  ctx.fillStyle="#e6f0ff"; ctx.textAlign="center";
+  ctx.fillText("Temperature (°C) — Skew-T Log-P", (pad.L+canvas.width-pad.R)/2, 20);
+  ctx.save(); ctx.translate(canvas.width-pad.R+48, (pad.T+canvas.height-pad.B)/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText("Wind (kt)", 0, 0); ctx.restore();
+}
+
+/* ---- Right-axis: height in km & ft ---- */
+function drawRightAxis() {
+  const y1000 = pToY(1000);
+  const y100  = pToY(100);
+  const hKmMax = 16;               // tampilkan sampai 16 km
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.fillStyle   = "#e6f0ff";
+  ctx.font = "11px Inter";
+
+  // axis label
+  ctx.fillText("Height (km)", canvas.width - pad.R + 22, pad.T + 10);
+
+  for (let km = 0; km <= hKmMax; km += 2) {
+    const y = y1000 - (y1000 - y100) * (km / hKmMax);
+    ctx.beginPath();
+    ctx.moveTo(canvas.width - pad.R, y);
+    ctx.lineTo(canvas.width - pad.R + 8, y);
+    ctx.stroke();
+    ctx.fillText(`${km}`, canvas.width - pad.R + 12, y + 3);
+  }
+
+  // feet scale on the far right
+  const ftMax = 52000;
+  ctx.fillText("FT (×1000)", canvas.width - pad.R + 70, pad.T + 10);
+  for (let ft = 0; ft <= ftMax; ft += 10000) {
+    const km = ft * 0.0003048;
+    const y = y1000 - (y1000 - y100) * (km / hKmMax);
+    ctx.fillText(`${ft/1000}`, canvas.width - pad.R + 62, y + 3);
+  }
+}
+
+/* ---- Info block (metadata summary) ---- */
+function drawInfoPanel() {
+  if (!META || !Object.keys(META).length) return;
+  const x0 = canvas.width - pad.R + 100;
+  let y = pad.T + 24;
+  ctx.fillStyle = "#e6f0ff";
+  ctx.font = "12px Inter";
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillRect(canvas.width - pad.R + 75, pad.T + 5, 130, 180);
+  ctx.fillStyle = "#e6f0ff";
+
+  const infos = [
+    ["TROP Lvl",  META.tropopause_height ? `${META.tropopause_height} m` : "–"],
+    ["FZL  Lvl",  META.freezing_level    ? `${META.freezing_level} m`    : "–"],
+    ["LCL  Hgt",  META.lcl_height        ? `${META.lcl_height} m`        : "–"],
+    ["LFC  Hgt",  META.lfc_height        ? `${META.lfc_height} m`        : "–"],
+    ["CAPE",      META.cape  ? `${META.cape.toFixed(0)} J/kg` : "–"],
+    ["CIN",       META.cin   ? `${META.cin.toFixed(0)} J/kg`  : "–"],
+    ["LI",        META.li    ? `${META.li.toFixed(1)} °C`     : "–"],
+    ["KI",        META.ki    ? `${META.ki.toFixed(1)} °C`     : "–"],
+    ["PW",        META.pw    ? `${META.pw.toFixed(1)} mm`     : "–"],
+  ];
+
+  infos.forEach(([k,v]) => {
+    ctx.fillText(`${k}:  ${v}`, x0, y);
+    y += 16;
+  });
+}
+
+
+/* ---- Profiles & wind barbs ---- */
+function drawSkewTProfile(){
+  if(!LEVELS.length){drawGrid(); return;}
+
+  // sort by pressure descending for smooth path
+  const L = LEVELS.filter(l=>l.pressure_hPa && l.temp_C!=null).sort((a,b)=>b.pressure_hPa-a.pressure_hPa);
+
+  drawGrid();
+
+  // Temp
+  ctx.beginPath();
+  L.forEach((l,i)=>{
+    const x=tToX_atP(l.temp_C, l.pressure_hPa), y=pToY(l.pressure_hPa);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle="#ff4d4d"; ctx.lineWidth=2; ctx.stroke();
+
+  // Dewpoint (dashed)
+  const Ld = LEVELS.filter(l=>l.pressure_hPa && l.dewpoint_C!=null).sort((a,b)=>b.pressure_hPa-a.pressure_hPa);
+  ctx.beginPath();
+  Ld.forEach((l,i)=>{
+    const x=tToX_atP(l.dewpoint_C, l.pressure_hPa), y=pToY(l.pressure_hPa);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.setLineDash([6,4]); ctx.strokeStyle="#d08b5a"; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]);
+
+  // Light fill between T & Td (moist layer look)
+  if(L.length && Ld.length){
+    ctx.beginPath();
+    L.forEach((l,i)=>{
+      const x=tToX_atP(l.temp_C, l.pressure_hPa), y=pToY(l.pressure_hPa);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    for(let i=Ld.length-1;i>=0;i--){
+      const l=Ld[i]; ctx.lineTo(tToX_atP(l.dewpoint_C,l.pressure_hPa), pToY(l.pressure_hPa));
+    }
+    ctx.fillStyle="rgba(0,200,255,0.08)"; ctx.fill();
+  }
+
+  // Wind barbs column on right
+  const xBarb = canvas.width - pad.R - 20; // 🔹 geser ~60px ke kiri
+  ctx.strokeStyle="#bfefff"; ctx.fillStyle="#bfefff"; ctx.lineWidth=1.4;
+  const barbPressures = [1000,925,850,700,500,400,300,250,200,150,100,50];
+  LEVELS.forEach(l=>{
+    if(!l.pressure_hPa) return;
+    const p = Math.round(l.pressure_hPa);
+    if(!barbPressures.some(bp => Math.abs(bp - p) <= 15)) return;   // tampil hanya di level utama
+    const y = pToY(l.pressure_hPa);
+    const wd = l.wind_dir_deg, mps = l.wind_speed_mps ?? l.wind_speed ?? null;
+    const wskt = (mps!=null)? mps*1.94384 : (l.wind_speed_kt ?? null);
+    if(wd==null || wskt==null) return;
+    drawWindBarb(xBarb, y, wskt, wd);
+  });
+
+  // garis pemisah di antara area barbs dan kolom teks kanan
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(canvas.width - pad.R + 70, pad.T);
+  ctx.lineTo(canvas.width - pad.R + 70, canvas.height - pad.B);
+  ctx.stroke();
+
+  // legend
+  ctx.fillStyle="#cfe8ff"; ctx.font="12px Inter"; ctx.textAlign="left";
+  ctx.fillText("Temp", pad.L+6, pad.T+16);
+  ctx.fillStyle="#ff4d4d"; ctx.fillRect(pad.L+50,pad.T+9,20,3);
+  ctx.fillStyle="#cfe8ff"; ctx.fillText("Dewpoint", pad.L+80, pad.T+16);
+  ctx.strokeStyle="#d08b5a"; ctx.setLineDash([6,4]); ctx.beginPath(); ctx.moveTo(pad.L+145,pad.T+12); ctx.lineTo(pad.L+165,pad.T+12); ctx.stroke(); ctx.setLineDash([]);
+
+  // === Right axis & info text ===
+  drawRightAxis();
+  drawInfoPanel();
+}
+
+function drawWindBarb(x,y,kt,dir){
+  const len=26, rad=(270-dir)*Math.PI/180;
+  const x2=x+Math.cos(rad)*len, y2=y+Math.sin(rad)*len;
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x2,y2); ctx.stroke();
+  let rem=Math.round(kt/5)*5, xp=x2, yp=y2, ang=rad+3*Math.PI/4;
+  while(rem>=50){drawFlag(xp,yp,ang); rem-=50; yp+=Math.cos(rad)*8; xp-=Math.sin(rad)*8;}
+  while(rem>=10){drawBarb(xp,yp,ang,12); rem-=10; yp+=Math.cos(rad)*6; xp-=Math.sin(rad)*6;}
+  if(rem>=5) drawBarb(xp,yp,ang,8);
+  function drawBarb(ax,ay,a,l){ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ax+Math.cos(a)*l,ay+Math.sin(a)*l);ctx.stroke();}
+  function drawFlag(ax,ay,a){ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ax+Math.cos(a)*16,ay+Math.sin(a)*16);ctx.lineTo(ax+Math.cos(a+Math.PI/8)*6,ay+Math.sin(a+Math.PI/8)*6);ctx.closePath();ctx.fill();}
+}
+
+/* ---- Hodograph ---- */
+function drawHodograph(){
+  clear();
+  const cx=pad.L + (canvas.width - pad.L - pad.R)/2, cy=pad.T + (canvas.height - pad.T - pad.B)/2;
+  const maxR = Math.min((canvas.width-pad.L-pad.R),(canvas.height-pad.T-pad.B))/2 - 20;
+  const scale= maxR/50; // 50 m/s max ring (adjust if you want)
+  // rings every 10 m/s
+  ctx.strokeStyle="rgba(255,255,255,0.14)"; ctx.lineWidth=1; ctx.textAlign="left"; ctx.fillStyle="#e6f0ff"; ctx.font="12px Inter";
+  for(let v=10; v<=50; v+=10){
+    ctx.beginPath(); ctx.arc(cx,cy,v*scale,0,2*Math.PI); ctx.stroke();
+    ctx.fillText(`${v} m/s`, cx+v*scale+4, cy-2);
+  }
+  // axes
+  ctx.strokeStyle="rgba(255,255,255,0.25)";
+  ctx.beginPath(); ctx.moveTo(cx-maxR,cy); ctx.lineTo(cx+maxR,cy); ctx.moveTo(cx,cy-maxR); ctx.lineTo(cx,cy+maxR); ctx.stroke();
+  ctx.fillText("W", cx-8, cy-maxR-6); ctx.fillText("E", cx-4, cy+maxR+14);
+  ctx.fillText("S", cx+maxR+6, cy+4); ctx.fillText("N", cx-maxR-16, cy+4);
+
+  if(!LEVELS.length) return;
+
+  // path
+  const L = LEVELS.filter(l=>l.wind_dir_deg!=null && (l.wind_speed_mps!=null || l.wind_speed!=null || l.wind_speed_kt!=null));
+  if(!L.length) return;
+
+  ctx.beginPath(); ctx.strokeStyle="#00d1ff"; ctx.lineWidth=2;
+  L.forEach((l,i)=>{
+    const mps = l.wind_speed_mps ?? l.wind_speed ?? ((l.wind_speed_kt??0)/1.94384);
+    const rad = l.wind_dir_deg*Math.PI/180;
+    const u = -mps*Math.sin(rad), v = -mps*Math.cos(rad); // meteorological
+    const x = cx + u*scale, y = cy + v*scale;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // points + pressure labels (1000, 850, 700, 500, 300, 200)
+  const labelPs=[1000,925,850,700,500,400,300,250,200];
+  ctx.fillStyle="#ff4d4d";
+  L.forEach(l=>{
+    const mps = l.wind_speed_mps ?? l.wind_speed ?? ((l.wind_speed_kt??0)/1.94384);
+    const rad = l.wind_dir_deg*Math.PI/180;
+    const u = -mps*Math.sin(rad), v = -mps*Math.cos(rad);
+    const x = cx + u*scale, y = cy + v*scale;
+    ctx.beginPath(); ctx.arc(x,y,3,0,2*Math.PI); ctx.fill();
+    if(labelPs.includes(Math.round(l.pressure_hPa||0))){
+      ctx.fillStyle="#cfe8ff"; ctx.font="12px Inter";
+      ctx.fillText(`${Math.round(l.pressure_hPa)}hPa`, x+6, y-6);
+      ctx.fillStyle="#ff4d4d";
+    }
+  });
+}
+
+/* ---- Master draw ---- */
+function drawAll(){
+  clear();
+  if(activeTab==="skewt") drawSkewTProfile(); else drawHodograph();
+}
+
+/* ---- React to toggles ---- */
+$("#showDry,#showIsoT,#showMix").on("change",()=>{ if(activeTab==="skewt") drawAll(); });
+
+/* ---- Resize handling ---- */
+window.addEventListener('resize',()=>{
+  const card = document.querySelector('.card');
+  canvas.width = Math.min(1300, Math.max(900, card.clientWidth-4));
+  canvas.height = 720;
+  drawAll();
+});
+(function initCanvas(){
+  const card = document.querySelector('.card');
+  canvas.width = Math.min(1300, Math.max(900, card.clientWidth-4));
+  canvas.height = 720;
+  drawAll();
+})();
+</script>
+</body>
+</html>

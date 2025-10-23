@@ -229,6 +229,20 @@
       background: rgba(255,255,255,0.4);
       border-radius: 4px;
     }
+    /* === Filter === */
+    .filter-bar{
+      background:rgba(255,255,255,0.1);padding:12px 16px;border-radius:10px;
+      display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:20px;
+    }
+    .filter-bar select,.filter-bar input,.filter-bar button{
+      background:rgba(255,255,255,0.1);color:white;border:0;border-radius:8px;
+      padding:8px 10px;font-family:inherit;
+    }
+    .filter-bar button{cursor:pointer;background:#0078d7;border:none;}
+    #fileList{margin-top:10px;}
+    #fileList button{background:rgba(255,255,255,0.1);border:0;color:white;
+      border-radius:6px;padding:6px 10px;margin:3px 0;cursor:pointer;}
+    #fileList button:hover{background:rgba(255,255,255,0.25);}
   </style>
 </head>
 
@@ -271,7 +285,7 @@
     </div>
 
     <!-- Filter -->
-    <div>
+    <div class="filter-bar">
       <label>Site:</label>
       <select id="siteSelect">
         {% for s in ['aceh','cilacap','pangkalanbun','ranai','tarakan','sorong'] %}
@@ -315,195 +329,6 @@
         <tbody></tbody>
       </table>
     </div>
-      <!-- === Scrollable Explanation Box === -->
-      <div class="explanation-box">
-        <h3>🧠 Radiosonde Deep Physics Analysis — Detailed Explanation</h3>
-      
-        <div class="scroll-area">
-          <pre>
-      1) Cold Point Tropopause (Very Low Temperature Layer)
-      ------------------------------------------------------
-      What it detects:
-      The coldest layer in the profile (the “cold point”), which typically marks the tropopause. Extremely low temperatures here indicate a sharp troposphere–stratosphere transition.
-      
-      Trigger logic:
-      - Condition: Tmin < -75 °C
-      - Action: add note/issue: “🧊 Strong cold point (<−75 °C) — tropopause region.”
-      
-      Why it matters:
-      - A very cold tropopause (≤ −75 °C) is common in the tropics and strongly tied to deep convection and radiative cooling.
-      - Helps QC: a realistic cold point supports vertical consistency; an absent cold point may hint at profile truncation or sensor bias.
-      
-      Typical context/altitude:
-      - Tropical tropopause: ~16–18 km (100–70 hPa).
-      - Midlat/high latitudes: lower/warmer tropopauses.
-      
-      Example that triggers:
-      - Minimum temperature = −78 °C at ~17 km → triggers.
-      
-      Caveats:
-      - If the flight doesn’t reach the tropopause, Tmin may be warmer (no trigger).
-      
-      
-      2) RH Freeze-Out (Extremely Dry Upper Layer)
-      ---------------------------------------------
-      What it detects:
-      An ultra-dry upper-tropospheric layer consistent with ice supersaturation and dehydration above cirrus anvils.
-      
-      Trigger logic:
-      - Condition: T < -40 °C and RH < 5 %
-      - Action: “💧 Very dry upper layer (<5 % RH below −40 °C).”
-      
-      Why it matters:
-      - Indicates dehydration layers near the cold point tropopause.
-      - Helps identify cirrus outflow levels and UTLS dryness.
-      
-      Typical context/altitude:
-      - 10–15 km (250–150 hPa), near the tropopause.
-      
-      Example that triggers:
-      - T = −55 °C, RH = 2 % at ~14.5 km → triggers.
-      
-      Caveats:
-      - Sensor lag or RH definition (liquid vs ice) can affect readings.
-      
-      
-      3) Pressure Anomaly (Physically Impossible Reversal)
-      ----------------------------------------------------
-      What it detects:
-      A pressure increase with height, which cannot happen in the free atmosphere and flags sensor/decoding issues.
-      
-      Trigger logic:
-      - Condition: P[i] > P[i−1]
-      - Action: “⚠️ Pressure reversal detected → barometric sensor glitch.”
-      
-      Why it matters:
-      - Pressure should monotonically decrease as the balloon ascends.
-      - Indicates data corruption or bad level ordering.
-      
-      Typical context/altitude:
-      - Can occur anywhere, especially during noisy transitions.
-      
-      Example that triggers:
-      - 600 hPa → 605 hPa → triggers.
-      
-      Caveats:
-      - Tiny reversals may be rounding artifacts.
-      
-      
-      4) Strong Vertical Wind Shear (Speed Gradient)
-      -----------------------------------------------
-      What it detects:
-      Layers where wind speed changes rapidly with height — turbulent or jet layers.
-      
-      Trigger logic:
-      - Condition: ΔWS / ΔH > 10 m/s per km
-      - Action: “🌪️ Strong vertical wind shear (>10 m/s per km).”
-      
-      Why it matters:
-      - Indicates mechanical turbulence, jet streams, or frontal zones.
-      - Important for balloon stability and aviation hazard detection.
-      
-      Typical context/altitude:
-      - 2–4 km: low-level jets.
-      - 9–12 km: subtropical jet streams.
-      
-      Example that triggers:
-      - Wind speed rises from 10 m/s at 4 km to 25 m/s at 5 km → triggers.
-      
-      Caveats:
-      - Noisy wind data can cause false positives.
-      
-      
-      5) Directional Wind Shear (Turning with Height)
-      -----------------------------------------------
-      What it detects:
-      Large changes in wind direction over a short vertical distance — frontal or jet transition zones.
-      
-      Trigger logic:
-      - Condition: ΔWD / ΔH > 60° per km (for 300–1500 m layer)
-      - Action: “🌀 Rapid directional shift (>60°/km).”
-      
-      Why it matters:
-      - Marks veering/backing winds, frontal transitions, or jet curvature.
-      - Important for detecting dynamic instability and air mass boundaries.
-      
-      Typical context/altitude:
-      - 2–4 km: low-level jets and fronts.
-      - 10–12 km: jet curvature regions.
-      
-      Example that triggers:
-      - Wind turns from 90° (east) at 3 km to 210° (southwest) at 4 km → triggers.
-      
-      Caveats:
-      - Handled circularly using angDiff() to avoid 360° wrap errors.
-      
-      
-      6) Low Burst Altitude (Premature Balloon Termination)
-      -----------------------------------------------------
-      What it detects:
-      A flight that ended prematurely — balloon failed to reach normal burst altitude (~25–35 km).
-      
-      Trigger logic:
-      - Condition: Pmin > 100 hPa AND flight not OK
-      - Action: “🎯 Balloon burst below 100 hPa → premature termination.”
-      
-      Why it matters:
-      - Indicates balloon leakage, underfilling, or early cutoff.
-      - Affects completeness of upper-level data.
-      
-      Typical context/altitude:
-      - Normal burst: 20–30 hPa (~25–35 km).
-      - Faulty flight: >100 hPa (<16 km).
-      
-      Example that triggers:
-      - Minimum pressure 150 hPa, flight failed → triggers.
-      
-      Caveats:
-      - Some manual cutoffs or heavy payloads may terminate early by design.
-      
-
-      7) RH Anomaly & Cloud Interaction
-      ---------------------------------
-      What it detects:
-      Abnormally high or saturated relative humidity values across large portions of the flight,
-      used to distinguish between realistic cloud penetration and possible humidity sensor malfunction.
-
-      Trigger logic:
-      - Condition A (sensor error): T < −40 °C AND RH > 90 %
-      - Condition B (cloud/rain):  H < 3 km AND T > 0 °C AND RH ≥ 99 %
-      - Condition C (convective slowdown): significant reduction in ascent rate (ΔH smaller than 50 % of mean for >10 % of profile)
-
-      Actions:
-      - A → “💦 RH sensor likely saturated or frozen (RH>90% while T<−40 °C) → unrealistic humidity, possible sensor error.”
-      - B → “☁️ High RH (>99%) with T>0 °C below 3 km → balloon likely passed through cloud or rainfall layer.”
-      - C → “🌧️ Ascent rate slowed significantly → possible deep convective cloud crossing (Cumulonimbus).”
-
-      Why it matters:
-      - Differentiates between true atmospheric saturation (cloud or precipitation) and sensor wetting/freeze errors.
-      - Helps identify conditions that degrade humidity sensor performance or distort upper-air humidity profiles.
-      - Indicates potential convective environments that can affect balloon motion and measurement stability.
-
-      Typical context/altitude:
-      - Cloud or rainfall layers: 0–3 km with warm, moist conditions.
-      - Frozen sensor response: above 10–12 km where T < −40 °C.
-      - Deep convective (CB) zones: ascent slowdown between 3–12 km.
-
-      Example that triggers:
-      - RH ≈ 100 % from surface to 5 km, T ≈ +20 °C → cloud or rainfall layer (☁️)
-      - RH ≈ 100 % while T = −60 °C at 15 km → sensor freeze error (💦)
-      - Sudden slowdown in ascent speed around 8–10 km → cumulonimbus crossing (🌧️)
-
-      Caveats:
-      - Sensor wetting can persist for several kilometers even after exiting clouds.
-      - Frozen polymer sensors may remain at 100 % RH until warmed by sunlight post-burst.
-      - Requires supporting temperature and vertical-velocity data for full interpretation.
-
-      ------------------------------------------------------
-      End of file — Radiosonde Deep Physics Analysis (Rason Monitoring)
-          </pre>
-        </div>
-      </div>
     <style>
       /* Scrollable table */
       .table-container {
