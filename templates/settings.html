@@ -109,7 +109,7 @@
   <div id="tab-users" class="tab-content active">
     <table id="userTable">
       <thead>
-        <tr><th>Username</th><th>Password</th><th>Status</th><th>Action</th></tr>
+          <th>Username</th><th>Password</th><th>Expiry</th><th>Pages</th><th>Status</th><th>Action</th>
       </thead>
       <tbody></tbody>
     </table>
@@ -200,9 +200,23 @@
       <p style="opacity:0.8;">Enter a serial number above to search...</p>
     </div>
   </div>
+
+  <!-- 🔹 Modal Popup untuk memilih halaman -->
+  <div id="pagesModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:white; color:black; padding:25px; border-radius:10px; width:400px; text-align:left; box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+      <h3 style="margin-top:0;">🧩 Edit Allowed Pages</h3>
+      <div id="pageCheckboxes" style="margin-top:10px; display:flex; flex-direction:column; gap:5px;"></div>
+      <div style="text-align:right; margin-top:15px;">
+        <button onclick="savePages()" style="background:#0d6efd; color:white; padding:6px 15px; border:none; border-radius:6px;">Save</button>
+        <button onclick="closePagesModal()" style="background:#dc3545; color:white; padding:6px 15px; border:none; border-radius:6px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <p>© 2025 Radiosonde Monitoring · Powered by Terrindo · BMKG · Meteomodem</p>
   </footer>
+
 
   <script>
     let currentSite = "default";
@@ -233,26 +247,53 @@
         const tbody = document.querySelector("#userTable tbody");
         tbody.innerHTML = "";
     
-        Object.entries(users).forEach(([u, _]) => {
+        Object.entries(users).forEach(([u, info]) => {
+          const expiry = info.expiry || "-";
+          const pages = (info.pages || []).join(", ") || "-";
           const isActive = activeUsers.includes(u);
-          const isCurrent = me.user === u; // session yang sedang digunakan
-    
-          // 🟢 Kalau user sedang login di mana pun, tetap hijau
-          // 🔵 Kalau ini user yang sedang buka halaman (device aktif sekarang)
+          const isCurrent = me.user === u;
+        
+          // Hitung status expiry
+          let expiryDisplay = expiry;
+          if (expiry && expiry !== "-") {
+            try {
+              const now = new Date();
+              const expDate = new Date(expiry);
+              const diffDays = Math.floor((expDate - now) / (1000 * 60 * 60 * 24));
+        
+              if (diffDays < 0) {
+                // 🔴 Sudah lewat
+                expiryDisplay = `<span style="color:#f87171; font-weight:600;">${expiry} 🔥 Expired</span>`;
+              } else if (diffDays <= 7) {
+                // 🟡 Hampir habis
+                expiryDisplay = `<span style="color:#facc15; font-weight:600;">${expiry} ⚠️ Expiring Soon (${diffDays} day${diffDays!==1?"s":""})</span>`;
+              } else {
+                // ✅ Masih aman
+                expiryDisplay = `<span style="color:#e2e8f0;">${expiry}</span>`;
+              }
+            } catch (e) {
+              console.warn("Invalid expiry format:", expiry);
+            }
+          }
+        
           const statusBadge = isCurrent
             ? `<span style="color:#60a5fa; font-weight:600;">🔵 Current Session</span>`
             : (isActive
                 ? `<span style="color:#4ade80; font-weight:600;">🟢 Active</span>`
                 : `<span style="color:#9ca3af;">⚪ Offline</span>`);
-    
+        
           tbody.innerHTML += `
             <tr>
               <td>${u}</td>
               <td>****</td>
+              <td>${expiryDisplay}</td>
+              <td>${pages}</td> 
               <td>${statusBadge}</td>
               <td>
                 ${u === "admin" ? "—" : `
-                  <button class="btn-edit" onclick="editUser('${u}')">Edit</button>
+                  <button class="btn-edit" onclick="editUser('${u}')">Edit Password</button>
+                  <button class="btn-edit" style="background:#22c55e;" onclick="editExpiry('${u}', '${expiry}')">Edit Expiry</button>
+                  <button class="btn-edit" style="background:#16a34a;" onclick="editPages('${u}', '${pages}')">Edit Pages</button>
                   <button class="btn-del" onclick="deleteUser('${u}')">Delete</button>
                   <button class="btn-logout" style="background:#f97316;" onclick="logoutUser('${u}')">Logout</button>
                 `}
@@ -289,6 +330,26 @@
       alert(json.success ? "🔐 Password updated" : json.error);
       loadUsers();
     }
+
+    async function editExpiry(username, current) {
+      const newExpiry = prompt(`Set expiry date for "${username}" (YYYY-MM-DD):`, current || "");
+      if (!newExpiry) return;
+    
+      const res = await fetch('/api/user_expiry', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, expiry: newExpiry})
+      });
+    
+      const json = await res.json();
+      if (json.success) {
+        alert(`✅ Expiry updated for ${username}: ${newExpiry}`);
+        loadUsers();
+      } else {
+        alert(`❌ ${json.error || 'Failed to update expiry date.'}`);
+      }
+    }
+    
 
     async function deleteUser(username) {
       if (!confirm(`Delete user "${username}"?`)) return;
@@ -575,6 +636,101 @@
       } catch (err) {
         console.error(err);
         alert(`❌ Network error when logging out ${username}.`);
+      }
+    }
+
+    let currentEditUser = null; // simpan user yang sedang diedit
+    
+    // Daftar halaman yang tersedia di sistem
+    const allAvailablePages = [
+      "main",
+      "dashboard",
+      "map",
+      "trajectory3d",
+      "time_accuracy",
+      "height_reach",
+      "data_availability",
+      "analysis",
+      "error_analysis",
+      "settings",
+      "raob",
+      "raob_doc",
+      "release",
+    ];
+    
+    function editPages(username, currentPagesStr) {
+      currentEditUser = username;
+    
+      // Ambil daftar halaman user saat ini
+      const currentPages = currentPagesStr.split(",").map(p => p.trim()).filter(Boolean);
+      const container = document.getElementById("pageCheckboxes");
+      container.innerHTML = "";
+    
+      // Tambahkan opsi "All Pages (*)"
+      const allChecked = currentPages.includes("*");
+      container.innerHTML += `
+        <label>
+          <input type="checkbox" id="page_all" ${allChecked ? "checked" : ""} onchange="toggleAllPages(this)">
+          <b>All Pages (*)</b>
+        </label>
+      `;
+    
+      // Tambahkan semua halaman sistem
+      allAvailablePages.forEach(page => {
+        const checked = allChecked || currentPages.includes(page);
+        container.innerHTML += `
+          <label>
+            <input type="checkbox" name="pageOption" value="${page}" ${checked ? "checked" : ""} ${allChecked ? "disabled" : ""}>
+            ${page}
+          </label>
+        `;
+      });
+    
+      document.getElementById("pagesModal").style.display = "flex";
+    }
+    
+    function toggleAllPages(checkbox) {
+      document.querySelectorAll("input[name='pageOption']").forEach(cb => {
+        cb.disabled = checkbox.checked;
+      });
+    }
+    
+    function closePagesModal() {
+      document.getElementById("pagesModal").style.display = "none";
+      currentEditUser = null;
+    }
+    
+    async function savePages() {
+      if (!currentEditUser) return;
+      const allSelected = document.getElementById("page_all").checked;
+      let selectedPages = [];
+    
+      if (allSelected) {
+        selectedPages = ["*"];
+      } else {
+        document.querySelectorAll("input[name='pageOption']:checked").forEach(cb => {
+          selectedPages.push(cb.value);
+        });
+      }
+    
+      try {
+        const res = await fetch("/api/user_pages", {
+          method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({username: currentEditUser, pages: selectedPages})
+        });
+    
+        const json = await res.json();
+        if (json.success) {
+          alert(`✅ Updated allowed pages for ${currentEditUser}`);
+          closePagesModal();
+          loadUsers();
+        } else {
+          alert(`❌ ${json.error || "Failed to update pages"}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Network error while saving pages");
       }
     }
 
