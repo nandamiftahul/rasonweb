@@ -2,72 +2,109 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Under Development - Radiosonde Monitoring</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>🚧 Under Development - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
   <style>
-    body, html {
-      margin:0; padding:0; height:100%;
-      display:flex; align-items:center; justify-content:center;
-      font-family:"Inter", sans-serif;
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: "Inter", sans-serif;
       background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
-      color:white;
-    }
-
-    .container {
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 12px;
-      padding: 40px 50px;
-      text-align: center;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-      max-width: 400px;
-    }
-
-    .container h1 {
-      margin: 0 0 20px;
-      font-size: 24px;
-      font-weight: 600;
-    }
-
-    .container p {
-      font-size: 15px;
-      color: #dbeafe;
-      margin-bottom: 25px;
-    }
-
-    .btn {
-      display: inline-block;
-      padding: 10px 20px;
-      background: linear-gradient(to right, #00b4ff, #0078d7);
       color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.3s, transform 0.2s;
+      overflow: hidden;
     }
 
-    .btn:hover {
-      transform: translateY(-2px);
-      background: linear-gradient(to right, #0095cc, #0062b5);
+    .glass-box {
+      background: rgba(255,255,255,0.12);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      padding: 40px 60px;
+      text-align: center;
+      box-shadow: 0 4px 25px rgba(0,0,0,0.3);
+      animation: fadeIn 1s ease;
     }
 
-    .footer {
-      margin-top: 20px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.8);
+    h1 {
+      font-size: 2.4em;
+      margin-bottom: 10px;
+      color: #facc15;
+      text-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+    }
+
+    p {
+      font-size: 1.1em;
+      color: #e5e7eb;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+
+    .spinner {
+      border: 4px solid rgba(255,255,255,0.2);
+      border-top: 4px solid #38bdf8;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      margin: 0 auto 25px;
+      animation: spin 1.5s linear infinite;
+    }
+
+    button {
+      background: #38bdf8;
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #0ea5e9;
+      transform: scale(1.05);
+    }
+
+    footer {
+      position: absolute;
+      bottom: 20px;
+      text-align: center;
+      font-size: 0.9em;
+      opacity: 0.8;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>⚠️ Page Under Development</h1>
-    <p>This feature is currently being built. Please check back later.</p>
-    <a href="{{ url_for('main_page') }}" class="btn">⬅ Back to Main Menu</a>
-    <div class="footer">
-      Powered by <b>Terrindo</b> · <b>BMKG</b> · <b>Meteomodem</b>
-    </div>
+
+  <div class="glass-box">
+    <div class="spinner"></div>
+    <h1>🚧 Under Development</h1>
+    <p>
+      This page is currently being developed to enhance<br>
+      the Radiosonde Monitoring experience.<br>
+      Please check back soon!
+    </p>
+    <button onclick="window.location.href='/'">🏠 Back to Main Menu</button>
   </div>
+
+  <footer>
+    <p>© 2025 Radiosonde Monitoring · Powered by Terrindo · BMKG · Meteomodem</p>
+  </footer>
+
 </body>
 </html>
