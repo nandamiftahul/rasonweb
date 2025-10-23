@@ -6,7 +6,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from flask import (
-    Flask, render_template, request, redirect,
+    Flask, render_template, request, redirect, abort,
     url_for, jsonify, session, send_file, Response
 )
 from functools import wraps
@@ -19,6 +19,7 @@ matplotlib.use("Agg")  # safe for server
 import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
+from functools import wraps
 
 import metpy.calc as mpcalc
 from metpy.units import units
@@ -240,6 +241,27 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def page_access_required(page_name):
+    """Batasi akses halaman berdasarkan izin per user."""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            user = session.get("user")
+            if not user or user not in VALID_USERS:
+                return redirect(url_for("login"))
+
+            user_info = VALID_USERS[user]
+            allowed_pages = user_info.get("pages", [])
+
+            # admin punya akses ke semua halaman
+            if user == "admin" or "*" in allowed_pages or page_name in allowed_pages:
+                return f(*args, **kwargs)
+
+            print(f"🚫 Access denied for '{user}' → {page_name}")
+            return abort(403)  # Forbidden
+        return wrapper
+    return decorator
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -346,6 +368,42 @@ def api_active_users():
 @login_required
 def whoami():
     return jsonify({"user": session.get("user", None)})
+
+@app.route("/api/user_expiry", methods=["PUT"])
+@login_required
+def update_user_expiry():
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json(force=True)
+    username = data.get("username")
+    expiry = data.get("expiry")
+
+    if username not in VALID_USERS:
+        return jsonify({"error": "User not found"}), 404
+
+    VALID_USERS[username]["expiry"] = expiry
+    save_users()
+    print(f"🗓️ Updated expiry for {username} → {expiry}")
+    return jsonify({"success": True, "username": username, "expiry": expiry})
+
+@app.route("/api/user_pages", methods=["PUT"])
+@login_required
+def update_user_pages():
+    if session.get("user") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json(force=True)
+    username = data.get("username")
+    pages = data.get("pages", [])
+
+    if username not in VALID_USERS:
+        return jsonify({"error": "User not found"}), 404
+
+    VALID_USERS[username]["pages"] = pages
+    save_users()
+    print(f"🔧 Updated allowed pages for {username}: {pages}")
+    return jsonify({"success": True, "user": username, "pages": pages})
 
 # --- BUFR decode ---
 def decode_bufr(filepath):
@@ -1547,6 +1605,7 @@ def download_file(site, filename):
 # --- Routes ---
 @app.route("/dashboard")
 @login_required
+@page_access_required("dashboard")
 def dashboard():
     # Default to ".bfr" if ext is missing or empty
     selected_ext = request.args.get("ext")
@@ -1621,7 +1680,6 @@ def file_metadata(site, filename):
     except Exception as e:
         print(f"[ERROR] file_metadata failed for {filename}: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/load_from_ftp/<site>/<filename>")
 @login_required
@@ -2245,18 +2303,19 @@ def generate_weather_analysis(df):
 
 @app.route("/main")
 @login_required
+@page_access_required("main")
 def main_page():
     return render_template("main.html")
 
 @app.route("/map")
 @login_required
+@page_access_required("map")
 def map_view():
     t = request.args.get("t", str(int(time.time())))
     store = get_user_store()
     total = len(store.get("levels", []))
     user = session.get("user")
     return render_template("map.html", total=total, user=user, t=t)
-
 
 @app.route("/underdev")
 @login_required
@@ -2265,6 +2324,7 @@ def under_development():
 
 @app.route("/time_accuracy")
 @login_required
+@page_access_required("time_accuracy")
 def time_accuracy():
     """
     Halaman grafik time accuracy (Launch→100hPa dan Launch→30hPa)
@@ -2446,6 +2506,7 @@ def api_time_accuracy(site):
 
 @app.route("/height_reach")
 @login_required
+@page_access_required("height_reach")
 def height_reach():
     return render_template("height_reach.html")
 
@@ -2608,6 +2669,7 @@ def api_height_reach(site):
 
 @app.route("/settings")
 @login_required
+@page_access_required("settings")
 def settings_page():
     # Hanya admin
     if session.get("user") != "admin":
@@ -2715,6 +2777,7 @@ def manage_sites():
 
 @app.route("/raob_doc")
 @login_required
+@page_access_required("raob_doc")
 def raob_doc():
     return render_template("raob_doc.html")
 
@@ -2776,6 +2839,7 @@ def api_trajectory3d():
 
 @app.route("/trajectory3d")
 @login_required
+@page_access_required("trajectory3d")
 def trajectory3d_page():
     return render_template("trajectory3d.html")
 
@@ -2881,6 +2945,7 @@ def upload_bufr():
 
 @app.route("/data_availability")
 @login_required
+@page_access_required("data_availability")
 def data_availability_page():
     return render_template("data_availability.html")
 
@@ -3252,6 +3317,7 @@ def api_bufrmap_site(site):
 
 @app.route("/error_analysis")
 @login_required
+@page_access_required("error_analysis")
 def error_analysis_page():
     return render_template("error_analysis.html")
 
@@ -3261,6 +3327,7 @@ def error_analysis_page():
 
 @app.route("/analysis")
 @login_required
+@page_access_required("analysis")
 def analysis_page():
     """
     Halaman RAOB Analysis — menampilkan Skew-T & Hodograph
@@ -3351,8 +3418,73 @@ def api_serial_lookup(serial):
 
 @app.route("/release")
 @login_required
+@page_access_required("release")
 def release_page():
     return render_template("release_v1_0.html")
+
+# ===== Custom 403 Forbidden Page =====
+@app.errorhandler(403)
+def forbidden_error(e):
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Access Denied</title>
+        <style>
+            body {
+                background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+                font-family: 'Inter', sans-serif;
+                color: white;
+                height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+            }
+            .box {
+                background: rgba(255,255,255,0.12);
+                padding: 30px 40px;
+                border-radius: 12px;
+                text-align: center;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                backdrop-filter: blur(10px);
+                max-width: 400px;
+                width: 90%;
+            }
+            h1 {
+                font-size: 1.6em;
+                margin-bottom: 10px;
+                color: #f87171;
+            }
+            p {
+                opacity: 0.9;
+                margin-bottom: 20px;
+                line-height: 1.5;
+            }
+            button {
+                background: #38bdf8;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 18px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            button:hover { background: #0ea5e9; }
+        </style>
+    </head>
+    <body>
+        <div class="box">
+            <h1>🚫 Access Restricted</h1>
+            <p>You are not allowed to access this page.<br>
+            Please contact your administrator if you think this is a mistake.</p>
+            <button onclick="window.location.href='/'">🏠 Back to Home</button>
+        </div>
+    </body>
+    </html>
+    """, 403
 
 @app.after_request
 def add_no_cache_headers(response):

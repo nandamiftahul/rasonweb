@@ -1,61 +1,120 @@
 {
   "admin": {
     "password": "scrypt:32768:8:1$VeS18yRr5LNhXh1q$c30e2e87a7e05945556d70031593a8fb8705214b1b2dc9188fbf2d9fd742ca194bd9fe77410642ffb1ce95e5e61a2baee6949f6c8dc44564fce3e27e837e2441",
-    "expiry": "2026-10-23"
+    "expiry": "2099-10-23",
+    "pages": [
+      "*"
+    ]
   },
   "trial1": {
     "password": "scrypt:32768:8:1$4mFktFBkTMP9jtfp$675f15688b144c145d40e5d55cf9e678e018e1d5022255149e869002b50a15ae9233845ba1cb9d9fa9e4c43b334be6a89e9c67746962307a1408a1e5dc1c451d",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "trial2": {
     "password": "scrypt:32768:8:1$KiDlvqPEFNmqADL6$42f3f9042e7459a265cb544229d5a80ca702f96b3140e55c78186dc8081fceff203eee60c54a5d68db53614d2116c3912a6eff812516fed2cbc2a1d691451171",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "guest": {
     "password": "scrypt:32768:8:1$HnVF3pO3yel36idR$de5e91f00497f57a35f8a5953368fcf002bc65228cf066145c84ae32c711c98c19370a9ef55e24301aa2e62aeb99996a58aca68c1e450fec3f34b9cceb486f16",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "user1": {
     "password": "scrypt:32768:8:1$ulLbm1b70pLAKEv0$89368221ac97aaf013d5d47aa53a7991c3d300d6e410c9392f2b1cdb344856f71e308ead0467b80030b1c0656ff689b6c9633f1112c32fcdf593774004b7cbbf",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "user2": {
     "password": "scrypt:32768:8:1$Vbyyam2QyzNYLg4o$9acc229a7cb8f4f6296c05ca9cec33c8676227bf1242864a26e4c3e29e04643c0fb304dd59ec01a4f3e7ed3ac59f696c540e13ee4d81f96e124857cb83ead05e",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "user3": {
     "password": "scrypt:32768:8:1$uxDJ4iM3IEhjtC60$307c4a97efa86dcd758cf637dcbc629de49c5310b38e24a5ef4eecda263ac6367667528d289d3d62c948c764bd4adbd001cadac27f5f7a77d98da5fe2422f96a",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "bmkg": {
     "password": "scrypt:32768:8:1$hTq811WApIyKWwwc$1be9ce5c9b89818f3acd35c6b6e76d94be8c314fbe35b95fc39e800f42ed6f6d73ac17bb9d8bd6b9a9070d4d91c73a83e2c64160d231c33d70b956c7cae77641",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "cilacap": {
     "password": "scrypt:32768:8:1$uP0YAAqMhr7aPtZk$a2ebd52d6e41a41ceb404281caf6a5816774bd8863d8224eba45e660892336bbac8ec42cc5cc66ff88beeec51697e59b425899a07efa7d63e2f989d5ecd51b39",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "aceh": {
     "password": "scrypt:32768:8:1$Kh3zf3VTtGixJttV$668fe90a60362b664f8628d7145df0feb9e9693c983fe8e7a54d01e8ab1720ac425277471443bf3d84eafe9c01fef21b9b2383a378ba30aa7043622348f44a39",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "pangkalanbun": {
     "password": "scrypt:32768:8:1$EInUTyj562EquwRX$88aaa9ddfb939c53cca100c656834333ed6ca5610928f3de500f615d6a4d0980ccf9a8bb1f579550237c789ad46413bd8e1f515996e83ee35ee865d8287a8c27",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "tarakan": {
     "password": "scrypt:32768:8:1$HJRzruF6dRgtjgjH$c3c5a93b2620cc8cc2984bd92454e675e00a556ee77551f0c268c856341081e68b72e097f68d31bf0490bd7194b56d754c0929728a0070cedbd70492c9c0b4f8",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "sorong": {
     "password": "scrypt:32768:8:1$fryoI0iDAPgzz87H$4fe80efe551a3fed5be46bfb9164bdeed20da70512b32d0a40b506da65bd7d09bd7a369cb00dfd4b29c6cf8474a7b37311b956b83b0f9e3c665bfc99b245649b",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "ranai": {
     "password": "scrypt:32768:8:1$4hpqXdO6yp6wV1xt$168ec19f597b9c1fc002ba9fe52435cd0d46ecd61f17ea0859430148d3b58c00b9d45d9d2001cd7c9aab13d0d42828c45c129da6f700d8e9c7f1fea8e5ab07bf",
-    "expiry": "2026-10-23"
+    "expiry": "2026-10-23",
+    "pages": [
+      "main",
+      "dashboard"
+    ]
   },
   "test": {
-    "password": "scrypt:32768:8:1$nNUFfdaBPqRacxY4$0474d22e9badf58d1c36c3064d076902f5663991f8b853b142a8628255fc8395e494ae32cbfc51210ffedd39bf49982a9ef0e77bc421ed9d6855a9ca661e0de2"
+    "password": "scrypt:32768:8:1$nNUFfdaBPqRacxY4$0474d22e9badf58d1c36c3064d076902f5663991f8b853b142a8628255fc8395e494ae32cbfc51210ffedd39bf49982a9ef0e77bc421ed9d6855a9ca661e0de2",
+    "expiry": "2025-10-25",
+    "pages": [
+      "main"
+    ]
   }
 }
