@@ -38,7 +38,7 @@ Developed by **Terrindo x BMKG** — this system integrates automated FTP data i
 - Checks completeness of daily observation data on the server.
 - Grouped by site, date, and time (00Z / 12Z).
 
-### 🧮 **RAOB Data Analysis**
+### 🧮 **Data Analysis**
 - Vertical profile decoding (pressure, temperature, humidity, wind).
 - Calculation of derived indices: CAPE, CIN, LCL, KI, LI, etc. (MetPy).
 - Tropopause and freezing level detection.
