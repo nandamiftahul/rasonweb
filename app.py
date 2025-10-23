@@ -32,6 +32,8 @@ load_dotenv()
 # === Database SQLite for Radiosonde Cache ===
 import sqlite3
 from werkzeug.security import check_password_hash
+from werkzeug.security import generate_password_hash
+import secrets
 
 DB_PATH = "rason_data.db"
 
@@ -243,26 +245,48 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
-        if username in VALID_USERS and check_password_hash(VALID_USERS[username], password):
-            session["user"] = username
-            session["session_version"] = get_global_session_version()
-        
-            # 🧩 Generate token baru setiap kali login → invalidate sesi lama
-            global USER_SESSION_TOKENS
-            if "USER_SESSION_TOKENS" not in globals():
-                USER_SESSION_TOKENS = {}
-            import secrets
-            new_token = secrets.token_hex(8)
-            USER_SESSION_TOKENS[username] = new_token   # overwrite token lama
-            session["user_token"] = new_token
-        
-            # 🧩 Tandai user aktif
-            ACTIVE_USERS.add(username)
-            print(f"✅ User logged in: {username} (active: {list(ACTIVE_USERS)})")
-        
-            return redirect(url_for("main_page"))
-        else:
+
+        # Pastikan user ada di daftar
+        if username not in VALID_USERS:
             return render_template("login.html", error="Invalid credentials")
+
+        user_info = VALID_USERS[username]
+
+        # Ambil password hash dan tanggal expiry
+        user_hash = user_info.get("password")
+        expiry_str = user_info.get("expiry")
+
+        # 🔒 Cek password
+        if not check_password_hash(user_hash, password):
+            return render_template("login.html", error="Invalid credentials")
+
+        # ⏰ Cek apakah masa aktif sudah lewat
+        try:
+            expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+            if datetime.utcnow().date() > expiry_date:
+                return render_template("login.html", error=f"❌ Subscription expired on {expiry_str}")
+        except Exception:
+            print(f"⚠️ Invalid expiry date format for user {username}: {expiry_str}")
+
+        # ✅ Jika valid → lanjutkan login
+        session["user"] = username
+        session["session_version"] = get_global_session_version()
+
+        # 🧩 Generate token baru setiap kali login (invalidate sesi lama)
+        global USER_SESSION_TOKENS
+        if "USER_SESSION_TOKENS" not in globals():
+            USER_SESSION_TOKENS = {}
+        new_token = secrets.token_hex(8)
+        USER_SESSION_TOKENS[username] = new_token
+        session["user_token"] = new_token
+
+        # 🟢 Tambahkan ke daftar user aktif
+        ACTIVE_USERS.add(username)
+        print(f"✅ User logged in: {username} (active: {list(ACTIVE_USERS)})")
+
+        return redirect(url_for("main_page"))
+
+    # GET method
     return render_template("login.html")
 
 @app.route("/logout")
@@ -2605,14 +2629,20 @@ def manage_users():
         data = request.get_json()
         username = data.get("username")
         password = data.get("password")
+
         if not username or not password:
             return jsonify({"error": "Missing fields"}), 400
         if username in VALID_USERS:
             return jsonify({"error": "User already exists"}), 400
 
-        VALID_USERS[username] = password
+        # 🔒 Hash password sebelum disimpan
+        hashed_pw = generate_password_hash(password)
+
+        # Jika kamu mau tambahkan expiry nanti, bisa disini:
+        VALID_USERS[username] = {"password": hashed_pw}
+
         save_users()
-        print(f"✅ Added new user: {username}")
+        print(f"✅ Added new user (hashed): {username}")
         return jsonify({"success": True, "users": VALID_USERS})
 
     # --- PUT: update existing user's password
@@ -2620,26 +2650,35 @@ def manage_users():
         data = request.get_json()
         username = data.get("username")
         password = data.get("password")
+
         if not username or not password:
             return jsonify({"error": "Missing fields"}), 400
         if username not in VALID_USERS:
             return jsonify({"error": "User not found"}), 404
 
-        VALID_USERS[username] = password
+        # 🔒 Re-hash password saat diubah
+        hashed_pw = generate_password_hash(password)
+
+        # Kompatibel dengan struktur lama & baru
+        if isinstance(VALID_USERS[username], dict):
+            VALID_USERS[username]["password"] = hashed_pw
+        else:
+            VALID_USERS[username] = {"password": hashed_pw}
+
         save_users()
-        print(f"🔑 Updated password for user: {username}")
+        print(f"🔑 Updated password (hashed) for user: {username}")
         return jsonify({"success": True, "users": VALID_USERS})
 
     # --- DELETE: remove user
     if request.method == "DELETE":
         data = request.get_json()
         username = data.get("username")
+        if not username:
+            return jsonify({"error": "Missing username"}), 400
         if username not in VALID_USERS:
             return jsonify({"error": "User not found"}), 404
-        if username == "admin":
-            return jsonify({"error": "Cannot delete admin"}), 400
 
-        del VALID_USERS[username]
+        VALID_USERS.pop(username, None)
         save_users()
         print(f"🗑️ Deleted user: {username}")
         return jsonify({"success": True, "users": VALID_USERS})
@@ -2673,7 +2712,6 @@ def manage_sites():
         SITE_LIST.remove(name)
         save_sites()
         return jsonify({"success": True, "sites": SITE_LIST})
-
 
 @app.route("/raob_doc")
 @login_required
