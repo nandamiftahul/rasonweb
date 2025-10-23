@@ -102,6 +102,7 @@
     <button class="tab-btn active" onclick="switchTab('users')">👥 User Management</button>
     <button class="tab-btn" onclick="switchTab('sites')">🌐 Site Configuration</button>
     <button class="tab-btn" onclick="switchTab('bufr')">🧩 BUFR Mapping Configuration</button>
+    <button class="tab-btn" onclick="switchTab('serial')">🔍 Serial Lookup</button>
   </div>
 
   <!-- ===== TAB 1: USERS ===== -->
@@ -182,7 +183,17 @@
       <button onclick="addSite()">Add Site</button>
     </div>
   </div>
-
+  <!-- ===== TAB 4: SERIAL LOOKUP ===== -->
+  <div id="tab-serial" class="tab-content">
+    <div style="text-align:center; margin-top:20px;">
+      <input type="text" id="serialInput" placeholder="Enter Serial Number (e.g. 230451)" style="padding:8px 12px; border-radius:6px; width:220px;">
+      <button onclick="lookupSerial()">Search</button>
+    </div>
+  
+    <div id="serialResult" style="margin-top:30px; text-align:center;">
+      <p style="opacity:0.8;">Enter a serial number above to search...</p>
+    </div>
+  </div>
   <footer>
     <p>© 2025 Radiosonde Monitoring · Powered by Terrindo · BMKG · Meteomodem</p>
   </footer>
@@ -417,6 +428,49 @@
       loadSites();
     }
     
+    // ===== SERIAL LOOKUP =====
+    async function lookupSerial() {
+      let serial = document.getElementById("serialInput").value.trim();
+      const resultDiv = document.getElementById("serialResult");
+    
+      if (!serial) {
+        resultDiv.innerHTML = "<p style='color:#fca5a5;'>⚠️ Please enter a serial number.</p>";
+        return;
+      }
+    
+      // 🔹 Normalisasi input agar sesuai backend: hapus semua non-digit
+      serial = serial.replace(/\D/g, ""); // "412 2 00795" -> "412200795"
+    
+      if (!serial) {
+        resultDiv.innerHTML = "<p style='color:#fca5a5;'>⚠️ Invalid serial number format.</p>";
+        return;
+      }
+    
+      try {
+        const res = await fetch(`/api/serial_lookup/${serial}`);
+        if (!res.ok) throw new Error("Server error");
+    
+        const data = await res.json();
+    
+        if (data && Object.keys(data).length > 0) {
+          resultDiv.innerHTML = `
+            <table style="width:60%; margin:20px auto; border-collapse:collapse; background:rgba(255,255,255,0.1); border-radius:10px;">
+              <tr><th>Nomor Kardus</th><td>${data.nomor_kardus || "-"}</td></tr>
+              <tr><th>Nomor Seri</th><td>${data.nomor_seri || serial}</td></tr>
+              <tr><th>Lokasi</th><td>${data.lokasi || "-"}</td></tr>
+              <tr><th>Manufactured</th><td>${data.manufactured || "-"}</td></tr>
+              <tr><th>Out</th><td>${data.out || "-"}</td></tr>
+              <tr><th>Source File</th><td>${data.source_file || "-"}</td></tr>
+            </table>`;
+        } else {
+          resultDiv.innerHTML = `<p style='color:#fca5a5;'>❌ Serial ${serial} not found in JSON database.</p>`;
+        }
+      } catch (err) {
+        console.error(err);
+        resultDiv.innerHTML = `<p style='color:#fca5a5;'>❌ Error fetching serial data.</p>`;
+      }
+    }
+
     loadSites();
 
   </script>
