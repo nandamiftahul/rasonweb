@@ -3126,6 +3126,86 @@ def analysis_page():
     """
     return render_template("analysis.html")
 
+@app.route("/api/serial_lookup/<serial>")
+@login_required
+def api_serial_lookup(serial):
+    import json, re, os
+
+    json_path = "list_data_modem.json"
+    if not os.path.exists(json_path):
+        json_path = "merged_modem_m20.json"
+
+    if not os.path.exists(json_path):
+        return jsonify({"error": "❌ JSON database not found"}), 404
+
+    # --- normalisasi serial number ---
+    def normalize_serial(val):
+        if val is None:
+            return None
+        if isinstance(val, (int, float)):
+            try:
+                return int(val)
+            except Exception:
+                pass
+        s = str(val).strip()
+        digits = re.sub(r"\D", "", s)
+        if not digits:
+            return None
+        try:
+            return int(digits)
+        except Exception:
+            return None
+
+    # --- normalisasi input user ---
+    target = normalize_serial(serial)
+    if target is None:
+        return jsonify({"error": "⚠️ Invalid serial input"}), 400
+
+    # --- load json ---
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        return jsonify({"error": f"Failed to load JSON: {e}"}), 500
+
+    print(f"\n📦 Loaded {len(data)} entries from {json_path}")
+    print(f"🔍 Searching for serial: {target}")
+
+    # --- pencarian ---
+    found = None
+    for i, row in enumerate(data):
+        row_lower = {str(k).strip().lower(): v for k, v in row.items()}
+        sn_json = (
+            row_lower.get("nomor serial")
+            or row_lower.get("nomor seri")
+            or row_lower.get("serial")
+            or row_lower.get("no seri")
+            or row_lower.get("sn")
+        )
+        sn_json_int = normalize_serial(sn_json)
+        if sn_json_int == target:
+            found = row_lower
+            break
+
+    if not found:
+        print("❌ Serial not found.")
+        return jsonify({})
+
+    # --- konversi manufactured/out ke tanggal ---
+    manufactured = excel_date_to_str(found.get("manufactured"))
+    out = excel_date_to_str(found.get("out"))
+
+    result = {
+        "nomor_kardus": found.get("nomor kardus", "-"),
+        "nomor_seri": normalize_serial(found.get("nomor serial")) or "-",
+        "lokasi": found.get("lokasi", "-"),
+        "manufactured": manufactured,
+        "out": out,
+        "source_file": found.get("source_file", "-"),
+    }
+
+    print("📤 Result:", result)
+    return jsonify(result)
 
 @app.route("/release")
 @login_required
