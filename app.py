@@ -94,7 +94,6 @@ def db_insert(filetype, site, filename, file_date, df_meta, df_levels):
     except Exception as e:
         print(f"[DB] insert error {filename}: {e}")
 
-
 # --- Load configuration from environment ---
 CONFIG = {
     "ftp": {
@@ -105,15 +104,19 @@ CONFIG = {
         "password": os.getenv("FTP_PASS", ""),
         "base_path": os.getenv("FTP_BASE_PATH", "/UA"),
         "file_ext": os.getenv("FTP_FILE_EXT", ".bufr,.bfh,.bfr,.bin").split(","),
-        "limit": int(os.getenv("FTP_LIMIT", "30"))
+        "limit": int(os.getenv("FTP_LIMIT", "30")),
+        "secretkey": os.getenv("SECRETKEY", "Unknown"),
     }
 }
+cfg = CONFIG["ftp"]
+print(cfg)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
+#app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
+app.secret_key = cfg["secretkey"]
 
 ACTIVE_USERS = set()
 
@@ -128,8 +131,9 @@ def bump_global_session_version():
     """Naikkan versi sesi global → semua user auto logout."""
     global GLOBAL_SESSION_VERSION
     GLOBAL_SESSION_VERSION += 1
+    USER_SESSION_TOKENS.clear()
+    ACTIVE_USERS.clear()
     print(f"🔒 Global session version bumped to {GLOBAL_SESSION_VERSION}")
-
 
 # In-memory per-user store (username -> {"metadata": {...}, "levels": [...]})
 USER_STATE = defaultdict(lambda: {"metadata": {}, "levels": []})
@@ -264,6 +268,7 @@ def page_access_required(page_name):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    print("CHECK ===>",request.headers)
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -351,8 +356,13 @@ def logout_user(username):
 
     # Set token user ke random baru → invalidate sesi mereka
     import secrets
-    USER_SESSION_TOKENS[username] = secrets.token_hex(8)
+    
+    if username in USER_SESSION_TOKENS:
+        del USER_SESSION_TOKENS[username]
 
+    # 2) remove from ACTIVE_USERS (agar UI admin langsung tidak menampilkan)
+    ACTIVE_USERS.discard(username)
+    USER_SESSION_TOKENS[username] = secrets.token_hex(8)
     print(f"🔒 User {username} forced logout.")
     return jsonify({"success": True, "user": username})
 
@@ -675,7 +685,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
             end_date = to_utc_naive(tomorrow_local_midnight)
 
     result = {}
-    cfg = CONFIG["ftp"]
+    
     exts = [e.lower() for e in (ext_filter or cfg.get("file_ext", [".bufr"]))]
 
     try:
