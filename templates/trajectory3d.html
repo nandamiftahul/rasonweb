@@ -4,239 +4,533 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Radiosonde 3D Trajectory</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<!-- Fonts & Icons -->
+<link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<!-- jQuery (konsisten dengan page lain) -->
+<script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+
+<!-- MapLibre & deck.gl -->
 <link href="{{ url_for('static', filename='libs/maplibre/maplibre-gl.css') }}" rel="stylesheet">
 <script src="{{ url_for('static', filename='libs/maplibre/maplibre-gl.js') }}"></script>
 <script src="{{ url_for('static', filename='libs/deckgl/deck.gl.min.js') }}"></script>
 
 <style>
-html, body {
-  margin: 0;
-  height: 100%;
-  font-family: "Inter", sans-serif;
-  background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
-  color: #fff;
-}
-#map { position: absolute; inset: 0; }
+  * { box-sizing: border-box; }
+  body{
+    margin:0; font-family:"Inter",sans-serif;
+    display:flex; flex-direction:row; min-height:100vh;
+    background:linear-gradient(to bottom right,#0a2a6b,#004aad,#0078d7);
+    color:white; overflow-y:auto; transition:all .3s ease;
+  }
 
-/* Shared panel style */
-.panel, #levelPanel {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  padding: 18px 20px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-  backdrop-filter: blur(6px);
-  color: #fff;
-  font-family: "Inter", sans-serif;
-}
-.panel h3, #levelPanel h3 {
-  margin-top: 0;
-  margin-bottom: 12px;
-  font-weight: 600;
-  color: #fff;
-  font-size: 17px;
-  text-align: center;
-}
-label, select, input, button {
-  font-family: "Inter", sans-serif;
-  font-size: 13px;
-}
-select,
-input[type="file"],
-input[type="range"],
-input[type="date"],
-input[type="text"] {
-  width: 100%;
-  margin: 3px 0 10px;
-  border-radius: 6px;
-  border: none;
-  padding: 7px 8px;
-  height: 34px;
-  box-sizing: border-box;
-  vertical-align: middle;
-}
-button {
-  background: linear-gradient(90deg, #0078d7, #0d6efd);
-  color: white;
-  font-weight: 600;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 10px;
+  /* === Sidebar (sama seperti Map Viewer) === */
+  .sidebar{
+    width:230px; background:rgba(255,255,255,.08); backdrop-filter:blur(8px);
+    border-right:1px solid rgba(255,255,255,.15);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding:40px 10px 20px; position:fixed; top:0; left:0; height:100vh; z-index:10;
+    transition:width .3s ease, transform .3s ease;
+  }
+  .sidebar h2{
+    font-size:20px; margin-bottom:30px; color:#e0f2fe; text-align:center; font-weight:700;
+    letter-spacing:1.2px; text-transform:uppercase; text-shadow:0 0 6px rgba(255,255,255,.3);
+    border-bottom:1px solid rgba(255,255,255,.15); padding-bottom:8px;
+    transition:opacity .3s ease, height .3s ease, margin .3s ease;
+  }
+  .sidebar a{
+    display:flex; align-items:center; gap:10px; text-decoration:none; color:white;
+    width:100%; padding:12px 15px; border-radius:8px; text-align:left; margin:8px 0;
+    transition:background .3s ease; white-space:nowrap; overflow:hidden;
+  }
+  .sidebar a:hover{ background:rgba(255,255,255,.15); }
+  .sidebar a i{ font-size:18px; width:22px; text-align:center; color:#e0f2fe; flex-shrink:0; }
+  .sidebar a span{ padding-left:6px; transition:opacity .3s ease, width .3s ease; }
+
+  .sidebar.compact{ width:70px; align-items:flex-start; padding:60px 5px; }
+  .sidebar.compact h2{ opacity:0; height:0; margin:0; overflow:hidden; }
+  .sidebar.compact a span{ opacity:0; width:0; overflow:hidden; }
+  .sidebar.compact a:hover::after{
+    content:attr(data-title); position:absolute; left:70px;
+    background:rgba(0,0,0,.8); padding:5px 10px; border-radius:6px; color:#fff; font-size:13px;
+    white-space:nowrap; z-index:999; transform:translateY(-2px);
+  }
+
+  /* Toggle Button */
+  .toggle-btn{
+    position:fixed; top:50%; left:220px; transform:translateY(-50%);
+    width:28px; height:28px; border:none; border-radius:50%;
+    background:rgba(255,255,255,.25); color:white; font-size:14px; cursor:pointer;
+    z-index:50; transition:all .3s ease; display:flex; align-items:center; justify-content:center;
+    backdrop-filter:blur(5px);
+  }
+  .toggle-btn:hover{ background:rgba(255,255,255,.4); }
+  .toggle-btn.compact-position{ left:60px; }
+
+  /* === Main === */
+  .main{
+    flex:1; display:flex; flex-direction:column; min-height:100vh;
+    margin-left:230px; padding:40px 40px 0; padding-bottom:50px; box-sizing:border-box;
+  }
+  .main.expanded{ margin-left:0; }
+
+  /* Header box (sama) */
+  .header-box{
+    position:relative; background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.2); border-radius:12px; padding:20px 30px;
+    box-shadow:0 6px 25px rgba(0,0,0,.3); backdrop-filter:blur(10px);
+    display:flex; align-items:center; gap:18px; margin-bottom:14px;
+  }
+  .header-icon{
+    width:50px; height:50px; background:rgba(255,255,255,.15); border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:26px; color:#dbeafe;
+  }
+  .header-text h1{ margin:0; font-size:26px; font-weight:600; letter-spacing:.5px; }
+  .header-text p{ margin:4px 0 0; font-size:14px; color:#dbeafe; opacity:.9; }
+  .header-logos{ position:absolute; right:20px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:12px; }
+  .header-logos img{ height:36px; opacity:.9; }
+  .header-clock{ display:flex; flex-direction:column; align-items:flex-end; justify-content:center; line-height:1.1; font-size:18px; color:#fff; font-weight:600; letter-spacing:1px; text-shadow:0 0 6px rgba(0,0,0,.4); }
+
+  /* Filter bar (adopt Map Viewer) */
+  .filter-bar{
+    background:rgba(255,255,255,.1);
+    padding:12px 16px; border-radius:10px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .filter-bar label{ font-size:13px; color:#e0f2fe; }
+  .filter-bar select,.filter-bar input,.filter-bar button{
+    background:rgba(255,255,255,.1); color:white; border:0; border-radius:8px;
+    padding:8px 10px; font-family:inherit; font-size:13px;
+  }
+  .filter-bar button{ cursor:pointer; background:#0078d7; border:none; font-weight:600; }
+  .filter-bar button:hover{ background:#0a6cc2; }
+  .filter-bar .uploader{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    border-left:1px solid rgba(255,255,255,.2); padding-left:10px; margin-left:4px;
+  }
+  .statusText{ font-size:12px; color:#e0f2fe; font-weight:600; min-width:160px; white-space:nowrap; }
+
+  /* Map container (sejajar header) */
+  #map-container{
+    position:relative; width:100%; height:72vh;
+    border-radius:10px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,.4); margin-bottom:14px;
+  }
+  #map{ position:absolute; inset:0; }
+
+  /* North arrow */
+  #northArrow{
+    position:absolute; bottom:18px; right:18px; width:50px; height:50px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
+    box-shadow:0 2px 10px rgba(0,0,0,.3); text-align:center; font-weight:600; color:#fff; pointer-events:none; z-index:400;
+  }
+  #northArrow::before{ content:"▲"; display:block; font-size:20px; color:#ff4c4c; transform-origin:center; transition:transform .1s linear; margin-top:8px; }
+  #northArrow span{ display:block; font-size:13px; margin-top:-2px; color:#fff; }
+
+  /* Level panel (dipindah ke dalam map, pojok kanan atas) */
+  #levelPanel{
+    position:absolute; top:10px; right:10px; width:260px; z-index:500; display:none;
+    background:rgba(255,255,255,.7); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.3);
+    color:#111; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.25); padding:12px 12px 10px;
+    max-height:65%; overflow-y:auto;
+  }
+  #levelPanel h3{ margin:0 0 6px 0; font-size:14px; color:#004aad; text-align:left; }
+  #levelContent{ font-size:13px; }
+  #levelContent .row{ display:flex; justify-content:space-between; margin:4px 0; border-bottom:1px solid rgba(0,0,0,.08); padding-bottom:2px; }
+  #levelContent .label{ color:#333; }
+  #levelContent .val{ color:#0d6efd; font-weight:700; }
+
+  /* Info ringkas (ikon play, speed, progress) – tampil inline di filter status */
+  #info-panel{ display:none; }
+
+  /* Footer (sama) */
+  .footer{
+    position:fixed; bottom:0; left:230px; width:calc(100% - 230px);
+    height:38px; background:#ffffff; padding:4px 0;
+    display:flex; justify-content:center; align-items:center;
+    border-top:1px solid #d1d5db; z-index:5; transition:all .3s ease;
+  }
+  .footer span{ color:#333; font-weight:500; margin-right:6px; font-size:12px; opacity:.8; }
+  .footer img{ height:28px; opacity:.85; margin:0 6px; filter:saturate(90%); }
+  .main.expanded ~ .footer{ left:0; width:100%; }
+
+/* === 👤 User icon di pojok kiri atas sidebar === */
+.user-icon {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-size: 26px;
+  color: #e0f2fe;
   cursor: pointer;
-  transition: 0.2s;
+  transition: color 0.3s ease;
+  z-index: 20;
 }
-button:hover { background: linear-gradient(90deg, #0d6efd, #1a89ff); }
-.row { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
-.label { font-size: 13px; color: #fff; }
-.val { font-weight: 600; font-size: 13px; }
-#upload-status { font-size: 12px; min-height: 16px; color: #ddd; }
-hr { border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 12px 0; }
+.user-icon:hover { color: #38bdf8; }
 
-/* Layout */
-.panel { position: absolute; top: 20px; left: 20px; width: 320px; }
-#levelPanel {
+/* === 💬 Popup user info === */
+.user-popup {
   position: absolute;
-  top: 60px;
-  right: 20px;
-  width: 260px;
-  display: none;
-}
-#levelContent { font-size: 13px; }
-#levelContent .row {
-  display: flex;
-  justify-content: space-between;
-  margin: 4px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  padding-bottom: 2px;
-}
-#levelContent .label { color: #eee; }
-#levelContent .val { font-weight: 600; color: #0dcaf0; }
-/* === Compass North Only === */
-#northArrow {
-  position: absolute;
-  bottom: 25px;
-  right: 25px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.2);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-  text-align: center;
-  font-weight: 600;
-  color: #fff;
-  font-family: "Inter", sans-serif;
-  pointer-events: none;
-}
-#northArrow::before {
-  content: "▲";
-  display: block;
-  font-size: 20px;
-  color: #ff4c4c;        /* merah agar mudah dikenali */
-  transform-origin: center;
-  transition: transform 0.1s linear;
-  margin-top: 8px;
-}
-#northArrow span {
-  display: block;
+  top: 45px;
+  left: 10px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
   font-size: 13px;
-  margin-top: -2px;
+  color: #fff;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  display: none;
+  z-index: 999;
+  width: 190px;
+}
+.user-popup.show { display: block; }
+.user-popup p { margin: 4px 0; color: #e0f2fe; }
+.user-popup b { color: #fff; }
+.user-popup button {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.2);
+  color: #fca5a5;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.user-popup button:hover {
+  background: rgba(255,255,255,0.35);
   color: #fff;
 }
-#userBox {
+/* === Playback Bar (di bawah map) === */
+.playback-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-top: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+.playback-bar button {
+  background: #0078d7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.playback-bar button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.playback-bar input[type="range"] {
+  accent-color: #0078d7;
+  height: 6px;
+  cursor: pointer;
+}
+.playback-bar span, .playback-bar label {
+  font-size: 13px;
+  color: #e0f2fe;
+  user-select: none;
+}
+/* === Map Layer Toggle Control === */
+#mapLayerControl {
   position: absolute;
   top: 12px;
-  right: 18px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 10px;
-  padding: 4px 10px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 500;
+}
+
+#mapLayerControl button {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #004aad;
+  transition: all 0.2s ease;
+}
+
+#mapLayerControl button:hover {
+  background: rgba(255,255,255,1);
+  transform: scale(1.08);
+}
+
+#mapLayerControl button.active {
+  background: #0078d7;
+  color: white;
+  border-color: rgba(0,0,0,0.25);
+}
+#upload-status {
+  display: inline-block;
+  margin-left: 8px;
+  min-width: 180px;
+  color: #e0f2fe;
+  font-weight: 600;
   font-size: 12px;
-  color: #e0f2fe;
-  backdrop-filter: blur(6px);
-  z-index: 1200;
 }
-#userBox a {
-  text-decoration: none;
-  color: #e0f2fe;
-  margin-left: 6px;
-  transition: opacity 0.2s;
+/* === Overlay Controls (inside map) === */
+#overlayControls {
+  position: absolute;
+  bottom: 90px;  /* di atas north arrow */
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 500;
 }
-#userBox a:hover { opacity: 0.8; }
+
+#overlayControls label {
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 6px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#overlayControls label:hover {
+  background: rgba(255,255,255,1);
+  transform: scale(1.05);
+}
+
+#overlayControls input {
+  display: none;
+}
+
+/* Aktif = biru */
+#overlayControls input:checked + i {
+  color: white;
+  background: #0078d7;
+  border-radius: 5px;
+  padding: 6px;
+}
+
+#overlayControls i {
+  font-size: 20px;
+  color: #004aad;
+  transition: all 0.2s ease;
+}
 
 </style>
 </head>
 <body>
-<!-- 🔹 Floating mini user box -->
-<div id="userBox">
-  <a href="{{ url_for('main_page') }}">🏠 Home</a>
-  <a href="{{ url_for('logout') }}">🚪 Logout</a>
-</div>
-<div id="map"></div>
-<div id="northArrow"><span>N</span></div>
-<!-- LEFT PANEL -->
-<div class="panel">
-  <h3>Radiosonde 3D Trajectory</h3>
+  <!-- Sidebar toggle -->
+  <button class="toggle-btn compact-position" id="toggleBtn" onclick="toggleSidebar()">☰</button>
 
-  <label>Filter Radiosonde</label>
-  <label>Site</label>
-  <select id="siteSelect">
-    <option value="">-- Pilih Site --</option>
-    <option value="aceh">Aceh</option>
-    <option value="tarakan">Tarakan</option>
-    <option value="sorong">Sorong</option>
-    <option value="cilacap">Cilacap</option>
-    <option value="pangkalanbun">Pangkalanbun</option>
-    <option value="ranai">Ranai</option>
-  </select>
-
-  <label>Tanggal</label>
-  <input type="date" id="dateSelect">
-  <label>Jam</label>
-  <select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
-  <label>Tipe File</label>
-  <select id="typeSelect">
-    <option value=".bfr">.bfr</option><option value=".bufr">.bufr</option>
-    <option value=".bfh">.bfh</option><option value=".bin">.bin</option>
-  </select>
-
-  <button id="applyFilter">🔍 Apply Filter</button>
-  <hr>
-
-  <label>Pilih File Radiosonde</label>
-  <input id="file-input" type="file" accept=".bufr,.bfr,.bfh,.bin" />
-  <button id="upload-btn">⬆️ Upload & Decode</button>
-  <div id="upload-status"></div>
-  <hr>
-
-  <label>Basemap</label>
-  <select id="basemapSelect">
-    <option value="osm">OpenStreetMap</option>
-    <option value="esri" selected>Esri Satellite</option>
-    <option value="google">Google Hybrid</option>
-  </select>
-  <hr>
-  <label>Analytical Layers</label>
-  <label style="display:flex;align-items:center;gap:8px;">
-    <input type="checkbox" id="chk-freeze">
-    ❄️ Freezing Layer (0 °C)
-  </label>
-  <label style="display:flex;align-items:center;gap:8px;">
-    <input type="checkbox" id="chk-shear">
-    🌀 Wind Barb Profile
-  </label>
-  <hr>
-
-  <div id="info-panel" style="display:none;">
-    <div class="row"><div class="label">Station</div><div class="val" id="st-name">-</div></div>
-    <div class="row"><div class="label">Launch</div><div class="val" id="st-launch">-</div></div>
-    <div class="row"><div class="label">Max Height</div><div class="val" id="st-maxz">-</div></div>
-    <div class="row"><div class="label">Elapsed</div><div class="val" id="st-elap">0 s</div></div>
-
-    <div class="row" style="justify-content:center;gap:10px;">
-      <button id="btn-play">▶️ Play</button>
-      <button id="btn-pause" disabled>⏸ Pause</button>
-    </div>
-
-    <div class="row">
-      <div class="label">Speed</div>
-      <input id="speed" type="range" min="0.1" max="1000" step="0.1" value="1" />
-      <div class="val" id="sp-val">1×</div>
-    </div>
-
-    <div class="row">
-      <div class="label">Progress</div>
-      <input id="prog" type="range" min="0" max="100" step="0.1" value="0" />
-    </div>
+  <!-- 👤 User Profile Icon -->
+  <div class="user-icon" onclick="toggleUserInfo()">
+    <i class="bi bi-person-circle"></i>
   </div>
+  
+  <!-- 💬 Popup Info -->
+  <div class="user-popup" id="userPopup">
+    <p><b>Username:</b> <span id="userName">-</span></p>
+    <p><b>Expiry:</b> <span id="userExpiry">-</span></p>
+    <button id="logoutBtn" onclick="logoutUser()">Logout</button>
+  </div>
+  
+
+  <!-- Sidebar -->
+  <div class="sidebar compact" id="sidebar">
+    <h2>RASON PANEL</h2>
+  
+    <a href="{{ url_for('main_page') }}" data-title="Main Page"><i class="bi bi-house-door"></i><span>Main Page</span></a>
+    <a href="{{ url_for('dashboard') }}" data-title="Data Resume"><i class="bi bi-bar-chart-fill"></i><span>Data Resume</span></a>
+    <a href="{{ url_for('map_view') }}"  data-title="Map"><i class="bi bi-map"></i><span>Map</span></a>
+    <a href="{{ url_for('trajectory3d_page') }}" data-title="Trajectory 3D"><i class="bi bi-globe2"></i><span>Trajectory 3D</span></a>
+    <a href="{{ url_for('time_accuracy') }}" data-title="Time Accuracy"><i class="bi bi-stopwatch"></i><span>Time Accuracy</span></a>
+    <a href="{{ url_for('height_reach') }}" data-title="Height Reach"><i class="bi bi-graph-up"></i><span>Height Reach</span></a>
+    <a href="{{ url_for('data_availability_page') }}" data-title="Data Availability"><i class="bi bi-calendar3"></i><span>Data Availability</span></a>
+    <a href="{{ url_for('error_analysis_page') }}" data-title="Error Analysis"><i class="bi bi-exclamation-triangle"></i><span>Error Analysis</span></a>
+    <a href="{{ url_for('settings_page') }}" data-title="Settings"><i class="bi bi-gear"></i><span>Settings</span></a>
+  </div>
+
+  <!-- Main -->
+  <div class="main" id="mainContent">
+    <!-- Header -->
+    <div class="header-box">
+      <div class="header-icon" style="filter:brightness(10) saturate(0.1);">🎈</div>
+      <div class="header-text">
+        <h1>Radiosonde 3D Trajectory</h1>
+        <p>Interactive 3D path • analysis overlays</p>
+      </div>
+      <div class="header-logos">
+        <div class="header-clock">
+          <div id="utcClock">--:--:-- UTC</div>
+          <div id="utcDate" style="font-size:12px; opacity:0.8;">-- --- ----</div>
+        </div>
+        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG" style="height:55px;width:auto;">
+      </div>
+    </div>
+
+    <!-- Filter bar (adopt Map Viewer; ID tetap seperti fungsi kamu) -->
+    <div class="filter-bar">
+      <label>Site:</label>
+      <select id="siteSelect">
+        <option value="aceh">Aceh</option>
+        <option value="tarakan">Tarakan</option>
+        <option value="sorong">Sorong</option>
+        <option value="cilacap">Cilacap</option>
+        <option value="pangkalanbun">Pangkalanbun</option>
+        <option value="ranai">Ranai</option>
+      </select>
+
+      <label>Date:</label><input type="date" id="dateSelect">
+      <label>Hour:</label><select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
+      <label>Type:</label>
+      <select id="typeSelect"><option value=".bfr">.bfr</option><option value=".bufr">.bufr</option><option value=".bfh">.bfh</option><option value=".bin">.bin</option></select>
+      <button id="applyFilter">Apply</button>
+
+      <!-- Uploader (ID & behavior dipertahankan) -->
+      <div class="uploader">
+        <input id="file-input" type="file" accept=".bufr,.bfr,.bfh,.bin" />
+        <button id="upload-btn">Upload & Decode</button>
+        <span id="upload-status" class="statusText"></span>
+      </div>
+    </div>
+
+    <!-- Map container -->
+    <div id="map-container">
+      <div id="map"></div>
+      <div id="northArrow"><span>N</span></div>
+<!-- ❄️🌀 Overlay Controls -->
+<div id="overlayControls">
+  <label title="Toggle Freezing Layer">
+    <input type="checkbox" id="chk-freeze">
+    <i class="bi bi-snow2"></i>
+  </label>
+  <label title="Toggle Wind Barb Profile">
+    <input type="checkbox" id="chk-shear">
+    <i class="bi bi-wind"></i>
+  </label>
 </div>
 
-<!-- RIGHT PANEL -->
-<div id="levelPanel">
-  <h3>📊 Level Info</h3>
-  <div id="levelContent">No data</div>
+<!-- 🔘 Basemap Toggle Buttons -->
+<div id="mapLayerControl">
+  <button data-layer="osm" title="OpenStreetMap"><i class="bi bi-map"></i></button>
+  <button data-layer="esri" title="Esri Satellite" class="active"><i class="bi bi-image"></i></button>
+  <button data-layer="google" title="Google Hybrid"><i class="bi bi-globe-americas"></i></button>
 </div>
+
+      <!-- Level Info dipindah ke pojok atas kanan map -->
+      <div id="levelPanel">
+        <h3>📊 Level Info</h3>
+        <div id="levelContent">No data</div>
+      </div>
+<!-- ✅ Dummy elements to prevent JS null errors -->
+<div id="info-panel" style="display:none;"></div>
+<div id="st-name" style="display:none;"></div>
+<div id="st-launch" style="display:none;"></div>
+<div id="st-maxz" style="display:none;"></div>
+
+    </div>
+<!-- 🎞️ Playback Controls -->
+<div class="playback-bar">
+  <button id="btn-play">▶️ Play</button>
+  <button id="btn-pause" disabled>⏸️ Pause</button>
+  <label>Speed:</label>
+  <input id="speed" type="range" min="0.5" max="1000" step="0.5" value="1">
+  <span id="sp-val">1×</span>
+  <input id="prog" type="range" min="0" max="100" step="0.5" value="0" style="flex:1;">
+  <span id="st-elap">0 s</span>
+</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+  </div>
+
+<script>
+/* ===== Layout: sidebar & clock (tanpa ubah fungsi trajectory) ===== */
+window.addEventListener("DOMContentLoaded", () => {
+  const sidebar = document.getElementById("sidebar");
+  const main = document.getElementById("mainContent");
+  const btn = document.getElementById("toggleBtn");
+  const footer = document.querySelector(".footer");
+  const saved = localStorage.getItem("sidebarState");
+
+  if (saved === "compact") {
+    sidebar.classList.add("compact");
+    main.style.marginLeft = "70px";
+    btn.classList.add("compact-position");
+    btn.textContent = "☰";
+    if (footer) { footer.style.left = "70px"; footer.style.width = "calc(100% - 70px)"; }
+  } else {
+    sidebar.classList.remove("compact");
+    main.style.marginLeft = "230px";
+    btn.classList.remove("compact-position");
+    btn.textContent = "❮";
+    if (footer) { footer.style.left = "230px"; footer.style.width = "calc(100% - 230px)"; }
+  }
+
+  // Pastikan map full render setelah layout settle
+  setTimeout(() => {
+    if (window.map && window.map.resize) window.map.resize();
+  }, 600);
+});
+
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const main = document.getElementById("mainContent");
+  const btn = document.getElementById("toggleBtn");
+  const footer = document.querySelector(".footer");
+
+  const isCompact = sidebar.classList.toggle("compact");
+  main.style.marginLeft = isCompact ? "70px" : "230px";
+  btn.textContent = isCompact ? "☰" : "❮";
+  btn.classList.toggle("compact-position", isCompact);
+
+  if (footer) {
+    footer.style.left = isCompact ? "70px" : "230px";
+    footer.style.width = isCompact ? "calc(100% - 70px)" : "calc(100% - 230px)";
+  }
+  localStorage.setItem("sidebarState", isCompact ? "compact" : "expanded");
+
+  // Resize map after sidebar animation
+  setTimeout(() => {
+    if (window.map && window.map.resize) window.map.resize();
+  }, 350);
+}
+
+function updateUTCClock() {
+  const now = new Date();
+  const hh = String(now.getUTCHours()).padStart(2, "0");
+  const mm = String(now.getUTCMinutes()).padStart(2, "0");
+  const ss = String(now.getUTCSeconds()).padStart(2, "0");
+  const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" ");
+  document.getElementById("utcClock").textContent = `${hh}:${mm}:${ss} UTC`;
+  document.getElementById("utcDate").textContent = dateStr;
+}
+updateUTCClock(); setInterval(updateUTCClock, 1000);
+
+// Tambahan jaga-jaga agar map tidak kepotong saat load
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    if (window.map && window.map.resize) window.map.resize();
+  }, 700);
+});
+</script>
+
 
 <script>
 let allLevels=[];
@@ -339,13 +633,19 @@ function start3DMap(d) {
     antialias: true
   });
 
-  const baseSel = document.getElementById("basemapSelect");
-  baseSel.onchange = () => {
+// === Basemap toggle buttons ===
+document.querySelectorAll("#mapLayerControl button").forEach(btn => {
+  btn.onclick = () => {
+    const layer = btn.dataset.layer;
     ["osm", "esri", "google"].forEach(id => {
-      const vis = id === baseSel.value ? "visible" : "none";
+      const vis = id === layer ? "visible" : "none";
       if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
     });
+    // Update button highlight
+    document.querySelectorAll("#mapLayerControl button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
   };
+});
 
   const minZ = Math.min(...path.map(p => p[2]));
   const maxZ = Math.max(...path.map(p => p[2]));
@@ -650,7 +950,36 @@ function start3DMap(d) {
     ];
   }
 
+// === Load user info from backend ===
+async function loadUserInfo() {
+  try {
+    const res = await fetch("/api/my_info");
+    const data = await res.json();
+    document.getElementById("userName").textContent = data.user || "-";
+    document.getElementById("userExpiry").textContent = data.expiry || "-";
+  } catch (err) {
+    console.error("❌ Failed to load user info:", err);
+  }
+}
 
+function toggleUserInfo() {
+  document.getElementById("userPopup").classList.toggle("show");
+}
+
+// Close popup if clicked outside
+document.addEventListener("click", (e) => {
+  const popup = document.getElementById("userPopup");
+  const icon = document.querySelector(".user-icon");
+  if (!popup.contains(e.target) && !icon.contains(e.target)) {
+    popup.classList.remove("show");
+  }
+});
+
+function logoutUser() {
+  window.location.href = "{{ url_for('logout') }}";
+}
+
+loadUserInfo();
 </script>
 </body>
 </html>
