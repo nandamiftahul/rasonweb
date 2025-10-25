@@ -27,6 +27,64 @@ from metpy.plots import SkewT, Hodograph
 from scipy.signal import medfilt
 from geopy.distance import geodesic
 
+# --- BEGIN: Encryption helpers (Fernet) ---
+import json as _json
+import base64 as _base64
+import hashlib as _hashlib
+
+from cryptography.fernet import Fernet
+
+def _derive_fernet_key(secret: str) -> bytes:
+    """
+    Derive a 32-byte key suitable for Fernet from a secret string using SHA256,
+    then urlsafe_b64encode it (Fernet expects 32-byte base64-encoded key).
+    """
+    if not secret:
+        raise ValueError("Secret key for Fernet derivation is empty.")
+    h = _hashlib.sha256(secret.encode("utf-8")).digest()
+    return _base64.urlsafe_b64encode(h)  # 32 bytes -> base64
+
+def _get_fernet():
+    key = _derive_fernet_key(app.secret_key if app.secret_key else cfg.get("secretkey", ""))
+    return Fernet(key)
+
+def encrypt_value(val):
+    """
+    Encrypts any JSON-serializable value (str/list/dict/int/etc) into a Fernet token string.
+    """
+    f = _get_fernet()
+    # convert to JSON text to allow dict/list storage
+    raw = _json.dumps(val, ensure_ascii=False).encode("utf-8")
+    token = f.encrypt(raw)
+    return token.decode("utf-8")
+
+def decrypt_value(token_str):
+    """
+    Decrypt a Fernet token string and return original Python object (via JSON).
+    If the token doesn't look like a Fernet token or fails to decrypt, returns the original value.
+    """
+    if token_str is None:
+        return None
+    if not isinstance(token_str, str):
+        return token_str
+    # quick fingerprint: Fernet tokens usually start with 'gAAAA' when base64-urlencoded
+    if not token_str.startswith("gAAAA"):
+        # likely plaintext — attempt to parse JSON (for lists/dicts) or return raw string
+        try:
+            return _json.loads(token_str)
+        except Exception:
+            return token_str
+    try:
+        f = _get_fernet()
+        raw = f.decrypt(token_str.encode("utf-8"))
+        return _json.loads(raw.decode("utf-8"))
+    except Exception as e:
+        # failed to decrypt — return original token (fallback)
+        print("⚠️ decrypt_value failed:", e)
+        return token_str
+# --- END: Encryption helpers (Fernet) ---
+
+
 # Load local .env file (ignored in production)
 load_dotenv()
 
@@ -178,38 +236,75 @@ load_sites()
 # --- Authentication ---
 USERS_FILE = "users.json"
 
+USER_FILE = "users.json"
+
 def load_users_from_file():
-    """Load hashed users from JSON."""
+    """Load hashed users from JSON (keep encrypted fields as-is). Decrypt on return."""
     try:
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
     except Exception as e:
         print("⚠️ Failed to read users.json:", e)
         return {}
 
-VALID_USERS = load_users_from_file()
+    # decrypt non-password fields (expiry, pages, etc.)
+    result = {}
+    for username, info in raw.items():
+        if not isinstance(info, dict):
+            result[username] = info
+            continue
 
-USER_FILE = "users.json"
+        decrypted = {}
+        for k, v in info.items():
+            if k == "password":
+                decrypted[k] = v
+            else:
+                # attempt decrypt; decrypt_value will return original if not encrypted
+                decrypted[k] = decrypt_value(v) if isinstance(v, str) else v
+        result[username] = decrypted
+
+    return result
+
+VALID_USERS = load_users_from_file()
 
 def load_users():
     """Load user data from JSON file or fallback to default."""
     global VALID_USERS
     if os.path.exists(USER_FILE):
         try:
-            with open(USER_FILE, "r") as f:
-                VALID_USERS = json.load(f)
+            VALID_USERS = load_users_from_file()
+            # Ensure structure compatibility: if value is plain string password, wrap it
+            for u, info in list(VALID_USERS.items()):
+                if isinstance(info, str):
+                    VALID_USERS[u] = {"password": info}
+            return
         except Exception as e:
             print("⚠️ Failed to read users.json:", e)
-    else:
-        # Default admin user
-        VALID_USERS = {"admin": "admin123"}
-        save_users()
+    # fallback default
+    VALID_USERS = {"admin": {"password": "admin123", "expiry": "2099-01-01", "pages": ["*"]}}
+    save_users()
 
 def save_users():
-    """Save user data to JSON file."""
+    """Save user data to JSON file (encrypt non-password fields)."""
     try:
-        with open(USER_FILE, "w") as f:
-            json.dump(VALID_USERS, f, indent=2)
+        out = {}
+        for username, info in VALID_USERS.items():
+            if isinstance(info, dict):
+                to_save = {}
+                for k, v in info.items():
+                    if k == "password":
+                        to_save[k] = v
+                    else:
+                        # encrypt value (but if already looks encrypted, keep it)
+                        if isinstance(v, str) and v.startswith("gAAAA"):
+                            to_save[k] = v
+                        else:
+                            to_save[k] = encrypt_value(v)
+                out[username] = to_save
+            else:
+                out[username] = info
+        with open(USER_FILE, "w", encoding="utf-8") as f:
+            json.dump(out, f, indent=2, ensure_ascii=False)
     except Exception as e:
         print("⚠️ Failed to save users.json:", e)
 
@@ -2708,11 +2803,16 @@ def manage_users():
 
         # 🔒 Hash password sebelum disimpan
         hashed_pw = generate_password_hash(password)
-
-        # Jika kamu mau tambahkan expiry nanti, bisa disini:
-        VALID_USERS[username] = {"password": hashed_pw}
-
+        
+        # Default expiry & pages (contoh 1 year)
+        expiry_default = (datetime.utcnow().date() + timedelta(days=365)).strftime("%Y-%m-%d")
+        VALID_USERS[username] = {
+            "password": hashed_pw,
+            "expiry": expiry_default,
+            "pages": ["main", "dashboard"]
+        }
         save_users()
+
         print(f"✅ Added new user (hashed): {username}")
         return jsonify({"success": True, "users": VALID_USERS})
 
