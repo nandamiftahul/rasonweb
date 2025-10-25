@@ -3462,6 +3462,16 @@ def api_redownload(site, filename):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/my_info")
+@login_required
+def my_info():
+    user = session.get("user")
+    info = VALID_USERS.get(user, {})
+    return jsonify({
+        "user": user,
+        "expiry": info.get("expiry", "-")
+    })
+
 @app.route("/release")
 @login_required
 @page_access_required("release")

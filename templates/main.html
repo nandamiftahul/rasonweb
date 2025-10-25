@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Main Menu - Radiosonde Monitoring</title>
   <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
-
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <!-- ✅ Leaflet lokal -->
   <link rel="stylesheet" href="{{ url_for('static', filename='libs/leaflet/leaflet.css') }}">
   <script src="{{ url_for('static', filename='libs/leaflet/leaflet.js') }}"></script>
@@ -58,6 +58,115 @@
       text-shadow: 0 0 6px rgba(255,255,255,0.3);
       border-bottom: 1px solid rgba(255,255,255,0.15);
       padding-bottom: 8px;
+    }
+    .sidebar a {
+      display: flex;
+      align-items: center;
+      gap: 10px;             /* jarak antara ikon dan teks */
+      font-size: 15px;
+    }
+    .sidebar a i {
+      font-size: 18px;
+      width: 22px;
+      text-align: center;
+      color: #e0f2fe;
+    }
+    .sidebar a:hover i {
+      color: #38bdf8;
+    }
+    /* 🔹 Sembunyikan tulisan RASON PANEL saat compact */
+    .sidebar h2 {
+      transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
+    }
+    
+    .sidebar.compact h2 {
+      opacity: 0;
+      height: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+    
+    /* === Compact Sidebar Mode === */
+    .sidebar {
+      width: 230px;
+      transition: width 0.3s ease, transform 0.3s ease;
+    }
+    
+    .sidebar.compact {
+      width: 70px; /* hanya tampil ikon */
+      align-items: flex-start;
+      padding: 60px 5px;
+    }
+    
+    .sidebar a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .sidebar a i {
+      font-size: 18px;
+      width: 22px;
+      text-align: center;
+      color: #e0f2fe;
+      flex-shrink: 0;
+    }
+    
+    /* 🔹 Sembunyikan teks saat compact */
+    .sidebar.compact a span {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    /* 🔹 Saat hover, tampilkan tooltip kecil */
+    .sidebar.compact a:hover::after {
+      content: attr(data-title);
+      position: absolute;
+      left: 70px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 5px 10px;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      white-space: nowrap;
+      z-index: 999;
+      transform: translateY(-2px);
+    }
+    
+    /* Sidebar text */
+    .sidebar a span {
+      padding-left: 6px;   /* 🧩 spasi tambahan setelah ikon */
+      transition: opacity 0.3s ease, width 0.3s ease;
+    }
+    
+    /* Toggle button style */
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      transition: left 0.3s ease;
+    }
+    .toggle-btn.compact-position {
+      left: 60px;
+    }
+    
+    /* 🔹 Sembunyikan tulisan RASON PANEL saat compact */
+    .sidebar h2 {
+      transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
+    }
+    
+    .sidebar.compact h2 {
+      opacity: 0;
+      height: 0;
+      margin: 0;
+      overflow: hidden;
     }
     
     .sidebar a {
@@ -258,27 +367,92 @@
       letter-spacing: 1px;
       text-shadow: 0 0 6px rgba(0,0,0,0.4); /* sedikit glow agar jelas di background */
     }
+    /* === 👤 User icon di pojok kiri atas sidebar === */
+    .user-icon {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      font-size: 26px;
+      color: #e0f2fe;
+      cursor: pointer;
+      transition: color 0.3s ease;
+      z-index: 20;
+    }
+    .user-icon:hover { color: #38bdf8; }
+    
+    /* === 💬 Popup user info === */
+    .user-popup {
+      position: absolute;
+      top: 45px;
+      left: 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #fff;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      display: none;
+      z-index: 999;
+      width: 190px;
+    }
+    .user-popup.show { display: block; }
+    .user-popup p {
+      margin: 4px 0;
+      color: #e0f2fe;
+    }
+    .user-popup b { color: #fff; }
+    
+    /* 🔘 Tombol logout di dalam popup */
+    .user-popup button {
+      margin-top: 8px;
+      width: 100%;
+      padding: 6px 0;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.2);
+      color: #fca5a5;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .user-popup button:hover {
+      background: rgba(255,255,255,0.35);
+      color: #fff;
+    }
+    
   </style>
 </head>
 
 <body>
-
-  <!-- Tombol toggle terpisah -->
-  <button class="toggle-btn" id="toggleBtn" onclick="toggleSidebar()">❮</button>
+  <button class="toggle-btn compact-position" id="toggleBtn" onclick="toggleSidebar()">☰</button>
+  <!-- 👤 User Profile Icon -->
+  <div class="user-icon" onclick="toggleUserInfo()">
+    <i class="bi bi-person-circle"></i>
+  </div>
+  
+  <!-- 💬 Popup Info -->
+  <div class="user-popup" id="userPopup">
+    <p><b>Username:</b> <span id="userName">-</span></p>
+    <p><b>Expiry:</b> <span id="userExpiry">-</span></p>
+    <button id="logoutBtn" onclick="logoutUser()">Logout</button>
+  </div>
+  
 
   <!-- Sidebar -->
-  <div class="sidebar" id="sidebar">
+  <div class="sidebar compact" id="sidebar">
     <h2>RASON PANEL</h2>
-    <a href="{{ url_for('main_page') }}"class="logout"><b>🏠 Main Page</b></a>
-    <a href="{{ url_for('dashboard') }}">📊 Data Resume</a>
-    <a href="{{ url_for('map_view') }}" target="_blank">🗺️ Map</a>
-    <a href="{{ url_for('trajectory3d_page') }}" target="_blank">🌐 Trajectory 3D</a>
-    <a href="{{ url_for('time_accuracy') }}">⏱️ Time Accuracy</a>
-    <a href="{{ url_for('height_reach') }}">📈 Height Reach Graph</a>
-    <a href="{{ url_for('data_availability_page') }}">📅 Data Availability</a>
-    <a href="{{ url_for('error_analysis_page') }}">❗ Error Analysis</a>
-    <a href="{{ url_for('settings_page') }}">⚙️ Settings</a>
-    <a href="{{ url_for('logout') }}" >🚪 Logout</a>
+  
+    <a href="{{ url_for('main_page') }}" data-title="Main Page"><i class="bi bi-house-door"></i><span>Main Page</span></a>
+    <a href="{{ url_for('dashboard') }}" data-title="Data Resume"><i class="bi bi-bar-chart-fill"></i><span>Data Resume</span></a>
+    <a href="{{ url_for('map_view') }}" target="_blank" data-title="Map"><i class="bi bi-map"></i><span>Map</span></a>
+    <a href="{{ url_for('trajectory3d_page') }}" target="_blank" data-title="Trajectory 3D"><i class="bi bi-globe2"></i><span>Trajectory 3D</span></a>
+    <a href="{{ url_for('time_accuracy') }}" data-title="Time Accuracy"><i class="bi bi-stopwatch"></i><span>Time Accuracy</span></a>
+    <a href="{{ url_for('height_reach') }}" data-title="Height Reach"><i class="bi bi-graph-up"></i><span>Height Reach</span></a>
+    <a href="{{ url_for('data_availability_page') }}" data-title="Data Availability"><i class="bi bi-calendar3"></i><span>Data Availability</span></a>
+    <a href="{{ url_for('error_analysis_page') }}" data-title="Error Analysis"><i class="bi bi-exclamation-triangle"></i><span>Error Analysis</span></a>
+    <a href="{{ url_for('settings_page') }}" data-title="Settings"><i class="bi bi-gear"></i><span>Settings</span></a>
   </div>
 
   <div class="main" id="mainContent">
@@ -313,22 +487,59 @@
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
   </div>
   <script>
-    function toggleSidebar() {
-      const sidebar = document.getElementById("sidebar");
-      const main = document.getElementById("mainContent");
-      const btn = document.getElementById("toggleBtn");
+  // === Apply saved sidebar state when page loads ===
+  window.addEventListener("DOMContentLoaded", () => {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.getElementById("mainContent");
+    const btn = document.getElementById("toggleBtn");
+    const footer = document.querySelector(".footer");
 
-      sidebar.classList.toggle("hidden");
-      main.classList.toggle("expanded");
+    // 🧩 baca preferensi terakhir dari localStorage
+    const saved = localStorage.getItem("sidebarState");
 
-      if (sidebar.classList.contains("hidden")) {
-        btn.textContent = "☰";
-        btn.classList.add("hidden-position");
-      } else {
-        btn.textContent = "❮";
-        btn.classList.remove("hidden-position");
+    if (saved === "compact") {
+      sidebar.classList.add("compact");
+      main.style.marginLeft = "70px";
+      btn.classList.add("compact-position");
+      btn.textContent = "☰";
+
+      if (footer) {
+        footer.style.left = "70px";
+        footer.style.width = "calc(100% - 70px)";
+      }
+    } else {
+      sidebar.classList.remove("compact");
+      main.style.marginLeft = "230px";
+      btn.classList.remove("compact-position");
+      btn.textContent = "❮";
+
+      if (footer) {
+        footer.style.left = "230px";
+        footer.style.width = "calc(100% - 230px)";
       }
     }
+  });
+
+  // === Toggle sidebar and save preference ===
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.getElementById("mainContent");
+    const btn = document.getElementById("toggleBtn");
+    const footer = document.querySelector(".footer");
+
+    const isCompact = sidebar.classList.toggle("compact");
+    main.style.marginLeft = isCompact ? "70px" : "230px";
+    btn.textContent = isCompact ? "☰" : "❮";
+    btn.classList.toggle("compact-position", isCompact);
+
+    if (footer) {
+      footer.style.left = isCompact ? "70px" : "230px";
+      footer.style.width = isCompact ? "calc(100% - 70px)" : "calc(100% - 230px)";
+    }
+
+    // ✅ simpan preferensi ke localStorage
+    localStorage.setItem("sidebarState", isCompact ? "compact" : "expanded");
+  }
 
     // Load status dari API
     async function loadLatestStatus() {
@@ -440,7 +651,6 @@
     }
   
   loadSitesFromConfig();
-
 
     
     // --- Map status → warna ---
@@ -569,6 +779,37 @@
       document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
       document.getElementById("utcDate").textContent = dateStr;
     }
+    // === Load user info from backend ===
+    async function loadUserInfo() {
+      try {
+        const res = await fetch("/api/my_info");
+        const data = await res.json();
+        document.getElementById("userName").textContent = data.user || "-";
+        document.getElementById("userExpiry").textContent = data.expiry || "-";
+      } catch (err) {
+        console.error("❌ Failed to load user info:", err);
+      }
+    }
+    
+    function toggleUserInfo() {
+      document.getElementById("userPopup").classList.toggle("show");
+    }
+    
+    // Close popup if clicked outside
+    document.addEventListener("click", (e) => {
+      const popup = document.getElementById("userPopup");
+      const icon = document.querySelector(".user-icon");
+      if (!popup.contains(e.target) && !icon.contains(e.target)) {
+        popup.classList.remove("show");
+      }
+    });
+    
+    function logoutUser() {
+      window.location.href = "{{ url_for('logout') }}";
+    }
+    
+    loadUserInfo();
+
     updateUTCClock();
     setInterval(updateUTCClock, 1000);
   </script>
