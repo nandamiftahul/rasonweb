@@ -109,7 +109,6 @@ CONFIG = {
     }
 }
 cfg = CONFIG["ftp"]
-print(cfg)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -3425,6 +3424,43 @@ def api_serial_lookup(serial):
 
     print("📤 Result:", result)
     return jsonify(result)
+
+@app.route("/api/db_files/<site>")
+@login_required
+def api_db_files(site):
+    """List semua file dari database berdasarkan site."""
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT filename, file_date FROM bufr WHERE site=? "
+                    "UNION SELECT filename, file_date FROM bfr WHERE site=? "
+                    "UNION SELECT filename, file_date FROM bfh WHERE site=? "
+                    "UNION SELECT filename, file_date FROM bin WHERE site=?", (site, site, site, site))
+        rows = [{"filename": r[0], "file_date": r[1]} for r in cur.fetchall()]
+    return jsonify({"files": rows})
+
+@app.route("/api/insert_from_ftp/<site>/<filename>")
+@login_required
+def api_insert_from_ftp(site, filename):
+    """Download dari FTP → decode → simpan ke DB"""
+    try:
+        download_and_process(site, filename)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/redownload/<site>/<filename>")
+@login_required
+def api_redownload(site, filename):
+    """Re-download file (hapus dari DB dulu)."""
+    ftype = filename.split(".")[-1].lower()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(f"DELETE FROM {ftype} WHERE site=? AND filename=?", (site, filename))
+        conn.commit()
+    try:
+        download_and_process(site, filename)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/release")
 @login_required
