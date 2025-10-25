@@ -92,6 +92,37 @@
     }
     .action-buttons button {
       margin: 5px;
+
+    }
+    #ftpTable, #dbTable {
+      width: 95%;
+      margin: 10px auto;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #ftpTable th, #dbTable th, #ftpTable td, #dbTable td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      text-align: left;
+    }
+    #ftpTable th, #dbTable th {
+      background: rgba(255,255,255,0.2);
+    }
+    /* === Highlight Sync State === */
+    tr.synced { background: rgba(34,197,94,0.25); }   /* green 500 */
+    tr.only-ftp { background: rgba(234,179,8,0.25); } /* yellow 500 */
+    tr.only-db { background: rgba(239,68,68,0.25); }  /* red 500 */
+
+    #ftpLoading, #dbLoading {
+      font-style: italic;
+      color: #e0f2fe;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 0.6; }
+      50%     { opacity: 1; }
     }
   </style>
 </head>
@@ -103,6 +134,7 @@
     <button class="tab-btn" onclick="switchTab('sites')">🌐 Site Configuration</button>
     <button class="tab-btn" onclick="switchTab('bufr')">🧩 BUFR Mapping Configuration</button>
     <button class="tab-btn" onclick="switchTab('serial')">🔍 Serial Lookup</button>
+    <button class="tab-btn" onclick="switchTab('compare')">🗂️ FTP vs Database</button>
   </div>
 
   <!-- ===== TAB 1: USERS ===== -->
@@ -199,6 +231,75 @@
     <div id="serialResult" style="margin-top:30px; text-align:center;">
       <p style="opacity:0.8;">Enter a serial number above to search...</p>
     </div>
+  </div>
+
+  <!-- ===== TAB 5: FTP vs DATABASE COMPARISON ===== -->
+  <div id="tab-compare" class="tab-content">
+  
+    <!-- 🔹 Filter bar (shared) -->
+    <div class="filter-bar" style="text-align:center; margin:20px 0;">
+      <label>📍 Site:</label>
+      <select id="ftpSiteSelect" style="margin:0 8px;"></select>
+  
+      <label>Type:</label>
+      <select id="ftpTypeSelect" style="margin:0 8px;">
+        <option value=".bfr">.bfr</option>
+        <option value=".bufr">.bufr</option>
+        <option value=".bfh">.bfh</option>
+        <option value=".bin">.bin</option>
+      </select>
+  
+      <label>Start:</label>
+      <input type="date" id="ftpStartDate" style="margin:0 8px;">
+  
+      <label>End:</label>
+      <input type="date" id="ftpEndDate" style="margin:0 8px;">
+  
+      <button onclick="loadFTPFiles()">🔍 Search</button>
+      <button onclick="reloadFTP()">🔄 Refresh</button>
+    </div>
+  
+    <!-- 🔹 Two-column layout -->
+    <div style="display:flex; justify-content:space-between; gap:20px; align-items:flex-start;">
+  
+      <!-- FTP PANEL -->
+      <div style="flex:1;">
+        <h2 style="text-align:center;">🌐 FTP Files</h2>
+        <div id="ftpLoading" style="display:none; text-align:center; padding:10px;">⏳ Loading FTP files...</div>
+        <table id="ftpTable">
+          <thead>
+            <tr><th>Status</th><th>Select</th><th>Filename</th><th>Date</th><th>Action</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+  
+      <!-- DB PANEL -->
+      <div style="flex:1;">
+        <h2 style="text-align:center;">🗃️ Database Cache</h2>
+        <div id="dbLoading" style="display:none; text-align:center; padding:10px;">⏳ Loading database cache...</div>
+        <table id="dbTable">
+          <thead>
+            <tr><th>Status</th><th>Select</th><th>Filename</th><th>Date</th><th>Action</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div> <!-- ✅ properly close flex container -->
+  
+    <!-- 🔹 Action buttons -->
+    <div class="add-section" style="margin-top:25px;">
+      <button onclick="syncSelected()">⬆️ Insert FTP → DB</button>
+      <button onclick="redoDownload()">🔁 Re-Download Selected</button>
+    </div>
+  
+    <!-- 🔹 Legend -->
+    <div style="text-align:center; margin-top:10px; opacity:0.8;">
+      <span>🟢 Synced</span> &nbsp;
+      <span>🟡 Only FTP</span> &nbsp;
+      <span>🔴 Only DB</span>
+    </div>
+  
   </div>
 
   <!-- 🔹 Modal Popup untuk memilih halaman -->
@@ -733,6 +834,188 @@
         alert("❌ Network error while saving pages");
       }
     }
+
+    let currentFTP = [];
+    let currentDB = [];
+    
+    // ===== LOAD FTP FILES =====
+    async function loadFTPFiles() {
+      const site  = document.getElementById("ftpSiteSelect").value;
+      const ftype = document.getElementById("ftpTypeSelect").value;
+      const start = document.getElementById("ftpStartDate").value;
+      const end   = document.getElementById("ftpEndDate").value;
+    
+      document.getElementById("ftpLoading").style.display = "block";
+      document.getElementById("dbLoading").style.display  = "block";
+    
+      try {
+        let url = `/api/sites?ext=${encodeURIComponent(ftype)}&limit=200`;
+        if (start) url += `&start_date=${start}`;
+        if (end)   url += `&end_date=${end}`;
+    
+        const res  = await fetch(url);
+        const data = await res.json();
+        currentFTP = (data[site] || []).map(f => f.name);
+    
+        // lanjut load DB setelah FTP selesai
+        await loadDBFiles();
+      } catch (err) {
+        alert("❌ Failed to load FTP data");
+        console.error(err);
+      } finally {
+        document.getElementById("ftpLoading").style.display = "none";
+        document.getElementById("dbLoading").style.display  = "none";
+      }
+    }
+    
+    // ===== LOAD DB FILES =====
+    async function loadDBFiles() {
+      const site = document.getElementById("ftpSiteSelect").value;
+      try {
+        const res  = await fetch(`/api/db_files/${site}`);
+        const data = await res.json();
+        currentDB  = (data.files || []).map(f => f.filename);
+        renderCompareTables();
+      } catch (err) {
+        console.error("❌ Failed to load DB files:", err);
+      }
+    }
+
+
+    
+    // ===== RENDER COMPARISON TABLES =====
+    async function renderCompareTables() {
+      const site = document.getElementById("ftpSiteSelect").value;
+      const ftype = document.getElementById("ftpTypeSelect").value;
+      const start = document.getElementById("ftpStartDate").value;
+      const end = document.getElementById("ftpEndDate").value;
+    
+      if (!site) return;
+    
+      const tbodyFTP = document.querySelector("#ftpTable tbody");
+      const tbodyDB = document.querySelector("#dbTable tbody");
+      tbodyFTP.innerHTML = "";
+      tbodyDB.innerHTML = "";
+    
+      // Build URL FTP
+      let url = `/api/sites?ext=${encodeURIComponent(ftype)}&limit=200`;
+      if (start) url += `&start_date=${start}`;
+      if (end) url += `&end_date=${end}`;
+    
+      // --- FTP SIDE ---
+      const ftpRes = await fetch(url);
+      const ftpData = await ftpRes.json();
+      let ftpFiles = (ftpData[site] || []);
+    
+      // 🧩 Sort descending by file_date (newest first)
+      ftpFiles.sort((a, b) => {
+        const da = new Date(a.file_date || 0);
+        const db = new Date(b.file_date || 0);
+        return db - da;
+      });
+    
+      ftpFiles.forEach(f => {
+        const inDB = currentDB.includes(f.name);
+        const indicator = inDB ? "🟢" : "🟡";
+        tbodyFTP.innerHTML += `
+          <tr>
+            <td>${indicator}</td>
+            <td><input type="checkbox" name="ftpSel" value="${f.name}"></td>
+            <td>${f.name}</td>
+            <td>${f.file_date || "-"}</td>
+            <td><button onclick="insertToDB('${site}','${f.name}')">📥 Insert</button></td>
+          </tr>`;
+      });
+    
+      // --- DB SIDE ---
+      const dbRes = await fetch(`/api/db_files/${site}`);
+      const dbData = await dbRes.json();
+      let dbFiles = (dbData.files || []);
+      
+      // === 🔹 Filter DB files berdasarkan file type (ekstensi) ===
+      if (ftype) {
+        const ext = ftype.replace(".", "").toLowerCase();
+        dbFiles = dbFiles.filter(f => f.filename && f.filename.toLowerCase().endsWith(ext));
+      }
+      
+      // === 🔹 Filter DB files berdasarkan start dan end date ===
+      if (start || end) {
+        const startDate = start ? new Date(start) : null;
+        const endDate = end ? new Date(end) : null;
+        dbFiles = dbFiles.filter(f => {
+          if (!f.file_date) return false;
+          const fileDate = new Date(f.file_date);
+          if (startDate && fileDate < startDate) return false;
+          if (endDate && fileDate > endDate) return false;
+          return true;
+        });
+      }
+   
+      // 🧩 Sort descending by file_date
+      dbFiles.sort((a, b) => {
+        const da = new Date(a.file_date || 0);
+        const db = new Date(b.file_date || 0);
+        return db - da;
+      });
+    
+      dbFiles.forEach(f => {
+        const inFTP = currentFTP.includes(f.filename);
+        const indicator = inFTP ? "🟢" : "🔴";
+        tbodyDB.innerHTML += `
+          <tr>
+            <td>${indicator}</td>
+            <td><input type="checkbox" name="dbSel" value="${f.filename}"></td>
+            <td>${f.filename}</td>
+            <td>${f.file_date || "-"}</td>
+            <td><button onclick="redoFile('${site}','${f.filename}')">🔁 Redownload</button></td>
+          </tr>`;
+      });
+    }
+
+
+    async function insertToDB(site, filename) {
+      const ok = confirm(`Insert ${filename} from FTP into database?`);
+      if (!ok) return;
+      const res = await fetch(`/api/insert_from_ftp/${site}/${filename}`);
+      const j = await res.json();
+      alert(j.success ? "✅ Inserted successfully!" : j.error);
+    }
+    
+    async function redoFile(site, filename) {
+      const ok = confirm(`Re-download and re-decode ${filename}?`);
+      if (!ok) return;
+      const res = await fetch(`/api/redownload/${site}/${filename}`);
+      const j = await res.json();
+      alert(j.success ? "✅ File updated!" : j.error);
+    }
+    
+    function syncSelected() {
+      const site = document.getElementById("ftpSiteSelect").value;
+      document.querySelectorAll("input[name='ftpSel']:checked").forEach(async cb => {
+        await insertToDB(site, cb.value);
+      });
+    }
+    
+    function redoDownload() {
+      const site = document.getElementById("dbSiteSelect").value;
+      document.querySelectorAll("input[name='dbSel']:checked").forEach(async cb => {
+        await redoFile(site, cb.value);
+      });
+    }
+    
+
+    function reloadFTP() { loadFTPFiles(); loadDBFiles(); }
+    function reloadDB() { loadFTPFiles(); loadDBFiles(); }
+
+    
+    async function populateCompareDropdowns() {
+      const res = await fetch("/api/sites_config");
+      const js = await res.json();
+      const options = js.sites.map(s => `<option value="${s}">${s}</option>`).join("");
+      document.getElementById("ftpSiteSelect").innerHTML = options;
+    }
+
+    populateCompareDropdowns();
 
     loadSites();
 
