@@ -421,7 +421,7 @@
       background: rgba(255,255,255,0.35);
       color: #fff;
     }
-    
+
   </style>
 </head>
 
@@ -539,6 +539,8 @@
 
     // ✅ simpan preferensi ke localStorage
     localStorage.setItem("sidebarState", isCompact ? "compact" : "expanded");
+    setTimeout(() => map.invalidateSize(), 400);
+
   }
 
     // Load status dari API
@@ -576,7 +578,9 @@
 
     // Leaflet Map
     var map = L.map('indoMap').setView([-2, 118], 5);
-    
+setTimeout(() => {
+  map.invalidateSize();
+}, 500)
     // --- Panes & z-index (marker di atas provinsi) ---
     map.createPane('provincePane');
     map.createPane('markerPane');
