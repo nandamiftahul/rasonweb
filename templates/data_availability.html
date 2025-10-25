@@ -183,15 +183,21 @@
     .toggle-btn:hover { background: rgba(255,255,255,0.4); }
     .toggle-btn.hidden-position { left: 10px; }
 
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 40px;
-      margin-left: 230px;
-      transition: margin-left 0.3s ease;
-    }
-    .main.expanded { margin-left: 0; }
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin-left: 230px;
+  padding: 40px 40px 0;
+  padding-bottom: 50px;
+  box-sizing: border-box;
+  transition: margin-left 0.3s ease;
+}
+
+.main.expanded {
+  margin-left: 0;
+}
 
     .header-box {
       position: relative;
@@ -247,22 +253,60 @@
       margin: 0 5px;
       font-size: 14px;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: rgba(255,255,255,0.1);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    th, td {
-      border: 1px solid rgba(255,255,255,0.2);
-      text-align: left;
-      padding: 6px;
-      font-size: 13px;
-      color: #dbeafe;
-      vertical-align: middle;
-    }
-    th { background: rgba(255,255,255,0.2); }
+#tableContainer {
+  width: 100%;
+  overflow-x: auto;           /* ✅ mencegah meluber ke kanan */
+  margin-top: 12px;
+  box-sizing: border-box;     /* ✅ padding dan border ikut dihitung */
+  padding-right: 8px;         /* ✅ biar scrollbar gak nabrak border */
+}
+
+table {
+  width: 100%;
+  max-width: 100%;            /* ✅ batasi agar tidak lebih lebar dari container */
+  border-collapse: collapse;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+  backdrop-filter: blur(6px);
+  table-layout: fixed;        /* ✅ kolom rapi seragam */
+}
+/* Kolom pertama (Site) tetap lebar & rata kiri */
+table td:first-child,
+table th:first-child {
+  width: 140px;
+  text-align: left;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+/* Kolom tanggal — buat lebih kecil & rapat */
+table td:not(:first-child),
+table th:not(:first-child) {
+  text-align: center;
+  padding: 4px 6px;          /* ✅ spacing kecil */
+  width: 32px;               /* ✅ seragam dan rapat */
+}
+
+
+th {
+  background: rgba(255,255,255,0.18);
+  color: #e0f2fe;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  text-align: left;        /* ✅ tambahkan ini */
+  padding-left: 10px;      /* ✅ biar nggak mepet kiri */
+}
+
+td {
+  color: #f1f5f9;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  text-align: left;          /* ✅ biar seragam */
+  padding: 6px 10px;
+}
+
+
 
     .circle {
       width: 14px; height: 14px; border-radius: 50%; display: inline-block;
@@ -410,7 +454,59 @@
       background: rgba(255,255,255,0.35);
       color: #fff;
     }
-    
+/* === Filter Bar ala Trajectory === */
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  backdrop-filter: blur(8px);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: #e0f2fe;
+}
+
+.filter-group label {
+  font-size: 13px;
+  margin-bottom: 4px;
+  opacity: 0.9;
+}
+
+.filter-bar select {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 14px;
+  height: 34px;
+  background: rgba(255,255,255,0.85);
+  color: #003366;
+}
+
+.btn-main {
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(90deg, #0078d7, #0d6efd);
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.btn-main:hover {
+  background: linear-gradient(90deg, #0d6efd, #1a89ff);
+}
+
   </style>
 </head>
 <body>
@@ -449,7 +545,7 @@
     <div class="header-icon" style="filter:brightness(10) saturate(0.1);">🎈</div>
     <div class="header-text">
       <h1>Data Availability per Month</h1>
-      <p>Monitor .bfr, .bin, T*.X, and P*.X completeness for each site & day</p>
+      <p>Monitor completeness data</p>
     </div>
         <div class="header-logos">
           <div class="header-clock">
@@ -461,15 +557,26 @@
         </div>
   </div>
 
-  <div class="controls">
+<!-- 🔹 Filter Bar  -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <label>Bulan</label>
     <select id="monthSelect"></select>
+  </div>
+  <div class="filter-group">
+    <label>Tahun</label>
     <select id="yearSelect"></select>
+  </div>
+  <div class="filter-group">
+    <label>Jam</label>
     <select id="hourSelect">
       <option value="00" selected>00Z</option>
       <option value="12">12Z</option>
     </select>
-    <button id="loadBtn">🔍 Load</button>
   </div>
+  <button id="loadBtn" class="btn-main">🔍 Load Data</button>
+</div>
+
 
   <div id="tableContainer"><p style="text-align:center;">Please select filters to load data.</p></div>
 </div>
