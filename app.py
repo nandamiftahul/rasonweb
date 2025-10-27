@@ -761,7 +761,7 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
     Untuk file hari ini dan kemarin, data selalu diambil langsung dari FTP (bypass cache).
     """
     _tz = None  # fallback (pakai UTC kalau zoneinfo tidak ada)
-
+    #print("=========================================>",start_date,end_date)
     # --- Default window: today 00:00 UTC -> tomorrow 00:00 UTC ---
     if start_date is None or end_date is None:
         now_local = datetime.now(_tz) if _tz else datetime.utcnow().replace(tzinfo=timezone.utc)
@@ -1044,7 +1044,13 @@ def api_latest_status():
     Site, Launch Time, End Time, Status, Termination,
     End Pressure, Max Height, End Distance, Ascent Rate.
     """
-    sites = fetch_all_sites(with_meta=True, limit=1)
+    now_utc = datetime.utcnow()
+    start_date = now_utc - timedelta(days=1)
+    end_date = now_utc + timedelta(days=1)
+
+    # 🔹 Ambil hanya beberapa file terbaru dari window waktu 2 hari
+    sites = fetch_all_sites(with_meta=True, ext_filter= [".bfr",".bin"], start_date=start_date, end_date=end_date)
+
     summary = []
     for site, files in sites.items():
         if not files:
