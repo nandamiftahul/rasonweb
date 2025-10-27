@@ -170,6 +170,8 @@ cfg = CONFIG["ftp"]
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+SESSION_TIMEOUT_MINUTES = 30  # ⏱️ logout otomatis setelah 30 menit tidak aktif
+
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 #app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
@@ -313,29 +315,36 @@ load_users()
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 🚪 Tidak ada sesi login
         if "user" not in session:
             return redirect(url_for("login"))
 
-        # 🌍 Global logout: semua user dipaksa keluar
         if session.get("session_version") != get_global_session_version():
             session.clear()
             return redirect(url_for("login"))
 
-        # 👤 Per-user logout: token mismatch (admin force logout)
         global USER_SESSION_TOKENS, ACTIVE_USERS
         if "USER_SESSION_TOKENS" in globals():
             user = session.get("user")
             token = session.get("user_token")
             current_token = USER_SESSION_TOKENS.get(user)
-
             if current_token and token != current_token:
-                # 🟢 Jangan hapus dari ACTIVE_USERS — user masih aktif di session baru
                 print(f"🔄 Session replaced for user '{user}' (device switched)")
                 session.clear()
                 return redirect(url_for("login"))
 
-        # ✅ Semua aman, lanjut ke route
+        # 🕒 Timeout check (30 menit idle)
+        last_active = session.get("last_active")
+        now = datetime.utcnow()
+        if last_active:
+            last_active_dt = datetime.strptime(last_active, "%Y-%m-%d %H:%M:%S")
+            inactive_minutes = (now - last_active_dt).total_seconds() / 60
+            if inactive_minutes > SESSION_TIMEOUT_MINUTES:
+                user = session.get("user")
+                print(f"⏰ Session expired for user '{user}' (inactive {inactive_minutes:.1f} min)")
+                session.clear()
+                return redirect(url_for("login"))
+        session["last_active"] = now.strftime("%Y-%m-%d %H:%M:%S")
+
         return f(*args, **kwargs)
     return decorated_function
 
