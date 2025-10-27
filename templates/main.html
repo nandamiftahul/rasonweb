@@ -421,6 +421,16 @@
       background: rgba(255,255,255,0.35);
       color: #fff;
     }
+/* === FIX: Footer selalu di atas peta === */
+#indoMap {
+  position: relative;
+  z-index: 1; /* map di bawah */
+}
+
+.footer {
+  z-index: 10; /* footer selalu di atas map */
+}
+
   </style>
 </head>
 

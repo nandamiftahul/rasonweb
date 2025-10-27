@@ -141,7 +141,6 @@
     .statusText.error   { color:#e74c3c; }
     @keyframes pulse { 0%{opacity:.3} 50%{opacity:1} 100%{opacity:.3} }
 
-/* === Panel posisi di dalam map (versi refined & aligned) === */
 /* === FIX MAP OVERLAP FOOTER & RIGHT CLIP === */
 #map-container {
   position: relative;
@@ -159,6 +158,16 @@
   height: 100% !important;
   border-radius: 12px;
   display: block;
+}
+
+/* === FIX: Footer selalu di atas peta === */
+#map {
+  position: relative;
+  z-index: 1; /* map di bawah */
+}
+
+.footer {
+  z-index: 10; /* footer selalu di atas map */
 }
 
 /* Tambah ruang bawah supaya tidak ketutup footer */

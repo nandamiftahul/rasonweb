@@ -306,6 +306,43 @@ td {
   padding: 6px 10px;
 }
 
+/* === FIX LAYOUT TABEL KELUAR WINDOW === */
+
+/* Pastikan isi main (termasuk tabel & filter) tidak melebihi batas */
+.main {
+  overflow-x: hidden; /* cegah konten meluber keluar ke kanan */
+  padding-right: 40px; /* jaga konsistensi padding kanan */
+  box-sizing: border-box;
+}
+
+/* Bungkus tabel agar scroll-nya tidak keluar area main */
+.table-scroll {
+  width: calc(100% - 8px);        /* ✅ kecilkan sedikit dari 100% agar tidak nabrak padding */
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-top: 12px;
+  border-radius: 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-color: rgba(255,255,255,0.4) transparent;
+  scrollbar-width: thin;
+  box-sizing: border-box;
+}
+
+/* Table adaptif terhadap scroll container */
+.table-scroll table {
+  width: max-content !important;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+/* Pastikan filter bar & header sejajar rapi di dalam .main */
+.filter-bar, .header-box {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-right: auto;
+  margin-left: auto;
+}
 
 
     .circle {
@@ -577,8 +614,13 @@ td {
   <button id="loadBtn" class="btn-main">🔍 Load Data</button>
 </div>
 
+<div class="table-scroll">
+  <div id="tableContainer">
+    <p style="text-align:center;">Please select filters to load data.</p>
+  </div>
+</div>
 
-  <div id="tableContainer"><p style="text-align:center;">Please select filters to load data.</p></div>
+
 </div>
 <!-- Footer -->
 <div class="footer">
