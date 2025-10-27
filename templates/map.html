@@ -142,22 +142,43 @@
     @keyframes pulse { 0%{opacity:.3} 50%{opacity:1} 100%{opacity:.3} }
 
 /* === Panel posisi di dalam map (versi refined & aligned) === */
+/* === FIX MAP OVERLAP FOOTER & RIGHT CLIP === */
 #map-container {
   position: relative;
-  width: calc(100% - 8px);       /* sedikit kecil agar sejajar dengan header/filter */
-  margin: 0 auto 14px auto;      /* center align */
-  height: 74vh;                  /* sedikit lebih tinggi */
+  width: calc(100% - 8px);
+  margin: 0 auto 14px auto;
+  height: calc(100vh - 270px);  /* ⬅️ Ganti 74vh → dinamis terhadap viewport dan header/filter/footer */
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 
-#map {
+/* Pastikan map selalu mengisi container penuh */
+#map, .leaflet-container {
   width: 100% !important;
   height: 100% !important;
   border-radius: 12px;
   display: block;
 }
+
+/* Tambah ruang bawah supaya tidak ketutup footer */
+.main {
+  padding-bottom: 90px !important;  /* agar map dan chart tidak tertimpa footer */
+}
+
+/* Saat sidebar compact, pastikan footer tetap sejajar */
+.footer {
+  left: 230px;
+  width: calc(100% - 230px);
+  transition: all 0.3s ease;
+  z-index: 15; /* pastikan footer tetap di atas chart, tapi di bawah map */
+}
+
+.sidebar.compact ~ .footer {
+  left: 70px;
+  width: calc(100% - 70px);
+}
+
 .leaflet-container {
   width: 100% !important;
   height: 100% !important;
