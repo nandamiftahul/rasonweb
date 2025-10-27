@@ -124,6 +124,14 @@
       0%,100% { opacity: 0.6; }
       50%     { opacity: 1; }
     }
+    /* ✨ Biarkan teks panjang membungkus di kolom tertentu */
+    #userTable td:nth-child(3),
+    #userTable td:nth-child(4) {
+      white-space: normal;        /* boleh turun ke baris berikut */
+      word-wrap: break-word;      /* potong kata jika terlalu panjang */
+      max-width: 220px;           /* batas lebar kolom agar rapi */
+    }
+    
   </style>
 </head>
 <body>
@@ -136,28 +144,31 @@
     <button class="tab-btn" onclick="switchTab('serial')">🔍 Serial Lookup</button>
     <button class="tab-btn" onclick="switchTab('compare')">🗂️ FTP vs Database</button>
   </div>
-
   <!-- ===== TAB 1: USERS ===== -->
   <div id="tab-users" class="tab-content active">
-    <table id="userTable">
-      <thead>
-          <th>Username</th><th>Password</th><th>Expiry</th><th>Pages</th><th>Status</th><th>Action</th>
-      </thead>
-      <tbody></tbody>
-    </table>
-
+    <div style="overflow-x:auto; max-width:95%; margin:0 auto;">
+      <table id="userTable">
+        <thead>
+          <th>Username</th><th>Password</th><th>Expiry</th><th>Pages</th><th>Status</th><th>Last Active</th><th>Action</th>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div> <!-- ✅ penutup div table-wrapper di sini -->
+  
     <div class="add-section">
       <input type="text" id="newUser" placeholder="New username">
       <input type="password" id="newPass" placeholder="Password">
       <button onclick="addUser()">Add User</button>
     </div>
+  
     <!-- 🔒 Force Logout All Users (hanya untuk admin) -->
     <div class="add-section" id="adminLogoutSection" style="margin-top:25px; display:none;">
       <button id="btnLogoutAll" style="background:#ef4444; color:white; font-weight:600;">
         🚪 Force Logout All Users
       </button>
     </div>
-  </div>
+  </div> <!-- ✅ baru tutup tab-users di sini -->
+
 
   <!-- ===== TAB 2: BUFR MAPPING ===== -->
   <div id="tab-bufr" class="tab-content">
@@ -209,18 +220,24 @@
     </div>
   </div>
 
-  <!-- ===== TAB 3: SITE CONFIGURATION ===== -->
-  <div id="tab-sites" class="tab-content">
-    <table id="siteTable">
-      <thead><tr><th>Site Name</th><th>Action</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  
-    <div class="add-section">
-      <input type="text" id="newSiteName" placeholder="e.g. pontianak">
-      <button onclick="addSite()">Add Site</button>
-    </div>
+<!-- ===== TAB 3: SITE CONFIGURATION ===== -->
+<div id="tab-sites" class="tab-content">
+  <table id="siteTable">
+    <thead>
+      <tr><th>Site Name</th><th>Latitude</th><th>Longitude</th><th>UTC Offset</th><th>Action</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="add-section">
+    <input type="text" id="newSiteName" placeholder="e.g. pontianak">
+    <input type="number" step="0.0001" id="newSiteLat" placeholder="Lat">
+    <input type="number" step="0.0001" id="newSiteLon" placeholder="Lon">
+    <input type="number" id="newSiteOffset" placeholder="UTC" value="7">
+    <button onclick="addSite()">Add Site</button>
   </div>
+</div>
+
   <!-- ===== TAB 4: SERIAL LOOKUP ===== -->
   <div id="tab-serial" class="tab-content">
     <div style="text-align:center; margin-top:20px;">
@@ -347,30 +364,46 @@
     
         const tbody = document.querySelector("#userTable tbody");
         tbody.innerHTML = "";
-    
+
+        const resLastActive = await fetch('/api/last_active');
+        const lastActiveData = await resLastActive.json();        
+        
         Object.entries(users).forEach(([u, info]) => {
+          const lastActive = lastActiveData[u] || "-";
           const expiry = info.expiry || "-";
           const pages = (info.pages || []).join(", ") || "-";
           const isActive = activeUsers.includes(u);
           const isCurrent = me.user === u;
         
-          // Hitung status expiry
+          // Hitung status expiry (versi multiline)
           let expiryDisplay = expiry;
           if (expiry && expiry !== "-") {
             try {
               const now = new Date();
               const expDate = new Date(expiry);
               const diffDays = Math.floor((expDate - now) / (1000 * 60 * 60 * 24));
-        
+          
               if (diffDays < 0) {
                 // 🔴 Sudah lewat
-                expiryDisplay = `<span style="color:#f87171; font-weight:600;">${expiry} 🔥 Expired</span>`;
+                expiryDisplay = `
+                  <div style="color:#f87171; font-weight:600; line-height:1.3;">
+                    ${expiry}<br>
+                    🔥 Expired
+                  </div>`;
               } else if (diffDays <= 7) {
                 // 🟡 Hampir habis
-                expiryDisplay = `<span style="color:#facc15; font-weight:600;">${expiry} ⚠️ Expiring Soon (${diffDays} day${diffDays!==1?"s":""})</span>`;
+                expiryDisplay = `
+                  <div style="color:#facc15; font-weight:600; line-height:1.3;">
+                    ${expiry}<br>
+                    ⚠️ Expiring Soon (${diffDays} day${diffDays!==1?"s":""})
+                  </div>`;
               } else {
                 // ✅ Masih aman
-                expiryDisplay = `<span style="color:#e2e8f0;">${expiry}</span>`;
+                expiryDisplay = `
+                  <div style="color:#e2e8f0; line-height:1.3;">
+                    ${expiry}<br>
+                    ✅ Active
+                  </div>`;
               }
             } catch (e) {
               console.warn("Invalid expiry format:", expiry);
@@ -390,9 +423,10 @@
               <td>${expiryDisplay}</td>
               <td>${pages}</td> 
               <td>${statusBadge}</td>
+              <td>${lastActive}</td>
               <td>
-                ${u === "admin" ? "—" : `
-                  <button class="btn-edit" onclick="editUser('${u}')">Edit Password</button>
+                <button class="btn-edit" onclick="editUser('${u}')">Edit Password</button>
+                ${u === "admin" ? "" : `
                   <button class="btn-edit" style="background:#22c55e;" onclick="editExpiry('${u}', '${expiry}')">Edit Expiry</button>
                   <button class="btn-edit" style="background:#16a34a;" onclick="editPages('${u}', '${pages}')">Edit Pages</button>
                   <button class="btn-del" onclick="deleteUser('${u}')">Delete</button>
@@ -579,52 +613,84 @@
     loadUsers();
     loadMappings();
 
-    async function loadSites() {
-      const res = await fetch('/api/sites_config');
-      const data = await res.json();
-      const tbody = document.querySelector("#siteTable tbody");
-      tbody.innerHTML = "";
-      data.sites.forEach(site => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${site}</td>
-            <td><button class="btn-del" onclick="deleteSite('${site}')">Delete</button></td>
-          </tr>`;
-      });
-    
-      // Refresh dropdown site di tab BUFR
-      const sel = document.getElementById("siteSelect");
-      if (sel) {
-        sel.innerHTML = `<option value="default">Default (All Sites)</option>` +
-          data.sites.map(s => `<option value="${s}">${s}</option>`).join("");
-      }
-    }
-    
-    async function addSite() {
-      const name = document.getElementById("newSiteName").value.trim();
-      if (!name) return alert("Please enter site name");
-      const res = await fetch('/api/sites_config', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name})
-      });
-      const json = await res.json();
-      alert(json.success ? "✅ Site added" : json.error);
-      loadSites();
-    }
-    
-    async function deleteSite(name) {
-      if (!confirm(`Delete site "${name}"?`)) return;
-      const res = await fetch('/api/sites_config', {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name})
-      });
-      const json = await res.json();
-      alert(json.success ? "🗑️ Site removed" : json.error);
-      loadSites();
-    }
-    
+async function loadSites() {
+  const res = await fetch('/api/sites_config');
+  const data = await res.json();
+  const tbody = document.querySelector("#siteTable tbody");
+  tbody.innerHTML = "";
+
+  (data.sites || []).forEach(s => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${s.name}</td>
+        <td>${s.lat ?? "-"}</td>
+        <td>${s.lon ?? "-"}</td>
+        <td>${s.utc_offset ?? 7}</td>
+        <td>
+          <button class="btn-edit" onclick="editSite('${s.name}', ${s.lat}, ${s.lon}, ${s.utc_offset})">Edit</button>
+          <button class="btn-del" onclick="deleteSite('${s.name}')">Delete</button>
+        </td>
+      </tr>`;
+  });
+
+  // refresh dropdown BUFR mapping
+  const sel = document.getElementById("siteSelect");
+  if (sel) {
+    sel.innerHTML = `<option value="default">Default (All Sites)</option>` +
+      data.sites.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+  }
+
+  // refresh dropdown FTP compare
+  const ftpSel = document.getElementById("ftpSiteSelect");
+  if (ftpSel) {
+    ftpSel.innerHTML = data.sites.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+  }
+}
+
+async function addSite() {
+  const name = document.getElementById("newSiteName").value.trim();
+  const lat = parseFloat(document.getElementById("newSiteLat").value || 0);
+  const lon = parseFloat(document.getElementById("newSiteLon").value || 0);
+  const utc_offset = parseInt(document.getElementById("newSiteOffset").value || 7);
+  if (!name) return alert("Please enter site name");
+  const res = await fetch('/api/sites_config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, lat, lon, utc_offset})
+  });
+  const json = await res.json();
+  alert(json.success ? "✅ Site added" : json.error);
+  loadSites();
+}
+
+async function editSite(name, lat, lon, utc_offset) {
+  const newLat = prompt(`Latitude for ${name}:`, lat);
+  const newLon = prompt(`Longitude for ${name}:`, lon);
+  const newUTC = prompt(`UTC offset for ${name}:`, utc_offset);
+  if (newLat === null || newLon === null || newUTC === null) return;
+
+  const res = await fetch('/api/sites_config', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, lat: parseFloat(newLat), lon: parseFloat(newLon), utc_offset: parseInt(newUTC)})
+  });
+  const json = await res.json();
+  alert(json.success ? "✅ Site updated" : json.error);
+  loadSites();
+}
+
+async function deleteSite(name) {
+  if (!confirm(`Delete site "${name}"?`)) return;
+  const res = await fetch('/api/sites_config', {
+    method: 'DELETE',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name})
+  });
+  const json = await res.json();
+  alert(json.success ? "🗑️ Site removed" : json.error);
+  loadSites();
+}
+
     // ===== SERIAL LOOKUP =====
     async function lookupSerial() {
       let serial = document.getElementById("serialInput").value.trim();
@@ -1014,6 +1080,42 @@
       const options = js.sites.map(s => `<option value="${s}">${s}</option>`).join("");
       document.getElementById("ftpSiteSelect").innerHTML = options;
     }
+
+// ===== ROLE-BASED TAB VISIBILITY =====
+$(document).ready(async function() {
+  try {
+    const res = await fetch('/api/whoami');
+    const data = await res.json();
+    const user = data.user || "";
+
+    // Kalau admin → tampilkan semua tab
+    if (user === "admin") return;
+
+    // Kalau user biasa → sembunyikan semua tab kecuali "Serial Lookup"
+    const allowedTabs = ["serial"]; // ID tab yg boleh diakses
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      const match = btn.getAttribute("onclick").match(/'([^']+)'/);
+      if (match && !allowedTabs.includes(match[1])) {
+        btn.style.display = "none";
+      }
+    });
+    document.querySelectorAll(".tab-content").forEach(tab => {
+      const id = tab.id.replace("tab-", "");
+      if (!allowedTabs.includes(id)) tab.style.display = "none";
+    });
+
+    // Auto-switch ke tab serial
+    switchTab("serial");
+
+    // Tambahkan indikator mode user
+    const hdr = document.querySelector("h1");
+    if (hdr) hdr.textContent = "Settings (User Mode)";
+  } catch (e) {
+    console.warn("Failed to adjust tabs:", e);
+  }
+});
+
 
     populateCompareDropdowns();
 

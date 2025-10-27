@@ -178,6 +178,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.secret_key = cfg["secretkey"]
 
 ACTIVE_USERS = set()
+#USER_STATE = {}
 
 # === 🧩 Global session versioning (logout-all control) ===
 GLOBAL_SESSION_VERSION = 1  # default awal, naikkan untuk memaksa logout semua
@@ -209,29 +210,45 @@ def clear_user_store():
         del USER_STATE[user]
 
 SITES_FILE = "sites.json"
-SITE_LIST = ["aceh", "tarakan", "sorong", "cilacap", "pangkalanbun", "ranai"]
+SITE_LIST = []
 def load_sites():
-    """Load site list from JSON file or use defaults."""
+    """Load sites.json (support dict or string format, with optional lat/lon/utc_offset)."""
     global SITE_LIST
-    if os.path.exists(SITES_FILE):
-        try:
-            with open(SITES_FILE, "r") as f:
-                data = json.load(f)
-                SITE_LIST = data.get("sites", [])
-        except Exception as e:
-            print("⚠️ Failed to read sites.json:", e)
-            SITE_LIST = SITE_LIST
-    else:
-        SITE_LIST = SITE_LIST
-        save_sites()
+    try:
+        with open(SITES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Bisa format lama {"sites": [...]}, atau langsung list []
+        sites_raw = data.get("sites", data) if isinstance(data, dict) else data
+        SITE_LIST = []
+
+        for s in sites_raw:
+            if isinstance(s, str):
+                SITE_LIST.append({"name": s.lower(), "lat": 0.0, "lon": 0.0, "utc_offset": 7})
+            elif isinstance(s, dict):
+                SITE_LIST.append({
+                    "name": s.get("name", "").lower(),
+                    "lat": float(s.get("lat", 0)),
+                    "lon": float(s.get("lon", 0)),
+                    "utc_offset": int(s.get("utc_offset", 7))
+                })
+
+        print(f"✅ Loaded {len(SITE_LIST)} sites.")
+        return SITE_LIST
+
+    except Exception as e:
+        print(f"[WARN] load_sites() failed: {e}")
+        SITE_LIST = []
+        return []
 
 def save_sites():
-    """Save site list to JSON file."""
+    """Save site list (dict format, with utc_offset) to sites.json"""
     try:
-        with open(SITES_FILE, "w") as f:
+        with open(SITES_FILE, "w", encoding="utf-8") as f:
             json.dump({"sites": SITE_LIST}, f, indent=2)
+        print(f"💾 Saved {len(SITE_LIST)} sites to {SITES_FILE}")
     except Exception as e:
-        print("⚠️ Failed to save sites.json:", e)
+        print(f"[WARN] save_sites() failed: {e}")
 
 load_sites()
 
@@ -345,6 +362,14 @@ def login_required(f):
                 return redirect(url_for("login"))
         session["last_active"] = now.strftime("%Y-%m-%d %H:%M:%S")
 
+        # 🧠 Simpan ke global USER_STATE
+        global USER_STATE
+        user = session.get("user")
+        if user:
+            if user not in USER_STATE:
+                USER_STATE[user] = {}
+            USER_STATE[user]["last_active"] = now.strftime("%Y-%m-%d %H:%M:%S")
+
         return f(*args, **kwargs)
     return decorated_function
 
@@ -409,6 +434,7 @@ def login():
         new_token = secrets.token_hex(8)
         USER_SESSION_TOKENS[username] = new_token
         session["user_token"] = new_token
+        session["last_active"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
         # 🟢 Tambahkan ke daftar user aktif
         ACTIVE_USERS.add(username)
@@ -517,6 +543,26 @@ def update_user_pages():
     save_users()
     print(f"🔧 Updated allowed pages for {username}: {pages}")
     return jsonify({"success": True, "user": username, "pages": pages})
+
+@app.route("/api/last_active")
+@login_required
+def api_last_active():
+    """
+    Return dictionary of users' last active timestamps (if available in session).
+    """
+    result = {}
+    for user, token in (USER_SESSION_TOKENS.items() if "USER_SESSION_TOKENS" in globals() else []):
+        # ambil last_active dari session (kalau masih hidup)
+        # di Flask default session tiap user disimpan client-side, jadi kita bisa tracking di global dict kalau mau
+        # tapi karena kamu pakai session di server-side per user, kita ambil dari USER_STATE
+        try:
+            s = USER_STATE.get(user, {})
+            last = s.get("last_active", None)
+            if last:
+                result[user] = last
+        except Exception:
+            pass
+    return jsonify(result)
 
 # --- BUFR decode ---
 def decode_bufr(filepath):
@@ -796,8 +842,13 @@ def fetch_all_sites(ext_filter=None, limit=None, with_meta=False,
             ftp.connect(cfg["host"], cfg.get("port", 21))
             ftp.login(cfg["user"], cfg["password"])
             ftp.cwd(cfg["base_path"])
-            sites = ftp.nlst()
-
+            sites_cfg = load_sites()
+            cfg_sites = load_sites()
+            ftp_sites = ftp.nlst()
+            sites = [s["name"] for s in cfg_sites if s["name"] in ftp_sites]
+            
+            print(f"[INFO] Using {len(sites)} sites from sites.json: {sites}")
+        
             for site in sites:
                 site_files = []
                 try:
@@ -1089,22 +1140,13 @@ def api_status():
     Jika waktu 'preparing' (Sonde ON) ditemukan di jam di luar 00Z/12Z,
     dianggap log menggunakan waktu lokal dan dikonversi ke UTC.
     """
-    import ftplib, io, re
-    from datetime import datetime, timedelta
 
     cfg = CONFIG["ftp"]
-    sites = SITE_LIST
+    sites = load_sites()  # sekarang list of dict [{'name': 'aceh', 'lat':..., 'lon':...}]
     results = []
 
-    # Offset per site
-    site_utc_offset = {
-        "aceh": 7,
-        "cilacap": 7,
-        "pangkalanbun": 7,
-        "tarakan": 8,
-        "sorong": 9,
-        "ranai": 7
-    }
+    # Default offset (nanti bisa diperluas per site)
+    site_utc_offset = {s["name"]: int(s.get("utc_offset", 7)) for s in sites}
 
     status_patterns = {
         "offline": ["station off", "eoscan manual close"],
@@ -1118,11 +1160,13 @@ def api_status():
             ftp.connect(cfg["host"], cfg.get("port", 21))
             ftp.login(cfg["user"], cfg["password"])
 
-            for site in sites:
+            for s in sites:
+                site_name = s["name"].lower()
                 status = "offline"
                 update = "-"
+
                 try:
-                    ftp.cwd(f"{cfg['base_path']}/{site}")
+                    ftp.cwd(f"{cfg['base_path']}/{site_name}")
                     files = ftp.nlst()
                     log_files = [f for f in files if re.match(r"EOSCAN.*\.log$", f, re.IGNORECASE)]
                     if not log_files:
@@ -1138,7 +1182,7 @@ def api_status():
                         day, mon, yy = date_match.groups()
                         try:
                             file_date = datetime.strptime(f"{day} {mon} 20{yy}", "%d %b %Y")
-                        except:
+                        except Exception:
                             pass
 
                     # Unduh isi file log
@@ -1155,13 +1199,17 @@ def api_status():
                         time_str, msg = m.groups()
                         msg_lower = msg.lower()
 
-                        for s, keys in status_patterns.items():
+                        for s_key, keys in status_patterns.items():
                             if any(k in msg_lower for k in keys):
-                                candidates.append((time_str, s))
+                                candidates.append((time_str, s_key))
                                 break
 
                     if not candidates:
-                        results.append({"site": site, "status": "unknown", "update": file_date.strftime("%Y-%m-%d") if file_date else "-"})
+                        results.append({
+                            "name": site_name,
+                            "status": "unknown",
+                            "update": file_date.strftime("%Y-%m-%d") if file_date else "-"
+                        })
                         continue
 
                     # Ambil status terakhir
@@ -1171,14 +1219,15 @@ def api_status():
 
                     if file_date:
                         try:
-                            time_dt = datetime.strptime(f"{file_date.strftime('%Y-%m-%d')} {last_time}", "%Y-%m-%d %H:%M:%S")
-                        except:
+                            time_dt = datetime.strptime(f"{file_date.strftime('%Y-%m-%d')} {last_time}",
+                                                        "%Y-%m-%d %H:%M:%S")
+                        except Exception:
                             pass
 
-                    # Jika status "preparing" (Sonde ON) dan jamnya bukan sekitar 00Z/12Z, konversi lokal → UTC
+                    # Jika status "preparing" (Sonde ON) dan jam bukan 00Z/12Z → konversi lokal → UTC
                     if status == "preparing" and time_dt:
                         if not (23 <= time_dt.hour or time_dt.hour <= 1 or 11 <= time_dt.hour <= 13):
-                            offset = site_utc_offset.get(site, 7)
+                            offset = site_utc_offset.get(site_name, 7)
                             time_dt_utc = time_dt - timedelta(hours=offset)
                             update = time_dt_utc.strftime("%Y-%m-%d %H:%M UTC")
                         else:
@@ -1189,11 +1238,11 @@ def api_status():
                         update = f"{file_date.strftime('%Y-%m-%d')} {last_time} UTC" if file_date else last_time
 
                 except Exception as e:
-                    print(f"⚠️ Gagal baca {site}: {e}")
+                    print(f"⚠️ Gagal baca {site_name}: {e}")
                     status = "offline"
 
                 results.append({
-                    "site": site,
+                    "name": site_name,
                     "status": status,
                     "update": update
                 })
@@ -2790,10 +2839,8 @@ def api_height_reach(site):
 @login_required
 @page_access_required("settings")
 def settings_page():
-    # Hanya admin
-    if session.get("user") != "admin":
-        return "Access denied. Admin only.", 403
-    return render_template("settings.html", users=VALID_USERS)
+    username = session.get("user")
+    return render_template("settings.html", users=VALID_USERS, current_user=username)
 
 @app.route("/api/users", methods=["GET", "POST", "PUT", "DELETE"])
 @login_required
@@ -2861,6 +2908,9 @@ def manage_users():
         username = data.get("username")
         if not username:
             return jsonify({"error": "Missing username"}), 400
+        # 🚫 Cegah penghapusan akun admin
+        if username.lower() == "admin":
+            return jsonify({"error": "Cannot delete admin account"}), 400
         if username not in VALID_USERS:
             return jsonify({"error": "User not found"}), 404
 
@@ -2869,7 +2919,7 @@ def manage_users():
         print(f"🗑️ Deleted user: {username}")
         return jsonify({"success": True, "users": VALID_USERS})
 
-@app.route("/api/sites_config", methods=["GET", "POST", "DELETE"])
+@app.route("/api/sites_config", methods=["GET", "POST", "PUT", "DELETE"])
 @login_required
 def manage_sites():
     # --- Semua user boleh GET ---
@@ -2882,20 +2932,30 @@ def manage_sites():
 
     data = request.get_json(force=True)
     name = data.get("name", "").strip().lower()
+    lat = float(data.get("lat", 0))
+    lon = float(data.get("lon", 0))
+    offset = int(data.get("utc_offset", 7))
+
     if not name:
         return jsonify({"error": "Missing site name"}), 400
 
     if request.method == "POST":
-        if name in SITE_LIST:
+        if any(s["name"] == name for s in SITE_LIST):
             return jsonify({"error": "Site already exists"}), 400
-        SITE_LIST.append(name)
+        SITE_LIST.append({"name": name, "lat": lat, "lon": lon, "utc_offset": offset})
         save_sites()
         return jsonify({"success": True, "sites": SITE_LIST})
 
+    if request.method == "PUT":
+        for s in SITE_LIST:
+            if s["name"] == name:
+                s["lat"], s["lon"], s["utc_offset"] = lat, lon, offset
+                save_sites()
+                return jsonify({"success": True, "sites": SITE_LIST})
+        return jsonify({"error": "Site not found"}), 404
+
     if request.method == "DELETE":
-        if name not in SITE_LIST:
-            return jsonify({"error": "Site not found"}), 404
-        SITE_LIST.remove(name)
+        SITE_LIST[:] = [s for s in SITE_LIST if s["name"] != name]
         save_sites()
         return jsonify({"success": True, "sites": SITE_LIST})
 
@@ -3106,7 +3166,7 @@ def api_data_availability():
     start_date = datetime(year, month, 1)
     end_day = calendar.monthrange(year, month)[1]
 
-    sites = SITE_LIST
+    sites = load_sites()
     results = []
 
     try:
@@ -3117,33 +3177,28 @@ def api_data_availability():
             ftp.cwd(cfg["base_path"])
 
             for site in sites:
-                ftp.cwd(f"{cfg['base_path']}/{site}")
+                site_name = site["name"] if isinstance(site, dict) else site
+                ftp.cwd(f"{cfg['base_path']}/{site_name}")
                 try:
                     files = ftp.nlst()
                 except Exception:
                     files = []
                 day_data = {}
-
+            
                 for day in range(1, end_day + 1):
                     date_prefix = f"{year}{month:02d}{day:02d}"
                     entry = {}
                     for hour in ["00", "12"]:
-                        # cari semua file yang cocok dengan tanggal dan jam
                         matched = [f for f in files if re.search(fr"{date_prefix}{hour}", f)]
-
-                        # --- deteksi setiap jenis file ---
+            
                         has_bfr = any(f.lower().endswith(".bfr") for f in matched)
                         has_bin = any(f.lower().endswith(".bin") for f in matched)
-
-                        # format TxxxxxxAYYYYmmddHHMM.X dan PxxxxxxAYYYYmmddHHMM.X
                         has_tx = any(re.search(r"T\d+[A-Z].*?(\d{10})(?:[A-Z]+)?\.[xX]$", f) for f in matched)
                         has_px = any(re.search(r"P\d+[A-Z].*?(\d{10})(?:[A-Z]+)?\.[xX]$", f) for f in matched)
-
-
+            
                         available = {"bfr": has_bfr, "bin": has_bin, "T": has_tx, "P": has_px}
                         total = sum(available.values())
-
-                        # --- status warna ---
+            
                         if total == 0:
                             color = "red"
                             tooltip = "no data"
@@ -3154,13 +3209,14 @@ def api_data_availability():
                         else:
                             color = "green"
                             tooltip = "bfr, bin, T, P available"
-
+            
                         entry[hour] = {"color": color, "tooltip": tooltip}
-
+            
                     day_data[day] = entry
-
-                results.append({"site": site, "days": day_data})
+            
+                results.append({"name": site_name, "days": day_data})
                 ftp.cwd(cfg["base_path"])
+            
 
     except Exception as e:
         print("❌ FTP error in data_availability:", e)

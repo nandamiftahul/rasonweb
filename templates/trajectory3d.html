@@ -384,12 +384,7 @@
     <div class="filter-bar">
       <label>Site:</label>
       <select id="siteSelect">
-        <option value="aceh">Aceh</option>
-        <option value="tarakan">Tarakan</option>
-        <option value="sorong">Sorong</option>
-        <option value="cilacap">Cilacap</option>
-        <option value="pangkalanbun">Pangkalanbun</option>
-        <option value="ranai">Ranai</option>
+        <option value="">Loading sites...</option>
       </select>
 
       <label>Date:</label><input type="date" id="dateSelect">
@@ -1007,6 +1002,50 @@ document.addEventListener("click", (e) => {
 function logoutUser() {
   window.location.href = "{{ url_for('logout') }}";
 }
+
+// === 🔹 Populate site dropdown dynamically from backend ===
+async function populateSites() {
+  const select = document.getElementById("siteSelect");
+  if (!select) return;
+  select.innerHTML = `<option value="">Loading sites...</option>`;
+
+  try {
+    const res = await fetch("/api/sites_config");
+    if (!res.ok) throw new Error("Failed to load sites list");
+    const data = await res.json();
+    const sites = data.sites || [];
+
+    if (!sites.length) {
+      select.innerHTML = `<option value="">(No sites configured)</option>`;
+      return;
+    }
+
+    select.innerHTML = "";
+
+    // ✅ Loop menyesuaikan struktur baru: { name, lat, lon }
+    for (const s of sites) {
+      const siteName = s.name || s; // fallback kalau backend masih string
+      const nameDisplay = siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const opt = document.createElement("option");
+      opt.value = siteName;
+      opt.textContent = nameDisplay;
+      select.appendChild(opt);
+    }
+
+    // 🔄 Restore pilihan terakhir
+    const saved = localStorage.getItem("siteSelect");
+    if (saved && sites.some(x => (x.name || x) === saved)) {
+      select.value = saved;
+    }
+
+  } catch (err) {
+    console.error("❌ Failed to populate sites:", err);
+    select.innerHTML = `<option value="">(Error loading sites)</option>`;
+  }
+}
+
+window.addEventListener("DOMContentLoaded", populateSites);
+
 
 loadUserInfo();
 </script>

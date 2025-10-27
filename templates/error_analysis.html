@@ -461,12 +461,10 @@
 
     <!-- Filter -->
     <div class="filter-bar">
-      <label>Site:</label>
-      <select id="siteSelect">
-        {% for s in ['aceh','cilacap','pangkalanbun','ranai','tarakan','sorong'] %}
-          <option value="{{s}}">{{s|capitalize}}</option>
-        {% endfor %}
-      </select>
+    <label>Site:</label>
+    <select id="siteSelect">
+      <option value="">Loading sites...</option>
+    </select>
       <label>Date:</label><input type="date" id="dateSelect">
       <label>Hour:</label><select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
       <label>File:</label><select id="typeSelect">
@@ -642,6 +640,65 @@
       document.getElementById("utcDate").textContent = dateStr;
     }
     updateUTCClock(); setInterval(updateUTCClock, 1000);
+
+async function populateSitesEA() {
+  const select = document.getElementById("siteSelect");
+  if (!select) return;
+  select.innerHTML = `<option value="">Loading sites...</option>`;
+
+  try {
+    const res = await fetch("/api/sites_config");
+    if (!res.ok) throw new Error("Failed to load sites list");
+    const data = await res.json();
+    const sites = data.sites || [];
+
+    if (!sites.length) {
+      select.innerHTML = `<option value="">(No sites configured)</option>`;
+      return;
+    }
+
+    select.innerHTML = "";
+
+    // ✅ Loop menyesuaikan struktur baru: { name, lat, lon }
+    for (const s of sites) {
+      const siteName = s.name || s; // fallback kalau backend masih string
+      const nameDisplay = siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const opt = document.createElement("option");
+      opt.value = siteName;
+      opt.textContent = nameDisplay;
+      select.appendChild(opt);
+    }
+
+    // 🔄 Restore pilihan terakhir
+    const saved = localStorage.getItem("siteSelect");
+    if (saved && sites.some(x => (x.name || x) === saved)) {
+      select.value = saved;
+    }
+
+  } catch (err) {
+    console.error("❌ Failed to populate sites:", err);
+    select.innerHTML = `<option value="">(Error loading sites)</option>`;
+  }
+}
+
+window.addEventListener("DOMContentLoaded", populateSitesEA);
+
+// === Simpan & restore filter lainnya ===
+function eaSaveFilterState() {
+  localStorage.setItem("ea_siteSelect", document.getElementById("siteSelect").value);
+  localStorage.setItem("ea_dateSelect", document.getElementById("dateSelect").value);
+  localStorage.setItem("ea_hourSelect", document.getElementById("hourSelect").value);
+  localStorage.setItem("ea_typeSelect", document.getElementById("typeSelect").value);
+}
+
+window.addEventListener("load", () => {
+  const date = localStorage.getItem("ea_dateSelect");
+  const hour = localStorage.getItem("ea_hourSelect");
+  const type = localStorage.getItem("ea_typeSelect");
+  if (date) document.getElementById("dateSelect").value = date;
+  if (hour) document.getElementById("hourSelect").value = hour;
+  if (type) document.getElementById("typeSelect").value = type;
+});
 
     // === FILTER ===
     $("#filterBtn").click(function(){

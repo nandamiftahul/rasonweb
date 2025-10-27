@@ -624,45 +624,29 @@ setTimeout(() => {
     
     // --- Titik site (koordinat tetap di sini) ---
     let sites = [];
-  
-    async function loadSitesFromConfig() {
-      try {
-        const res = await fetch("/api/sites_config");
-        const data = await res.json();
-    
-        // Kalau backend sudah mengirim array of objects
-        if (Array.isArray(data.sites) && data.sites.length > 0 && typeof data.sites[0] === "object") {
-          sites = data.sites.map(s => ({
-            name: s.name.charAt(0).toUpperCase() + s.name.slice(1),
-            lat: parseFloat(s.lat) || 0,
-            lon: parseFloat(s.lon) || 0
-          }));
-        } else {
-          // fallback (kalau masih string array)
-          const defaultCoords = {
-            aceh: [5.52256, 95.41685],
-            tarakan: [3.32708, 117.57052],
-            sorong: [-0.89059, 131.28581],
-            cilacap: [-7.71897, 109.01487],
-            pangkalanbun: [-2.70508, 111.66573],
-            ranai: [3.95929, 108.38576]
-          };
-          const siteNames = data.sites || [];
-          sites = siteNames.map(name => ({
-            name: name.charAt(0).toUpperCase() + name.slice(1),
-            lat: defaultCoords[name]?.[0] ?? 0,
-            lon: defaultCoords[name]?.[1] ?? 0
-          }));
-        }
-    
-        drawStaticMarkers();     // tampilkan marker awal
-        updateSiteStatus();      // update status real
-      } catch (err) {
-        console.error("❌ Gagal load site list:", err);
-        drawStaticMarkers();
-      }
+async function loadSitesFromConfig() {
+  try {
+    const res = await fetch("/api/sites_config");
+    const data = await res.json();
+
+    if (Array.isArray(data.sites) && data.sites.length > 0) {
+      sites = data.sites.map(s => ({
+        name: s.name.charAt(0).toUpperCase() + s.name.slice(1),
+        lat: parseFloat(s.lat) || 0,
+        lon: parseFloat(s.lon) || 0
+      }));
+    } else {
+      console.warn("⚠️ No sites configured or invalid format");
+      sites = [];
     }
-  
+
+    drawStaticMarkers();     // tampilkan marker awal
+    updateSiteStatus();      // update status real
+  } catch (err) {
+    console.error("❌ Gagal load site list:", err);
+    drawStaticMarkers();
+  }
+}
   loadSitesFromConfig();
 
     
@@ -719,7 +703,7 @@ setTimeout(() => {
     
         const statuses = await res.json();
         // Index by normalized name
-        const byName = new Map(statuses.map(st => [norm(st.site), st]));
+        const byName = new Map(statuses.map(st => [norm(st.name || st.site), st]));
     
         siteMarkers.clearLayers();
         sites.forEach(site => {

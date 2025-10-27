@@ -711,7 +711,8 @@ td {
     html+="</tr>";
 
     data.sites.forEach(site=>{
-      html+=`<tr><td>${site.site}</td>`;
+      const siteName = site.name || site.site || "-";
+      html+=`<tr><td>${siteName.charAt(0).toUpperCase() + siteName.slice(1)}</td>`;
       for(let d=1;d<=endDay;d++){
         const info=site.days[d]?.[selectedHour] || {color:"red",tooltip:"no data"};
         html+=`<td><div class='tooltip'><span class='circle ${info.color}'></span><span class='tooltiptext'>${selectedHour}Z - ${info.tooltip}</span></div></td>`;
