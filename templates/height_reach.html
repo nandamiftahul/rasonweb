@@ -671,17 +671,16 @@
   // ===== Load available sites =====
   async function loadSites() {
     loadingMsg.textContent = "Loading sites...";
-    const year  = parseInt(yearSelect.value);
-    const month = parseInt(monthSelect.value);
-    const { start, end } = getMonthRange(year, month);
     try {
-      const res = await fetch(`/api/sites?ext=.bfr&start_date=${start}&end_date=${end}`);
-      const siteMap = await res.json();
-      const sites = Object.keys(siteMap).sort();
+      const res = await fetch("/api/sites_config");
+      const data = await res.json();
+      const sites = (data.sites || []).map(s => s.name).sort();
+  
       if (sites.length === 0) {
         siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
         return;
       }
+  
       siteSelect.innerHTML = "";
       sites.forEach(s => {
         const opt = document.createElement("option");
@@ -689,9 +688,14 @@
         opt.textContent = s;
         siteSelect.appendChild(opt);
       });
+  
       siteSelect.value = sites[0];
+  
+      const year = parseInt(yearSelect.value);
+      const month = parseInt(monthSelect.value);
       await loadHeightReach(sites[0], year, month);
-    } catch {
+    } catch (err) {
+      console.error("❌ Failed to load site list:", err);
       loadingMsg.textContent = "Failed to load sites.";
     }
   }
