@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Release v1.1.0 — RASON Monitoring</title>
+  <title>RASON Monitoring — Release v1.1.0</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
@@ -45,41 +45,30 @@
       font-size: 13px;
     }
 
-    .doc__body { padding: 28px 32px 36px 32px; }
+    .doc__body { padding: 32px; }
     .section {
-      border: 1px solid #e7ecf3;
-      border-radius: 12px;
-      margin-bottom: 28px;
-      overflow: hidden;
+      margin-bottom: 32px;
+      border-left: 4px solid #0078d7;
+      padding-left: 16px;
     }
-    .section__head {
+
+    h2 { color: #0a2a6b; margin-bottom: 10px; }
+    h3 { color: #004aad; margin-top: 20px; }
+
+    ul { margin: 0; padding-left: 20px; line-height: 1.6; }
+    li { margin-bottom: 6px; }
+
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 14px; }
+    th, td { padding: 8px 10px; border: 1px solid #e7ecf3; vertical-align: top; }
+    thead th { background: #f6f9ff; color: #0a2a6b; }
+
+    pre, code {
       background: #f6f9ff;
-      border-bottom: 1px solid #e7ecf3;
-      padding: 16px 18px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      overflow-x: auto;
     }
-    .section__title { font-size: 18px; font-weight: 800; color: #0a2a6b; margin: 0; }
-    .section__body { padding: 16px 18px 20px 18px; }
-    .pill {
-      padding: 3px 8px; border: 1px solid #e1e8f5; border-radius: 999px;
-      background: #f7fbff; color: #0a2a6b; font-size: 12px; font-weight: 700;
-    }
-
-    ul.check { list-style: none; margin: 0; padding-left: 0; }
-    ul.check li { padding-left: 28px; margin: 8px 0; position: relative; }
-    ul.check li::before {
-      content: "✔"; position: absolute; left: 0; top: 0;
-      color: #0a8f3a; font-weight: 800;
-    }
-
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td {
-      padding: 10px 12px; border-bottom: 1px solid #eef2f8;
-      text-align: left; font-size: 14px;
-    }
-    thead th { background: #f6f9ff; color: #0a2a6b; font-weight: 800; }
 
     .doc__footer {
       background: #f8fbff;
@@ -91,121 +80,177 @@
       flex-wrap: wrap;
       color: #406189;
     }
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .brand img { height: 24px; }
 
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand img { height: 26px; }
     @media print { body { background: #fff; } .doc { box-shadow: none; } }
   </style>
 </head>
 <body>
   <main class="doc">
-
     <header class="doc__header">
-      <h1 class="doc__title">RASON Monitoring — Release v1.1.0</h1>
+      <h1 class="doc__title">🚀 RASON Monitoring — Release v1.1.0 (28 October 2025)</h1>
       <p class="doc__subtitle">Refactor Release — Modular Architecture & Enhanced Security</p>
       <div class="doc__meta">
         <span class="badge">Version: v1.1.0</span>
         <span class="badge">Date: 28 Oct 2025</span>
-        <span class="badge">Developed by: Terrindo</span>
+        <span class="badge">Developer: Terrindo</span>
+        <span class="badge">Author: Nanda Miftahul Khoyri</span>
       </div>
     </header>
 
     <div class="doc__body">
-
+      
       <section class="section">
-        <div class="section__head"><h2 class="section__title">1. Overview</h2><span class="pill">Summary</span></div>
-        <div class="section__body">
-          <p>Rason Monitoring (RasonWeb) adalah platform web terpadu untuk pemantauan, analisis, dan visualisasi data radiosonde BMKG (BUFR/BFR/BFH/BIN). 
-          Refactor Release v1.1.0 menandai selesainya fase utama pengembangan sistem dengan arsitektur modular, frontend seragam, serta fitur analitik dan keamanan yang lengkap.</p>
-        </div>
+        <h2>📘 Overview</h2>
+        <p>Rason Monitoring (RasonWeb) adalah platform web terpadu untuk pemantauan, analisis, dan visualisasi data radiosonde berformat BUFR/BFR/BFH/BIN.</p>
+        <p>Sistem ini dikembangkan untuk menggantikan proses manual dalam validasi dan analisis data hasil peluncuran balon udara, menggunakan teknologi modern berbasis web yang cepat, modular, dan interaktif.</p>
+        <p>Refactor Release (v1.1.0) menandai selesainya fase utama pengembangan sistem dengan struktur backend yang terpisah, frontend seragam, dan fitur analitik lengkap.</p>
       </section>
 
       <section class="section">
-        <div class="section__head"><h2 class="section__title">2. Project Objectives</h2><span class="pill">Goal</span></div>
-        <div class="section__body">
-          <ul class="check">
-            <li>Menstandarkan decoding & QC radiosonde di seluruh stasiun BMKG.</li>
-            <li>Menyediakan analisis otomatis berbasis fisika atmosfer.</li>
-            <li>Menampilkan hasil interaktif melalui dashboard web.</li>
-            <li>Monitoring kualitas data antar-site secara real-time.</li>
-            <li>Menjamin keamanan user & integrasi admin control.</li>
-          </ul>
-        </div>
+        <h2>🎯 Project Objective</h2>
+        <ul>
+          <li>Menstandarkan proses decoding dan QC radiosonde di seluruh stasiun.</li>
+          <li>Menyediakan analisis otomatis berbasis fisika atmosfer.</li>
+          <li>Menampilkan hasil secara visual dan interaktif melalui dashboard web.</li>
+          <li>Memungkinkan monitoring performa dan kualitas data antar site secara real-time.</li>
+          <li>Menyediakan manajemen user dan keamanan terintegrasi.</li>
+        </ul>
       </section>
 
       <section class="section">
-        <div class="section__head"><h2 class="section__title">3. Development Timeline</h2><span class="pill">October 2025</span></div>
-        <div class="section__body">
-          <table>
-            <thead><tr><th>Phase</th><th>Periode</th><th>Fokus</th></tr></thead>
-            <tbody>
-              <tr><td>Phase 1</td><td>7–10 Okt</td><td>Setup Flask, login (hash+expiry), session & Gunicorn.</td></tr>
-              <tr><td>Phase 2</td><td>11–14 Okt</td><td>API `/upload_bufr`, `/api/time_accuracy`, `/api/height_reach`, Deep Physics QC.</td></tr>
-              <tr><td>Phase 3</td><td>15–20 Okt</td><td>UI konsisten, sidebar collapsible, Chart.js v4, DataTables.</td></tr>
-              <tr><td>Phase 4</td><td>21–25 Okt</td><td>Tambah halaman Height Reach, Data Availability, Trajectory 3D, Settings.</td></tr>
-              <tr><td>Phase 5</td><td>26–27 Okt</td><td>Access control, admin logout, expiry editor, active users list.</td></tr>
-              <tr><td>Phase 6</td><td>28 Okt</td><td>Refactor final, create_app(), Procfile, README, dokumentasi.</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <h2>🕒 Project Development Timeline</h2>
+        <table>
+          <thead>
+            <tr><th>Phase</th><th>Periode (2025)</th><th>Pencapaian Utama</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Phase 1 – Initial Build</td><td>7–10 Okt</td><td>Setup struktur Flask, login system (hash password + expiry), single-session, dasar Gunicorn.</td></tr>
+            <tr><td>Phase 2 – Core APIs & Analyzer</td><td>11–14 Okt</td><td>Implementasi /upload_bufr, /api/time_accuracy, /api/height_reach, parsing BUFR ke SQLite + Deep Physics QC.</td></tr>
+            <tr><td>Phase 3 – UI/UX & Frontend Integration</td><td>15–20 Okt</td><td>Tema konsisten, sidebar collapsible, header box, Chart.js v4, DataTables, halaman error_analysis.</td></tr>
+            <tr><td>Phase 4 – Feature Expansion</td><td>21–25 Okt</td><td>Tambah halaman Data Availability, Height Reach, Time Accuracy, Trajectory 3D, Settings.</td></tr>
+            <tr><td>Phase 5 – Admin & Access Control</td><td>26–27 Okt</td><td>Allowed pages per user, admin force logout, edit expiry, daftar user aktif.</td></tr>
+            <tr><td>Phase 6 – Refactor & Deployment</td><td>28 Okt</td><td>Struktur modular, create_app(), wsgi.py, Procfile, README, dokumentasi final.</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Total waktu pengembangan:</strong> ± 3 minggu (7–28 Oktober 2025)</p>
       </section>
 
       <section class="section">
-        <div class="section__head"><h2 class="section__title">4. Key Features</h2><span class="pill">Highlights</span></div>
-        <div class="section__body">
-          <ul class="check">
-            <li>Automatic BUFR/BFR/BFH/BIN decoding + SQLite cache.</li>
-            <li>Deep Physics QC (tropopause, freeze-out, shear, burst detection).</li>
-            <li>Interactive Charts & 3D Trajectory Viewer.</li>
-            <li>Secure User Management (expiry, allowed_pages, force logout).</li>
-            <li>Optimized Gunicorn + centralized logs.</li>
-          </ul>
-        </div>
+        <h2>🏗️ System Architecture</h2>
+        <h3>Backend Layer</h3>
+        <ul>
+          <li>Flask Framework dengan struktur modular</li>
+          <li>Package: core/, routes/, config/</li>
+          <li>SQLite sebagai cache metadata</li>
+          <li>Gunicorn sebagai WSGI server</li>
+        </ul>
+        <h3>Frontend Layer</h3>
+        <ul>
+          <li>Chart.js v4, DataTables, Leaflet, Deck.gl</li>
+          <li>Sidebar collapsible, tema biru gradasi, font Inter</li>
+        </ul>
+        <h3>Deployment Layer</h3>
+        <ul>
+          <li>Gunicorn + Nginx via systemd service</li>
+          <li>Railway/Render dengan Procfile</li>
+          <li>Centralized log dan upload folder terpisah</li>
+        </ul>
       </section>
 
       <section class="section">
-        <div class="section__head"><h2 class="section__title">5. Architecture Overview</h2><span class="pill">System</span></div>
-        <div class="section__body">
-          <p><strong>Backend:</strong> Flask modular (core/, routes/, config/), SQLite cache, Gunicorn WSGI.<br>
-          <strong>Frontend:</strong> Chart.js, Leaflet, Deck.gl, DataTables dengan tema biru gradasi dan font Inter.<br>
-          <strong>Deployment:</strong> Gunicorn + Nginx (systemd) atau Railway Procfile.</p>
-        </div>
+        <h2>🧩 Key Features</h2>
+        <ol>
+          <li><strong>Automatic Data Decoding</strong> – BUFR/BFR/BFH/BIN support, auto cache ke SQLite, FTP fallback</li>
+          <li><strong>Deep Physics Analysis</strong> – Cold point, RH freeze-out, lapse rate inversion, burst detection, wind shear, RH–T mismatch</li>
+          <li><strong>Interactive Visualization</strong> – 4 grafik Chart.js, Data Availability Calendar, Height Reach Graph, 3D Trajectory, Time Accuracy</li>
+          <li><strong>User & Access Management</strong> – Hash password, expiry, single session, allowed pages, force logout</li>
+          <li><strong>Performance & Security</strong> – Optimized Gunicorn, centralized logs, offline static libs, clear 403 UI</li>
+        </ol>
       </section>
 
       <section class="section">
-        <div class="section__head"><h2 class="section__title">6. Future Roadmap</h2><span class="pill">Next</span></div>
-        <div class="section__body">
-          <ul class="check">
-            <li>Subscription Dashboard & Renewal Notification.</li>
-            <li>Live User Session Map (geolocation-based).</li>
-            <li>Cross-variable QC Correlation Matrix.</li>
-            <li>API Authentication dengan Token.</li>
-            <li>Mobile-optimized responsive layout.</li>
-            <li>Automatic BUFR sync ke central database.</li>
-          </ul>
-        </div>
+        <h2>📡 Available API Endpoints</h2>
+        <p>Semua endpoint menggunakan @login_required dan role-based access.</p>
+        <h3>User Management</h3>
+        <ul>
+          <li>/api/users – CRUD user</li>
+          <li>/admin/logout_all – Logout semua user</li>
+          <li>/admin/active_users – Daftar user aktif</li>
+        </ul>
+        <h3>Data Analysis</h3>
+        <ul>
+          <li>/api/time_accuracy/&lt;site&gt; – Analisis AA–DD</li>
+          <li>/api/height_reach/&lt;site&gt; – Tinggi maksimum</li>
+          <li>/api/data_availability – Status harian</li>
+          <li>/raob/&lt;site&gt;/&lt;file&gt; – Analisis RAOB</li>
+        </ul>
       </section>
 
       <section class="section">
-        <div class="section__head"><h2 class="section__title">7. Impact & Benefits</h2><span class="pill">Results</span></div>
-        <div class="section__body">
-          <ul class="check">
-            <li>Mempercepat QC radiosonde hingga 80%.</li>
-            <li>Validasi otomatis dan seragam di semua stasiun.</li>
-            <li>Visualisasi interaktif berbasis sains.</li>
-            <li>Platform nasional terpusat untuk radiosonde BMKG.</li>
-            <li>Meningkatkan efisiensi dan reliabilitas operasional.</li>
-          </ul>
-        </div>
+        <h2>🚀 Refactor Improvements</h2>
+        <table>
+          <thead><tr><th>Sebelum Refactor</th><th>Sesudah Refactor</th></tr></thead>
+          <tbody>
+            <tr><td>Semua kode di app.py</td><td>Struktur modular (core/routes/config)</td></tr>
+            <tr><td>Tidak ada sistem role</td><td>Role-based access control</td></tr>
+            <tr><td>UI tidak seragam</td><td>Tema konsisten dan responsif</td></tr>
+            <tr><td>Cache manual</td><td>SQLite auto cache</td></tr>
+            <tr><td>Session tidak aman</td><td>Token single-session enforcement</td></tr>
+            <tr><td>Deployment manual</td><td>Gunicorn + Nginx siap produksi</td></tr>
+            <tr><td>Logging minim</td><td>Log file terpisah & terpusat</td></tr>
+          </tbody>
+        </table>
       </section>
 
       <section class="section">
-        <div class="section__head"><h2 class="section__title">8. Summary</h2><span class="pill">Conclusion</span></div>
-        <div class="section__body">
-          <p>Refactor Release <strong>v1.1.0</strong> adalah tonggak penting yang menyatukan seluruh modul Rason Monitoring menjadi platform stabil, aman, dan efisien. 
-          Fondasi ini mempersiapkan sistem menuju tahap berikutnya — <strong>AI-driven QC dan National Radiosonde Dashboard</strong> — 
-          untuk meningkatkan akurasi, efisiensi, dan nilai ilmiah data atmosfer nasional.</p>
-        </div>
+        <h2>🔭 Future Roadmap (v1.2.x)</h2>
+        <ul>
+          <li>Subscription Dashboard & renewal notification</li>
+          <li>Real-time session map</li>
+          <li>Cross-variable QC correlation</li>
+          <li>Token-based API authentication</li>
+          <li>Responsive mobile interface</li>
+          <li>Automatic BUFR sync ke central DB</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>💡 Impact & Benefits</h2>
+        <ul>
+          <li>QC lebih cepat hingga 80%</li>
+          <li>Validasi fisika otomatis & seragam</li>
+          <li>Pelacakan error & anomaly mudah</li>
+          <li>Satu platform visual nasional</li>
+          <li>Efisiensi operasional meningkat</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>🧱 System Strengths</h2>
+        <ul>
+          <li>Struktur modular dan scalable</li>
+          <li>Analisis fisika mendalam (CAPE, CIN, tropopause, shear)</li>
+          <li>Integrasi penuh FTP ↔ SQLite ↔ Web API</li>
+          <li>Visual interaktif (Chart.js, Deck.gl, Leaflet)</li>
+          <li>Keamanan kuat (token + expiry + access control)</li>
+          <li>Deployment siap produksi (Gunicorn, Nginx, Railway)</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>📄 Summary</h2>
+        <p>Rason Monitoring menyediakan solusi end-to-end dari decoding radiosonde, QC otomatis, hingga visualisasi dan manajemen akses pengguna.</p>
+        <p>Versi Refactor (v1.1.0) adalah fondasi stabil yang siap dikembangkan ke fase berikutnya (v1.2.x) dengan fitur subscription dashboard, live session map, dan advanced QC correlation.</p>
+        <blockquote><em>“From decoding to insight — Rason Monitoring transforms raw radiosonde data into actionable intelligence for atmospheric science.”</em></blockquote>
+      </section>
+
+      <section class="section">
+        <h2>👨‍💻 Contact</h2>
+        <p><strong>Developed by:</strong> PT. Terrindo Media Raya<br>
+           <strong>Developer:</strong> Nanda Miftahul Khoyri<br>
+           <strong>Release Date:</strong> 28 October 2025 (Refactor v1.1.0)</p>
       </section>
 
     </div>
