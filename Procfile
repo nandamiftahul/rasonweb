@@ -1,1 +1,1 @@
-web : cd rason_backend && gunicorn app:app
+web: cd rason_backend && gunicorn -w 2 -b 0.0.0.0:8080 app:app
