@@ -1,15 +1,17 @@
 import os, sys
 from pathlib import Path
 
-# Pastikan directory project root masuk ke sys.path
+# Pastikan project root /app dikenali oleh Python
 BASE_DIR = Path(__file__).resolve().parent
+os.chdir(BASE_DIR)
 if str(BASE_DIR) not in sys.path:
-    sys.path.append(str(BASE_DIR))
+    sys.path.insert(0, str(BASE_DIR))
 
-# Import create_app dari app.py
+# Debug print (boleh hapus setelah berhasil)
+print("✅ WSGI running from:", os.getcwd())
+print("✅ sys.path includes:", sys.path)
+
+# Import create_app
 from app import create_app
 
 app = create_app()
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8082, debug=True)
