@@ -1,0 +1,91 @@
+“kamus cepat” buat indeks-indeks penting di sounding/RAOB:
+
+CAPE — Convective Available Potential Energy
+
+Apa: Energi positif (J/kg) yang tersedia untuk parcel udara naik secara bebas (buoyant).
+
+Bagaimana hitung: Integrasi ∫ g·(Tᵥ,parcel − Tᵥ,env)/Tᵥ,env dz pada lapisan di mana parcel lebih hangat dari lingkungan (dari LFC ke EL). Biasanya pakai parcel surface, mixed-layer (ML) 0–100 mb, atau most-unstable (MU); gunakan virtual temperature correction.
+
+Interpretasi (kasar): 0–500 lemah, 500–1000 marginal, 1000–2000 sedang, 2000–3500 kuat, >3500 ekstrem.
+
+Implikasi: CAPE tinggi → updraft kuat, potensi badai lebih besar (tapi tetap tergantung trigger & shear).
+
+
+CIN — Convective Inhibition
+
+Apa: Energi negatif (J/kg) yang “mengunci” konveksi (cap/penutup).
+
+Hitung: Integrasi ∫ g·(Tᵥ,parcel − Tᵥ,env)/Tᵥ,env dz pada lapisan di mana parcel lebih dingin dari lingkungan (dari permukaan ke LFC).
+
+Interpretasi: 0–25 lemah (mudah pecah), 25–100 sedang, >100 kuat (perlu pemicu kuat: pemanasan, konvergensi/sea-breeze, topografi).
+
+Implikasi: CIN kecil memudahkan konveksi spontan; CIN sedang-besar dapat menunda konveksi sampai “meledak” bila pemicunya cukup.
+
+
+LCL — Lifting Condensation Level
+
+Apa: Ketinggian (m atau hPa) di mana parcel yang diangkat adiabatik kering pertama kali jenuh (RH=100%), awan dasar.
+
+Estimasi cepat: LCL ≈ 125 m × (T(°C) − Td(°C)). (Pendekatan.)
+
+Interpretasi: LCL rendah (≤1 km) → lingkungan lembap, mendukung hujan lebat/puting beliung basah; LCL tinggi → lebih kering, risiko angin turun/ downburst lebih besar.
+
+
+Lifted Index (LI)
+
+Apa: Stabilitas di 500 hPa relatif terhadap parcel yang diangkat dari permukaan/ML.
+
+Definisi: LI = T_env(500) − T_parcel(500).
+
+Interpretasi: LI > 0 stabil; 0 s/d −2 sedikit labil; −3 s/d −5 cukup labil; < −6 sangat labil (konveksi kuat mungkin).
+
+Catatan: Peka pada pilihan parcel & pengaruh adveksi/diurnal.
+
+
+K Index (KI)
+
+Apa: Indeks kelembapan + lapse rate untuk potensi badai (terutama badai non-supercell, hujan/petir).
+
+Rumus: KI = (T850 − T500) + Td850 − (T700 − Td700).
+
+Interpretasi (rule-of-thumb): <20 kecil, 20–25 rendah, 26–30 sedang, 31–35 tinggi, >35 sangat tinggi potensi badai/petir.
+
+Catatan: Bagus untuk konveksi luas/tropis; kurang peka terhadap wind shear.
+
+
+Wind Shear (Bulk Shear)
+
+Apa: Perubahan vektor angin dengan ketinggian (m/s atau kt) pada lapisan tertentu.
+
+Umum dipakai: 0–1 km (low-level), 0–3 km (mesoscale), 0–6 km (deep-layer).
+
+Ambang lazim (0–6 km): <10 m/s lemah; 10–20 m/s moderat; >20 m/s kuat (mendukung badai terorganisir/linear/supercell jika CAPE cukup).
+
+Implikasi: Shear besar → pemisahan updraft/downdraft yang baik, umur badai lebih lama, potensi garis badai/supercell; directional shear (veering) di low-level penting untuk tornado.
+
+
+SRH — Storm-Relative Helicity
+
+Apa: Ukuran “pulas/spiral” aliran low-level relatif terhadap badai (m²/s²). Diintegralkan biasanya 0–1 km dan 0–3 km.
+
+Definisi ringkas: SRH = ∫ ( v − c ) · ( k × dv/dz ) dz, di mana c adalah vektor kecepatan badai.
+
+Interpretasi (0–1 km): <100 rendah; 100–200 moderat; >200 tinggi (dukung supercell/hasil putaran updraft).
+(0–3 km): >250 sering terkait potensi supercell signifikan—jika CAPE memadai.
+
+Catatan: Perlu asumsi/estimasi kecepatan badai; sangat sensitif ke hodograph.
+
+
+Tropopause (LRT & CPT)
+
+Lapse-Rate Tropopause (LRT, definisi WMO): Tingkat di mana lapse rate pertama kali turun ≤2 °C/km dan tetap ≤2 °C/km rata-rata pada 2 km di atasnya. Umumnya di mid-lat ~10–12 km; di tropis (Indonesia) sering lebih tinggi ~16–17 km.
+
+Cold-Point Tropopause (CPT): Level termal terdingin pada profil (umumnya sedikit di atas LRT di tropis). Penting untuk studi tropopause tropis, uap air stratosfer.
+
+Implikasi: Posisi tropopause memengaruhi kedalaman konveksi, potensi overshooting top, dan penampang energi gelombang.
+
+
+
+---
+
+Catatan praktik penting untuk sounding/RAOB
