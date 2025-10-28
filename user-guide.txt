@@ -1,0 +1,262 @@
+RASON MONITORING - USER GUIDE
+===========================================================
+Version: v1.1.0 (Refactor Release)
+Date: 28 October 2025
+Developed by Terrindo
+-----------------------------------------------------------
+
+📘 OVERVIEW
+-----------------------------------------------------------
+Rason Monitoring adalah sistem web untuk menganalisis data radiosonde BMKG.
+Platform ini menampilkan hasil decoding BUFR/BFR/BFH/BIN secara otomatis
+dalam bentuk grafik, tabel, dan peta interaktif.
+
+Akses sistem dibedakan menjadi **Admin** dan **User biasa**, 
+dengan batas masa aktif (expiry) dan halaman yang diizinkan (allowed pages).
+
+
+🔑 LOGIN PAGE
+-----------------------------------------------------------
+URL: `/login`
+
+• Masukkan **username** dan **password** yang diberikan admin.
+• Sistem melakukan validasi password hash dan memeriksa masa aktif akun.
+• Jika masa aktif telah lewat, akan muncul pesan:
+  `❌ Subscription expired on <tanggal>`
+
+✅ Setelah login berhasil:
+- Sistem membuat session token unik.
+- User diarahkan ke halaman **Main Page**.
+- Status login disimpan di daftar aktif (Active Users).
+
+⚠️ Keamanan:
+- Satu user hanya bisa login di satu sesi aktif.
+- Login baru otomatis mengeluarkan sesi sebelumnya.
+
+
+🏠 MAIN PAGE
+-----------------------------------------------------------
+URL: `/main` (atau `/`)
+
+Halaman utama menampilkan tampilan dashboard umum dan navigasi sidebar.
+Dari sini user dapat menuju ke seluruh fitur utama.
+
+🔹 Elemen utama:
+- **Sidebar kiri** → daftar halaman (Data Availability, Time Accuracy, Error Analysis, dsb.)
+- **Header box** → judul, deskripsi singkat, dan jam digital real-time.
+- **Footer** → “Powered by Terrindo · BMKG · Meteomodem”
+- **Background** → gradasi biru (#0a2a6b → #0078d7) dengan font *Inter*.
+
+Sidebar dapat disembunyikan/diperluas (collapse) dan sistem menyimpan 
+status terakhirnya menggunakan *localStorage* (tetap sama meski pindah halaman).
+
+
+📊 DASHBOARD PAGE
+-----------------------------------------------------------
+URL: `/dashboard`
+
+Fungsi: Melihat daftar file radiosonde dari FTP berdasarkan ekstensi dan batas jumlah.
+
+🔹 Fitur:
+- Dropdown filter ekstensi (`.bfr`, `.bufr`, `.bfh`, `.bin`)
+- Input limit untuk membatasi jumlah file per site.
+- Tabel menampilkan site dan file terbaru.
+- Semua data diambil dari fungsi `fetch_all_sites()`.
+
+Halaman ini berguna bagi operator untuk memantau data terbaru per site.
+
+
+🕒 TIME ACCURACY PAGE
+-----------------------------------------------------------
+URL: `/time_accuracy`
+
+Menampilkan grafik **akurasi waktu peluncuran** terhadap pesan AA–DD.
+
+🔹 Fungsi:
+- Mengambil data dari `/api/time_accuracy/<site>`
+- Grafik menunjukkan waktu mencapai 100 hPa (AB) dan 30 hPa (CD)
+- Perbandingan dilakukan per tanggal (00Z dan 12Z)
+- Dapat memilih site dan bulan tertentu melalui dropdown/filter
+
+Gunanya untuk mengevaluasi keakuratan waktu peluncuran radiosonde.
+
+
+📈 HEIGHT REACH PAGE
+-----------------------------------------------------------
+URL: `/height_reach`
+
+Menampilkan grafik capaian maksimum ketinggian setiap peluncuran.
+
+🔹 Fungsi:
+- Sumber data dari `/api/height_reach/<site>`
+- Sumbu X = tanggal, Sumbu Y = tinggi maksimum (m)
+- Warna atau tooltip menunjukkan tekanan minimum yang tercapai
+- Bermanfaat untuk memastikan performa balon dan sensor
+
+Halaman ini menunjukkan seberapa tinggi radiosonde berhasil naik sebelum burst.
+
+
+📆 DATA AVAILABILITY PAGE
+-----------------------------------------------------------
+URL: `/data_availability`
+
+Menampilkan kalender ketersediaan data radiosonde dalam 1 bulan.
+
+🔹 Fungsi:
+- Data diambil dari `/api/data_availability`
+- Grid kalender menunjukkan status setiap hari (00Z dan 12Z)
+- Warna indikator:
+  - 🟥 **Merah:** tidak ada data
+  - 🟨 **Kuning:** sebagian file hilang
+  - 🟩 **Hijau:** semua file (BFR, BIN, T, P) tersedia
+- Tooltip menampilkan detail file yang hilang
+
+Halaman ini digunakan untuk audit ketersediaan data per site dan per hari.
+
+
+🌡️ ERROR ANALYSIS PAGE
+-----------------------------------------------------------
+URL: `/error_analysis`
+
+Menganalisis kualitas data berdasarkan parameter fisika atmosfer.
+
+🔹 Fungsi:
+- File diambil dari `/upload_bufr`
+- Menampilkan empat grafik utama terhadap ketinggian:
+  1. Temperature vs Height
+  2. Relative Humidity vs Height
+  3. Wind Speed vs Height
+  4. Wind Direction vs Height
+- Hasil QC ditampilkan otomatis oleh fungsi `deepPhysics()`:
+  mendeteksi cold-point tropopause, lapse rate inversion, freeze-out RH, 
+  wind shear, burst detection, dll.
+- Setiap hasil analisis ditampilkan di panel deskripsi bawah grafik.
+
+Halaman ini penting untuk verifikasi otomatis kualitas sounding.
+
+
+🧭 TRAJECTORY 3D PAGE
+-----------------------------------------------------------
+URL: `/trajectory3d`
+
+Visualisasi lintasan radiosonde dalam ruang 3D menggunakan **Deck.gl + MapLibre**.
+
+🔹 Fungsi:
+- Data diambil dari `/api/trajectory3d`
+- Menampilkan jalur (lon, lat, height) sebagai **trip animation**
+- Informasi tambahan: durasi, maksimum tinggi, dan posisi stasiun
+- Mendukung animasi interaktif (berjalan sesuai timestamp)
+
+Fitur ini memberikan pandangan spasial perjalanan radiosonde.
+
+
+📉 ANALYSIS PAGE / RAOB PAGE
+-----------------------------------------------------------
+URL: `/analysis` atau `/raob/<site>/<filename>`
+
+Analisis meteorologi mendalam menggunakan diagram Skew-T dan Hodograph.
+
+🔹 Fitur:
+- Decode data dari FTP atau DB via `/api/raob`
+- Menampilkan:
+  - **Skew-T**: Temperature, Dewpoint, Parcel Path
+  - **Hodograph**: Profil angin (warna = ketinggian)
+- Menampilkan indeks termodinamika:
+  - CAPE, CIN, LCL, Lifted Index, K Index, Wind Shear, SRH
+- Analisis tambahan: Freezing Level, Tropopause (CPT & LRT)
+- Gambar hasil (Skew-T, Hodo) dihasilkan otomatis dan disimpan sementara.
+
+Digunakan oleh analis untuk mengevaluasi kestabilan atmosfer dan potensi konvektif.
+
+
+🗺️ MAP VIEW PAGE
+-----------------------------------------------------------
+URL: `/map`
+
+Peta interaktif (Leaflet) untuk menampilkan posisi lintasan radiosonde.
+
+🔹 Fungsi:
+- Menampilkan marker site dan path radiosonde (lon/lat)
+- Mendukung zoom dan pan
+- Terkoneksi langsung dengan data terakhir yang di-upload
+
+Digunakan sebagai alat pantau cepat hasil sounding.
+
+
+⚙️ SETTINGS PAGE
+-----------------------------------------------------------
+URL: `/settings`
+
+Panel administrasi untuk konfigurasi user dan BUFR mapping.
+
+🔹 Tab 1 – User Management
+- Menampilkan daftar user dari `users.json`
+- Admin dapat:
+  - Mengubah expiry date
+  - Mengatur halaman yang boleh diakses
+  - Menghapus atau menambah user baru
+
+🔹 Tab 2 – BUFR Mapping Config
+- Menampilkan struktur mapping field BUFR (meta & level)
+- Dapat mengubah atau menambah variabel mapping per site
+- Semua perubahan otomatis tersimpan ke file JSON konfigurasi
+
+Halaman ini hanya dapat diakses oleh admin.
+
+
+📦 RELEASE PAGE
+-----------------------------------------------------------
+URL: `/release`
+
+Menampilkan catatan rilis (release notes) sistem Rason Monitoring.
+
+Contoh:  
+> **v1.0.2 – 25 Oktober 2025**  
+> Database FTP & SQLite comparison update  
+> Sinkronisasi lebih cepat dan sederhana.
+
+Digunakan sebagai dokumentasi versi dan update fitur sistem.
+
+
+🧩 UNDER DEVELOPMENT PAGE
+-----------------------------------------------------------
+URL: `/underdev`
+
+Halaman placeholder untuk fitur yang sedang dalam tahap pengembangan.
+
+Tampilannya tetap mengikuti tema utama sistem (sidebar, header, footer).
+
+
+🚪 LOGOUT
+-----------------------------------------------------------
+URL: `/logout`
+
+- Menghapus session aktif dan cookie browser.
+- User langsung diarahkan kembali ke halaman login.
+- Status user dihapus dari daftar `ACTIVE_USERS`.
+
+
+👑 ADMIN FEATURES (Tambahan)
+-----------------------------------------------------------
+Admin memiliki akses penuh terhadap semua halaman dan API:
+- Menambahkan / menghapus user.
+- Memaksa logout semua user (`/admin/logout_all`).
+- Melihat daftar user aktif (`/admin/active_users`).
+- Mengubah expiry date dan akses halaman setiap user.
+- Mengatur konfigurasi site dan mapping BUFR.
+
+-----------------------------------------------------------
+🧭 SUMMARY
+-----------------------------------------------------------
+**Rason Monitoring v1.1.0** menyediakan sistem analisis radiosonde yang lengkap:
+- Login aman dan manajemen pengguna fleksibel.  
+- Tampilan konsisten dan modern.  
+- Data otomatis diambil dari FTP dan divisualisasikan secara interaktif.  
+- Dilengkapi QC berbasis fisika dan analisis RAOB profesional.
+
+> “Satu platform untuk memantau, menganalisis, dan memverifikasi data radiosonde nasional.”
+
+-----------------------------------------------------------
+Developed by PT. Terrindo Media Raya · BMKG Collaboration  
+Author: Nanda Miftahul Khoyri  
+Release Date: 28 October 2025

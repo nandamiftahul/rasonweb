@@ -1,0 +1,315 @@
+RASON MONITORING - PROJECT PRESENTATION DOCUMENT
+===========================================================
+Version: v1.1.0 (Refactor Release)
+Date: 28 October 2025
+Developer: Terrindo · BMKG · Meteomodem
+Author: Nanda Miftahul Khoyri
+
+
+📘 OVERVIEW
+-----------------------------------------------------------
+Rason Monitoring (RasonWeb) adalah platform web terpadu untuk
+pemantauan, analisis, dan visualisasi data radiosonde BMKG
+berformat BUFR/BFR/BFH/BIN.
+
+Sistem ini dikembangkan untuk menggantikan proses manual
+dalam validasi dan analisis data hasil peluncuran balon udara,
+menggunakan teknologi modern berbasis web yang cepat,
+modular, dan interaktif.
+
+Refactor Release (v1.1.0) menandai selesainya fase utama
+pengembangan sistem dengan struktur backend yang terpisah,
+frontend seragam, dan fitur analitik lengkap.
+
+
+🎯 PROJECT OBJECTIVE
+-----------------------------------------------------------
+• Menstandarkan proses decoding dan QC radiosonde di seluruh stasiun BMKG.
+• Menyediakan analisis otomatis berbasis fisika atmosfer.
+• Menampilkan hasil secara visual dan interaktif melalui dashboard web.
+• Memungkinkan monitoring performa dan kualitas data antar site secara real-time.
+• Menyediakan manajemen user dan keamanan terintegrasi.
+
+
+🕒 PROJECT DEVELOPMENT TIMELINE
+-----------------------------------------------------------
+| Phase | Periode (2025) | Pencapaian Utama |
+|-------|----------------|------------------|
+| **Phase 1 – Initial Build** | **7–10 Okt** | Setup struktur Flask, login system (hash password + expiry), single-session, dasar Gunicorn. |
+| **Phase 2 – Core APIs & Analyzer** | **11–14 Okt** | Implementasi `/upload_bufr`, `/api/time_accuracy`, `/api/height_reach`, parsing BUFR ke SQLite + Deep Physics QC. |
+| **Phase 3 – UI/UX & Frontend Integration** | **15–20 Okt** | Tema konsisten, sidebar collapsible, header box, Chart.js v4, DataTables, dan halaman `error_analysis`. |
+| **Phase 4 – Feature Expansion** | **21–25 Okt** | Tambah halaman Data Availability, Height Reach, Time Accuracy, Trajectory 3D, Settings. |
+| **Phase 5 – Admin & Access Control** | **26–27 Okt** | Allowed pages per user, admin force logout, edit expiry, daftar user aktif. |
+| **Phase 6 – Refactor & Deployment** | **28 Okt** | Struktur modular, `create_app()`, `wsgi.py`, Procfile, README, dan dokumentasi final. |
+
+⏱ Total waktu pengembangan: ± 3 minggu (7–28 Oktober 2025)
+
+
+🏗️ SYSTEM ARCHITECTURE
+-----------------------------------------------------------
+**Backend Layer:**
+• Flask Framework dengan struktur modular
+• Paket:
+  - core/ (decoding, db, ftp, utils, auth)
+  - routes/ (api, pages, admin)
+  - config/ (BUFR mapping per site)
+• SQLite sebagai cache metadata
+• Gunicorn sebagai WSGI server produksi
+
+**Frontend Layer:**
+• Template HTML interaktif dengan Chart.js v4 dan DataTables
+• Map visualisasi via Leaflet & Deck.gl
+• Sidebar collapsible dengan localStorage
+• Tema biru gradasi (#0a2a6b → #0078d7)
+• Font “Inter” dari Google Fonts
+• Footer dan header konsisten di semua halaman
+
+**Deployment Layer:**
+• Gunicorn + Nginx (systemd service)
+• Railway/Render deployment via Procfile
+• Log file terpusat di `/var/log/rason_web/`
+• Upload folder terpisah di `uploads/`
+
+
+🧩 KEY FEATURES
+-----------------------------------------------------------
+1️⃣ **Automatic Data Decoding**
+   - Mendukung BUFR/BFR/BFH/BIN (Meteomodem M10/M20)
+   - Auto cache ke SQLite
+   - Fallback FTP retrieval jika file lokal tidak tersedia
+
+2️⃣ **Deep Physics Analysis**
+   - Cold point tropopause detection
+   - RH freeze-out & lapse rate inversion
+   - Pressure reversal detection
+   - Ascent deceleration / burst altitude detection
+   - Wind shear & directional change QC
+   - RH–T mismatch analysis
+
+3️⃣ **Interactive Visualization**
+   - 4 Grafik Chart.js (T, RH, WS, WD vs Height)
+   - Data Availability Calendar (00Z/12Z)
+   - Height Reach Graph per site/date
+   - 3D Trajectory (Deck.gl + MapLibre)
+   - Time Accuracy (AA–DD message comparison)
+
+4️⃣ **User & Access Management**
+   - Hashed password (Werkzeug)
+   - Expiry date / subscription limit
+   - Single active session enforcement
+   - Allowed pages (wildcard `*` untuk admin)
+   - Admin force logout (token reset)
+   - Settings tab untuk edit expiry & access
+
+5️⃣ **Performance & Security**
+   - Optimized Gunicorn worker/thread config
+   - Centralized log system
+   - Offline-capable static libs
+   - Clear 403-like UI message untuk access restriction
+
+
+🎨 FRONTEND PAGES SUMMARY
+-----------------------------------------------------------
+• **Main Dashboard:** Menu utama dan akses semua fitur
+• **Data Availability:** Kalender harian radiosonde (00Z/12Z)
+• **Time Accuracy:** Analisis waktu AA/BB/CC/DD terhadap peluncuran
+• **Error Analysis:** QC grafik vs height + summary hasil deep physics
+• **Height Reach:** Grafik maksimum ketinggian per site/date
+• **Trajectory 3D:** Visual lintasan radiosonde dalam 3D
+• **Settings:** Admin control (User management + BUFR mapping)
+• **Under Development:** Placeholder fitur tahap berikutnya
+
+
+🔐 USER MANAGEMENT STRUCTURE
+-----------------------------------------------------------
+users.json:
+[
+  {
+    "username": "admin",
+    "password": "<hashed>",
+    "expiry": "2026-10-01",
+    "pages": ["*"]
+  },
+  {
+    "username": "observer",
+    "password": "<hashed>",
+    "expiry": "2025-12-31",
+    "pages": ["main", "map", "data_availability"]
+  }
+]
+
+• Enkripsi password via tools/encrypt_users.py
+• Admin dapat ubah expiry & akses halaman
+• Token session unik per user (single login)
+
+
+⚙️ TECHNOLOGY STACK
+-----------------------------------------------------------
+| Layer | Teknologi |
+|--------|------------|
+| Backend | Python 3.12, Flask, SQLite, Gunicorn |
+| Frontend | HTML, CSS, JS, Chart.js v4, DataTables, Leaflet, Deck.gl, MapLibre |
+| Tools | Werkzeug (security), pybufrkit / pyart (decoding), pandas (analysis) |
+| Deployment | Gunicorn + Nginx + systemd / Railway Procfile |
+| UI Theme | Inter font + Gradient biru (0a2a6b→0078d7) |
+
+
+
+📡 AVAILABLE API ENDPOINTS
+-----------------------------------------------------------
+
+### 🧩 **USER MANAGEMENT & SECURITY**
+| Endpoint | Method | Deskripsi |
+|-----------|---------|-----------|
+| `/api/whoami` | GET | Mengembalikan user login saat ini. |
+| `/api/user_expiry` | PUT | Admin mengubah masa aktif user. |
+| `/api/user_pages` | PUT | Admin mengubah daftar halaman yang diizinkan. |
+| `/api/last_active` | GET | Melihat waktu aktivitas terakhir user. |
+| `/api/users` | GET/POST/PUT/DELETE | CRUD user (hanya admin). |
+| `/admin/logout_all` | POST | Logout seluruh user (reset global session). |
+| `/admin/logout_user/<username>` | POST | Force logout user tertentu. |
+| `/admin/active_users` | GET | Daftar user aktif (admin only). |
+| `/api/my_info` | GET | Info user dan tanggal expiry login. |
+
+---
+
+### 🗺️ **SITE CONFIGURATION**
+| Endpoint | Method | Deskripsi |
+|-----------|---------|-----------|
+| `/api/sites` | GET | Ambil daftar site dari FTP. |
+| `/api/sites_with_meta` | GET | Sama seperti di atas tapi lengkap dengan metadata radiosonde. |
+| `/api/sites_config` | GET/POST/PUT/DELETE | CRUD konfigurasi site (koordinat, offset UTC). |
+
+---
+
+### 📊 **DATA ANALYSIS & VISUALIZATION**
+| Endpoint | Method | Deskripsi |
+|-----------|---------|-----------|
+| `/api/time_accuracy/<site>` | GET | Mengambil data akurasi waktu (AA–DD) per site per bulan. |
+| `/api/height_reach/<site>` | GET | Grafik capaian maksimum ketinggian & tekanan minimum. |
+| `/api/data_availability` | GET | Status ketersediaan data radiosonde harian (00Z/12Z). |
+| `/api/trajectory3d` | GET | Path radiosonde untuk tampilan 3D (Deck.gl). |
+| `/api/latest_status` | GET | Status peluncuran terakhir tiap site. |
+| `/api/status` | GET | Membaca status EOSCAN*.log dari FTP setiap site. |
+| `/raob/<site>/<filename>` | GET | Analisis RAOB lengkap: Skew-T, Hodograph, CAPE, CIN, LCL, SRH, Tropopause. |
+
+---
+
+### 💾 **FILE & FTP OPERATIONS**
+| Endpoint | Method | Deskripsi |
+|-----------|---------|-----------|
+| `/upload_bufr` | POST | Upload manual / ambil dari FTP → decode & simpan ke session. |
+| `/api/filter` | POST | Filter file dari FTP berdasarkan site/date/hour/ftype. |
+| `/api/filemeta/<site>/<filename>` | GET | Metadata minimum dari BUFR cache (launch time, serial). |
+| `/download/<site>/<filename>` | GET | Download file mentah dari FTP. |
+| `/load_from_ftp/<site>/<filename>` | GET | Download & buka langsung di map viewer. |
+| `/api/insert_from_ftp/<site>/<filename>` | GET | Insert file baru dari FTP ke DB. |
+| `/api/redownload/<site>/<filename>` | GET | Re-download file (hapus cache DB terlebih dahulu). |
+| `/api/db_files/<site>` | GET | Daftar file per site dari database lokal. |
+| `/api/download_wmo/<site>/<filename>` | GET | Generate atau gabungkan WMO message (TTAA–TTDD & PPAA–PPDD). |
+
+---
+
+### ⚙️ **BUFR MAPPING & METADATA**
+| Endpoint | Method | Deskripsi |
+|-----------|---------|-----------|
+| `/api/bufrmap_full` | GET/POST/PUT/DELETE | Konfigurasi global BUFR mapping (meta + level). |
+| `/api/bufrmap/<site>` | GET/POST/PUT/DELETE | Mapping khusus per site (override default). |
+| `/api/serial_lookup/<serial>` | GET | Lookup informasi radiosonde berdasarkan serial number. |
+| `/api/metadata` | GET | Metadata lengkap (auto-derived max height, ascent rate, dsb). |
+| `/api/all_levels` | GET | Semua data level yang disimpan di session user. |
+| `/value` | GET | Ambil data satu frame (tinggi tertentu) untuk animasi 3D. |
+
+---
+
+### 🧠 **QC & ANALYTICS**
+| Endpoint | Method | Deskripsi |
+|-----------|---------|-----------|
+| `/api/height_reach/<site>` | GET | Ketinggian maksimum dan tekanan minimum tiap peluncuran. |
+| `/api/time_accuracy/<site>` | GET | Perbandingan waktu pesan AA–DD terhadap waktu peluncuran. |
+| `/api/latest_status` | GET | Ringkasan status terakhir tiap site. |
+| `/api/status` | GET | Status dari file log EOSCAN. |
+| `/raob/<site>/<filename>` | GET | Analisis RAOB (Skew-T, Hodograph, indeks termodinamika). |
+
+
+💡 Catatan: Semua endpoint di atas menggunakan **@login_required**
+dan sebagian dibatasi dengan **role-based access (allowed_pages)**.
+
+
+📦 DIRECTORY STRUCTURE
+-----------------------------------------------------------
+.
+├── app.py / wsgi.py                → Entry point
+├── routes/ (api.py, pages.py, admin.py)
+├── core/ (auth.py, db.py, ftp.py, bufr_parser.py, utils.py)
+├── config/ (site-based BUFR mapping)
+├── templates/ (HTML frontend)
+├── static/ (libs, images, geojson)
+├── uploads/ (cached flight files)
+├── tools/ (utility scripts)
+├── users.json, sites.json
+└── requirements.txt, Procfile
+
+
+🚀 REFRACTOR IMPROVEMENTS
+-----------------------------------------------------------
+| Sebelum Refactor | Sesudah Refactor |
+|------------------|------------------|
+| Semua kode dalam app.py | Struktur modular (core/routes/config) |
+| Tidak ada sistem role | Role-based access control |
+| UI tidak seragam | Tema konsisten dan responsif |
+| Cache manual | SQLite auto cache |
+| Session tidak aman | Token single-session enforcement |
+| Deployment manual | Gunicorn + Nginx siap produksi |
+| Logging minim | Log file terpisah dan terpusat |
+
+
+🔭 FUTURE ROADMAP (v1.2.x)
+-----------------------------------------------------------
+• Subscription Dashboard & renewal notification  
+• Real-time session map (user login location)  
+• Cross-variable QC correlation matrix  
+• Token-based API authentication  
+• Mobile-optimized responsive interface  
+• Automatic BUFR sync ke central database
+
+
+💡 IMPACT & BENEFITS
+-----------------------------------------------------------
+✅ Mempercepat QC radiosonde hingga 80%  
+✅ Menyediakan validasi fisika otomatis & seragam  
+✅ Mempermudah pelacakan anomali & error data  
+✅ Menyediakan satu platform visual nasional BMKG  
+✅ Meningkatkan efisiensi operasional & pemeliharaan alat
+
+
+🧱 SYSTEM STRENGTHS
+-----------------------------------------------------------
+• Modular dan mudah dikembangkan.  
+• Analisis fisika mendalam (CAPE, CIN, LCL, tropopause, wind shear).  
+• Integrasi penuh FTP ↔ SQLite ↔ Web API.  
+• Visualisasi interaktif dengan Chart.js, Deck.gl, dan Leaflet.  
+• Sistem user & keamanan kuat (token + expiry + access control).  
+• Deployment siap produksi (Gunicorn, Nginx, Railway-ready).
+
+
+📄 SUMMARY
+-----------------------------------------------------------
+Rason Monitoring menyediakan solusi end-to-end dari decoding radiosonde,
+QC otomatis, hingga visualisasi dan manajemen akses pengguna.
+
+Versi Refactor (v1.1.0) adalah fondasi stabil yang siap dikembangkan
+ke fase berikutnya (v1.2.x) dengan fitur subscription dashboard,
+live session map, dan advanced QC correlation.
+
+> "From decoding to insight — Rason Monitoring transforms raw radiosonde data
+> into actionable intelligence for atmospheric science."
+
+
+👨‍💻 CONTACT
+-----------------------------------------------------------
+Developed by: PT. Terrindo Media Raya  
+In collaboration with: BMKG & Meteomodem  
+Developer: Nanda Miftahul Khoyri  
+Release Date: 28 October 2025 (Refactor v1.1.0)
+
