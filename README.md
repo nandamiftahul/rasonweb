@@ -1,153 +1,242 @@
-RASON MONITORING BACKEND
-========================
+RASON MONITORING (RASONWEB)
+=====================================
 
-Author     : Terrindo · BMKG Project
-Build Date : October 2025
-Framework  : Flask (Python 3.12)
-Database   : SQLite (rason_data.db)
-Deployment : Gunicorn / Nginx / Railway / Render
+Version: Refactor Branch (v1.1.0)
+Author: Terrindo · BMKG Project
+Category: Radiosonde Data Visualization & Analysis Platform
+Environment: Python 3.12, Flask, Gunicorn, Nginx
 
---------------------------------------------------
-📁 PROJECT STRUCTURE
---------------------------------------------------
 
-rason_backend/
+📘 DESCRIPTION
+-------------------------------------
+Rason Monitoring (RasonWeb) adalah platform web berbasis Flask
+yang digunakan untuk memonitor, menganalisis, dan memvisualisasikan
+data radiosonde (BUFR/BFR/BFH/BIN) dari stasiun BMKG.
+
+Sistem ini melakukan decoding, analisis fisika mendalam (Deep Physics),
+dan menampilkan hasilnya dalam bentuk grafik interaktif, tabel, serta peta 2D dan 3D.
+
+Refactor branch ini merupakan versi perombakan total yang memisahkan struktur
+backend menjadi modul-modul yang lebih rapi dan scalable.
+
+
+📁 DIRECTORY STRUCTURE
+-------------------------------------
+.
+├── app.py                     → Flask app entry point
+├── wsgi.py                    → Entry point for Gunicorn (production)
+├── Procfile                   → Render/Railway deployment config
+├── requirements.txt            → Python dependencies
+├── README.md / README.txt      → Project documentation
+├── __init__.py                 → App initialization marker
 │
-├── app.py                # Entry point (menjalankan Flask)
+├── routes/                     → All Flask Blueprints
+│   ├── api.py                 → REST API endpoints
+│   ├── pages.py               → Web page routes
+│   ├── admin.py               → User management routes
+│   └── __init__.py
 │
-├── config/
-│   ├── __init__.py
-│   └── settings.py       # Konfigurasi global, load .env, FTP, secret key, paths
+├── core/                       → Backend logic modules
+│   ├── auth.py                → User authentication / token control
+│   ├── bufr_parser.py         → Meteomodem BUFR/BFR/BIN decoder
+│   ├── db.py                  → SQLite caching for radiosonde metadata
+│   ├── ftp.py                 → FTP downloader / fetcher
+│   ├── utils.py               → Helper functions (hashing, formatting, etc.)
+│   └── __init__.py
 │
-├── core/
-│   ├── __init__.py
-│   ├── db.py             # Semua fungsi database SQLite
-│   ├── utils.py          # Fungsi umum: enkripsi, analisis, parser, helper
-│   ├── ftp.py            # Semua operasi FTP (fetch_all_sites, download, dll)
-│   ├── bufr_parser.py    # Decode & parsing BUFR/BFR/BIN files
-│   └── auth.py           # Login/logout, session management
+├── config/                     → Configuration sets per site
+│   ├── bufr_mapping_default.json
+│   ├── bufr_mapping_*.json     → Per-site BUFR mapping (Aceh, Ranai, Tarakan, etc.)
+│   ├── settings.py             → Global configuration (FTP, paths, etc.)
+│   └── __init__.py
 │
-├── routes/
-│   ├── __init__.py
-│   ├── api.py            # Semua @app.route("/api/...")
-│   ├── pages.py          # Semua halaman HTML (render_template)
-│   └── admin.py          # Endpoint admin-only (user mgmt, logout all, dll)
+├── templates/                  → HTML templates (Jinja2)
+│   ├── main.html              → Main menu / dashboard
+│   ├── data_availability.html → Calendar-based availability page
+│   ├── error_analysis.html    → QC/physics analysis viewer
+│   ├── height_reach.html      → Maximum height graph page
+│   ├── time_accuracy.html     → Time accuracy comparison
+│   ├── trajectory3d.html      → 3D flight visualization (deck.gl)
+│   ├── settings.html          → User & BUFR config management
+│   ├── under_development.html → Placeholder for WIP pages
+│   ├── login.html             → Login page
+│   └── others...              → RAOB docs, release notes, etc.
 │
-├── static/
-│   └── ...               # CSS, JS, images
+├── static/                     → Static frontend assets
+│   ├── libs/                 → JS/CSS libraries (Chart.js, Leaflet, MapLibre, jQuery)
+│   ├── images/               → Logos (TBR2, BMKG, Meteomodem)
+│   ├── geojson/              → Map boundaries of Indonesia
+│   └── style.css, fonts/, etc
 │
-├── templates/
-│   └── ...               # HTML pages
+├── uploads/                    → Uploaded or cached radiosonde files
+│   └── *.bfr / *.bin files
 │
-├── sites.json
-├── users.json
-├── bufr_mapping_full.json
-├── list_data_modem.json
-└── requirements.txt
+├── tools/                      → Utility scripts
+│   ├── encrypt_users.py       → Hashing all passwords in users.json
+│   ├── pass_generate.py       → Password generator
+│   ├── fetch_libs.sh          → Auto-download frontend libraries
+│   ├── merged_data_modem.py   → Data merging utility
+│   └── app.py.backup          → Previous app version
+│
+├── users.json                  → User accounts, hashed passwords, expiry, allowed_pages
+├── sites.json                  → List of all radiosonde sites
+├── bufr_mapping_full.json      → Complete BUFR mapping table
+└── list_data_modem.json        → List of known data sources
 
 
---------------------------------------------------
-⚙️ REQUIREMENTS
---------------------------------------------------
-Python >= 3.10
-Flask >= 3.0
-pandas >= 2.0
-numpy >= 1.25
-ftplib (builtin)
-metpy
-geopy
-cryptography
-python-dotenv
-matplotlib
-scipy
-werkzeug
+⚙️ INSTALLATION
+-------------------------------------
+1. Clone the repository:
+   git clone https://github.com/nandamiftahul/rasonweb.git
+   cd rasonweb
 
-Install all dependencies:
-> pip install -r requirements.txt
+2. Create virtual environment:
+   python3.12 -m venv .venv
+   source .venv/bin/activate
+   pip install --upgrade pip
+   pip install -r requirements.txt
 
---------------------------------------------------
-🚀 RUNNING THE APP
---------------------------------------------------
-1️⃣ Activate virtual environment:
-   > source venv/bin/activate
+3. Run development server:
+   python app.py
+   (or)
+   python -c "from app import create_app; app=create_app(); app.run(host='0.0.0.0', port=8082)"
 
-2️⃣ Run Flask (development mode):
-   > python app.py
+4. Production (Gunicorn):
+   gunicorn -w 2 -b 0.0.0.0:8080 wsgi:app
 
-3️⃣ Or run via Gunicorn (production mode):
-   > gunicorn -w 3 -b 0.0.0.0:8082 app:app
+   Example systemd service:
+   -------------------------------------
+   [Unit]
+   Description=Gunicorn instance for Rason Web
+   After=network.target
 
-Then open your browser:
-   http://localhost:8082
+   [Service]
+   User=tbr
+   Group=tbr
+   WorkingDirectory=/home/tbr/app_core/rason_web
+   Environment="PATH=/home/tbr/venv/py312_core/bin"
+   ExecStart=/home/tbr/venv/py312_core/bin/gunicorn \
+             --workers 1 \
+             --threads 2 \
+             --bind unix:/home/tbr/app_core/rason_web/run/rason_web_gunicorn.sock \
+             wsgi:app
+   Restart=always
 
---------------------------------------------------
-🔐 LOGIN & SECURITY
---------------------------------------------------
-- User credentials stored in `users.json`
-- Passwords hashed via Werkzeug
-- Session timeout: 30 minutes
-- Encrypted expiry & page access stored using Fernet
-- Only admin can modify or delete users
+   [Install]
+   WantedBy=multi-user.target
 
---------------------------------------------------
-🗄️ DATABASE (SQLite)
---------------------------------------------------
-File: rason_data.db
-Tables:
-- bufr / bfr / bfh / bin
-  (id, site, filename, filetype, file_date, meta_json, levels_json, created_at)
 
---------------------------------------------------
-🌐 FTP CONNECTION
---------------------------------------------------
-All FTP credentials and base path loaded from `.env`:
-Example:
-    FTP_HOST=192.168.1.100
-    FTP_USER=anonymous
-    FTP_PASS=
-    FTP_BASE_PATH=/UA
-    FTP_LIMIT=30
-    SECRETKEY=my_super_secret_key
+🧭 FEATURES
+-------------------------------------
+- Decode BUFR/BFR/BFH/BIN files (Meteomodem M10/M20)
+- Store decoded metadata to SQLite cache
+- Deep physics analysis: cold point tropopause, lapse rate, freeze-out RH, pressure anomaly,
+  ascent deceleration, wind shear, directional change, burst detection, etc.
+- Chart.js graphs: T/RH/Wind vs Height
+- MapLibre & Deck.gl: 3D trajectory visualization
+- Leaflet-based site maps (2D)
+- User management with hashed passwords, expiry control, and per-page access restriction
+- Admin force logout and single-session protection
+- Time Accuracy & Data Availability API endpoints
+- Responsive UI with collapsible sidebar, footer, and unified gradient theme
+- Automatic FTP data retrieval and caching
 
---------------------------------------------------
-🧠 MAIN FEATURES
---------------------------------------------------
-- User login / subscription expiry
-- Radiosonde data decoding (BUFR, BFR, BFH, BIN)
-- FTP data caching (SQLite)
-- Time Accuracy Analysis
-- Height Reach Analysis
-- RAOB & Skew-T Plot
-- 3D Trajectory Viewer (Deck.gl)
-- Error Analysis (Physics-based QC)
-- Data Availability calendar
-- Settings (User & BUFR mapping)
-- Admin Controls (Logout all, update expiry, allowed pages)
 
---------------------------------------------------
-📦 DEPLOYMENT NOTES
---------------------------------------------------
-For Gunicorn + Nginx:
-- Gunicorn service runs app:app
-- Static files served by Nginx under `/static`
-- Ensure uploads/ writable by web user
-- Environment variables loaded from `.env`
+🔐 USER MANAGEMENT
+-------------------------------------
+users.json structure:
+[
+  {
+    "username": "admin",
+    "password": "<hashed>",
+    "expiry": "2026-10-01",
+    "pages": ["*"]
+  },
+  {
+    "username": "guest",
+    "password": "<hashed>",
+    "expiry": "2025-12-31",
+    "pages": ["main", "map", "data_availability"]
+  }
+]
 
---------------------------------------------------
-🧩 VERSIONING
---------------------------------------------------
-v1.0.0 — Initial production build  
-v1.0.1 — Login/session/expiry upgrade  
-v1.0.2 — Database/FTP comparison + settings refactor  
-v1.0.3 — (planned) Geo-tracking login, global session map
+Features:
+- Hashing handled by `core/auth.py`
+- Encryption script: `tools/encrypt_users.py`
+- Expiry check on login (auto-block expired)
+- Single active session enforcement
+- Admin override access
 
---------------------------------------------------
-🧑‍💻 DEVELOPED BY
-Terrindo · BMKG · Meteomodem Collaboration
-Powered by Flask · Chart.js · Leaflet · Deck.gl · MetPy
 
---------------------------------------------------
+🌐 FRONTEND OVERVIEW
+-------------------------------------
+- Gradient Theme: #0a2a6b → #004aad → #0078d7
+- Font: Inter
+- Sidebar: collapsible with localStorage persistence
+- Header box: adaptive + digital clock
+- Charts: Chart.js v4 + plugins (zoom, datalabels)
+- Tables: DataTables.js with responsive layout
+- Maps: Leaflet / MapLibre + GeoJSON overlays (Indonesia provinces)
+- Footer: “Powered by Terrindo · BMKG · Meteomodem”
+
+
+🧪 APIs SUMMARY
+-------------------------------------
+/api/time_accuracy/<site>
+  → Returns AA/BB/CC/DD time deviation dataset
+/api/data_availability
+  → Returns daily 00Z/12Z availability matrix
+/upload_bufr
+  → Decode BUFR/BFR/BIN and return metadata & level data
+
+
+🧱 BACKEND MODULES
+-------------------------------------
+core/auth.py         → Token + password management
+core/db.py           → SQLite caching layer
+core/ftp.py          → FTP file fetching
+core/bufr_parser.py  → Main BUFR decoder (pybufrkit / pyart)
+core/utils.py        → Utility helpers
+
+routes/api.py        → JSON API endpoints
+routes/pages.py      → Web routes
+routes/admin.py      → Admin-only routes
+
+
+🚀 DEPLOYMENT (Render / Railway)
+-------------------------------------
+Procfile:
+web: gunicorn -w 2 -b 0.0.0.0:8080 wsgi:app
+
+Environment variables:
+FLASK_ENV=production
+SECRET_KEY=<your_secret_key>
+UPLOAD_FOLDER=./uploads
+
+Deploy by connecting GitHub repo and using this branch (refactor).
+
+
+🧾 CHANGELOG (v1.1.0 Refactor)
+-------------------------------------
+• Backend refactored into modular packages (core/, routes/, config/)
+• Separated BUFR mapping per site (Aceh, Ranai, Tarakan, etc.)
+• Added error handling in FTP and BUFR parsing
+• Reorganized templates & static libs
+• Improved login security and single-session enforcement
+• Updated Time Accuracy and Height Reach pages with Chart.js v4
+• Optimized Gunicorn worker/thread model
+• Added under_development.html placeholder for new features
+• UI enhancements with responsive sidebar & header
+
+---
+
 📄 LICENSE
---------------------------------------------------
-This software is proprietary and intended for internal BMKG use only.
-Redistribution or commercial use without permission is prohibited.
+-------------------------------------
+Terrindo © 2025
+
+
+💬 CONTACT
+-------------------------------------
+PT. Terrindo Media Raya · BMKG Project Collaboration
+For internal use within BMKG & Terrindo technical team.
+
