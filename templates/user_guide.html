@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>RASON Monitoring — User Guide v1.1.0</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 32px 16px;
+      color: #0b1d3a;
+    }
+
+    .doc {
+      width: 100%;
+      max-width: 1100px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+
+    /* Header */
+    .doc__header {
+      background: linear-gradient(135deg, #0a2a6b 0%, #004aad 55%, #0078d7 100%);
+      color: #fff;
+      padding: 28px 32px;
+    }
+    .doc__title { margin: 0; font-size: 28px; font-weight: 800; }
+    .doc__subtitle { margin-top: 6px; font-size: 15px; opacity: 0.9; }
+    .doc__meta { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    /* Sections */
+    .doc__body { padding: 28px 32px 36px 32px; }
+    .section {
+      border: 1px solid #e7ecf3;
+      border-radius: 12px;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+    .section__head {
+      background: #f6f9ff;
+      border-bottom: 1px solid #e7ecf3;
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section__title { font-size: 18px; font-weight: 800; color: #0a2a6b; margin: 0; }
+    .section__body { padding: 16px 18px 20px 18px; }
+    .pill {
+      padding: 3px 8px;
+      border: 1px solid #e1e8f5;
+      border-radius: 999px;
+      background: #f7fbff;
+      color: #0a2a6b;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    ul.check { list-style: none; margin: 0; padding-left: 0; }
+    ul.check li { padding-left: 28px; margin: 8px 0; position: relative; }
+    ul.check li::before { content: "✔"; position: absolute; left: 0; top: 0; color: #0a8f3a; font-weight: 800; }
+
+    code { background: #eef4ff; padding: 2px 6px; border-radius: 6px; font-size: 13px; }
+
+    /* Footer */
+    .doc__footer {
+      background: #f8fbff;
+      border-top: 1px solid #e7ecf3;
+      padding: 18px 24px;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      color: #406189;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand img { height: 24px; }
+
+    @media print {
+      body { background: #fff; }
+      .doc { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="doc">
+
+    <header class="doc__header">
+      <h1 class="doc__title">RASON Monitoring — User Guide</h1>
+      <p class="doc__subtitle">Panduan Penggunaan Sistem Radiosonde Monitoring v1.1.0</p>
+      <div class="doc__meta">
+        <span class="badge">Version: v1.1.0</span>
+        <span class="badge">Release: 28 Oct 2025</span>
+        <span class="badge">Developed by: Terrindo · BMKG</span>
+      </div>
+    </header>
+
+    <div class="doc__body">
+
+      <!-- Overview -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">1. Overview</h2><span class="pill">Introduction</span></div>
+        <div class="section__body">
+          <p><strong>Rason Monitoring</strong> adalah sistem web untuk analisis data radiosonde BMKG.
+          Sistem ini melakukan decoding otomatis file BUFR/BFR/BFH/BIN, menampilkannya dalam grafik, tabel, dan peta interaktif.
+          Akses pengguna dibagi menjadi <strong>Admin</strong> dan <strong>User biasa</strong> dengan masa aktif (expiry) dan batas akses halaman tertentu.</p>
+        </div>
+      </section>
+
+      <!-- Login -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">2. Login Page</h2><span class="pill">Authentication</span></div>
+        <div class="section__body">
+          <ul class="check">
+            <li>URL: <code>/login</code></li>
+            <li>Masukkan <strong>username</strong> dan <strong>password</strong> yang diberikan admin.</li>
+            <li>Jika akun sudah kadaluarsa, muncul pesan merah “Subscription expired”.</li>
+            <li>Setelah login, sistem membuat token unik dan menandai user sebagai aktif.</li>
+            <li>Login baru akan otomatis menggantikan sesi lama (single session enforcement).</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Main Page -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">3. Main Page</h2><span class="pill">Dashboard</span></div>
+        <div class="section__body">
+          <p>Halaman utama dengan tampilan navigasi sidebar, header box, dan footer.</p>
+          <ul class="check">
+            <li>Sidebar: navigasi ke semua fitur (Data Availability, Time Accuracy, dsb).</li>
+            <li>Header Box: judul halaman + jam digital real-time.</li>
+            <li>Footer: “Powered by Terrindo”.</li>
+            <li>Sidebar dapat di-collapse dan posisi terakhir disimpan oleh <em>localStorage</em>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Feature Pages -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">4. Fitur Utama</h2><span class="pill">Pages</span></div>
+        <div class="section__body">
+          <ul class="check">
+            <li><strong>Dashboard</strong> (<code>/dashboard</code>) — Menampilkan daftar file radiosonde dari FTP berdasarkan ekstensi dan jumlah limit.</li>
+            <li><strong>Time Accuracy</strong> (<code>/time_accuracy</code>) — Grafik deviasi waktu AA–DD vs jam peluncuran (00Z/12Z).</li>
+            <li><strong>Height Reach</strong> (<code>/height_reach</code>) — Grafik ketinggian maksimum tiap peluncuran.</li>
+            <li><strong>Data Availability</strong> (<code>/data_availability</code>) — Kalender ketersediaan data per hari/site (warna merah, kuning, hijau).</li>
+            <li><strong>Error Analysis</strong> (<code>/error_analysis</code>) — 4 grafik QC (T, RH, WS, WD vs Height) + hasil <em>deepPhysics()</em>.</li>
+            <li><strong>Trajectory 3D</strong> (<code>/trajectory3d</code>) — Visual lintasan radiosonde dalam 3D (Deck.gl + MapLibre).</li>
+            <li><strong>RAOB Analysis</strong> (<code>/analysis</code> / <code>/raob</code>) — Diagram Skew-T dan Hodograph, indeks CAPE/CIN/LCL, SRH, Tropopause.</li>
+            <li><strong>Map View</strong> (<code>/map</code>) — Peta posisi radiosonde 2D (Leaflet).</li>
+            <li><strong>Settings</strong> (<code>/settings</code>) — Tab User Management & BUFR Mapping Configuration (khusus admin).</li>
+            <li><strong>Release Page</strong> (<code>/release</code>) — Catatan rilis & pembaruan versi.</li>
+            <li><strong>Under Development</strong> (<code>/underdev</code>) — Placeholder fitur mendatang.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Admin -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">5. Admin Features</h2><span class="pill">Administration</span></div>
+        <div class="section__body">
+          <ul class="check">
+            <li>Tambah / hapus user melalui Settings tab.</li>
+            <li>Atur expiry date dan daftar halaman yang dapat diakses.</li>
+            <li>Lihat daftar user aktif (<code>/admin/active_users</code>).</li>
+            <li>Force logout user tertentu (<code>/admin/logout_user/&lt;username&gt;</code>).</li>
+            <li>Logout seluruh user sekaligus (<code>/admin/logout_all</code>).</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Logout -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">6. Logout</h2><span class="pill">Session End</span></div>
+        <div class="section__body">
+          <p>Logout melalui menu atau URL <code>/logout</code> akan menghapus session dan cookie pengguna,
+          menghapus user dari daftar aktif, lalu mengarahkan kembali ke halaman login.</p>
+        </div>
+      </section>
+
+      <!-- Summary -->
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">7. Ringkasan</h2><span class="pill">Summary</span></div>
+        <div class="section__body">
+          <p><strong>RASON Monitoring v1.1.0</strong> menyediakan sistem analisis radiosonde lengkap —
+          dari decoding, QC, hingga visualisasi 3D — dengan desain antarmuka profesional dan keamanan berbasis token.
+          Platform ini mendukung operasional nasional BMKG serta siap dikembangkan menjadi sistem intelijen atmosfer modern.</p>
+        </div>
+      </section>
+
+    </div>
+
+    <footer class="doc__footer">
+      <div>© {{ current_year or "2025" }} • RASON Monitoring v1.1.0 — User Guide</div>
+      <div class="brand">
+        <img src="{{ url_for('static', filename='images/terrindo.png') }}" alt="Terrindo">
+        <span>Powered by Terrindo</span>
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

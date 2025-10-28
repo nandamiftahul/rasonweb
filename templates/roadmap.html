@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>RASON Monitoring — Development Roadmap</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 32px 16px;
+      color: #0b1d3a;
+    }
+
+    .doc {
+      width: 100%;
+      max-width: 1100px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+
+    /* Header */
+    .doc__header {
+      background: linear-gradient(135deg, #0a2a6b 0%, #004aad 55%, #0078d7 100%);
+      color: #fff;
+      padding: 28px 32px;
+    }
+    .doc__title { margin: 0; font-size: 28px; font-weight: 800; }
+    .doc__subtitle { margin-top: 6px; font-size: 15px; opacity: 0.9; }
+    .doc__meta {
+      margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    /* Sections */
+    .doc__body { padding: 28px 32px 36px 32px; }
+    .section {
+      border: 1px solid #e7ecf3;
+      border-radius: 12px;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+    .section__head {
+      background: #f6f9ff;
+      border-bottom: 1px solid #e7ecf3;
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section__title {
+      font-size: 18px; font-weight: 800; color: #0a2a6b; margin: 0;
+    }
+    .section__body { padding: 16px 18px 20px 18px; }
+    .pill {
+      padding: 3px 8px; border: 1px solid #e1e8f5; border-radius: 999px;
+      background: #f7fbff; color: #0a2a6b; font-size: 12px; font-weight: 700;
+    }
+    ul.check { list-style: none; margin: 0; padding-left: 0; }
+    ul.check li { padding-left: 28px; margin: 8px 0; position: relative; }
+    ul.check li::before {
+      content: "✔"; position: absolute; left: 0; top: 0;
+      color: #0a8f3a; font-weight: 800;
+    }
+
+    table {
+      width: 100%; border-collapse: collapse;
+      border: 1px solid #e7ecf3; border-radius: 10px; overflow: hidden;
+      margin-top: 10px;
+    }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #eef2f8; font-size: 14px; }
+    thead th { background: #f6f9ff; color: #0a2a6b; font-weight: 800; }
+
+    /* Footer */
+    .doc__footer {
+      background: #f8fbff; border-top: 1px solid #e7ecf3;
+      padding: 18px 24px; font-size: 13px;
+      display: flex; justify-content: space-between; flex-wrap: wrap;
+      color: #406189;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand img { height: 24px; }
+
+    @media print {
+      body { background: #fff; }
+      .doc { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="doc">
+
+    <header class="doc__header">
+      <h1 class="doc__title">RASON Monitoring — Development Roadmap</h1>
+      <p class="doc__subtitle">Perencanaan versi lanjutan hingga Data Intelligence Hub (2026)</p>
+      <div class="doc__meta">
+        <span class="badge">Version: v1.2 → v2.0</span>
+        <span class="badge">Updated: 28 October 2025</span>
+        <span class="badge">Prepared by: Terrindo</span>
+      </div>
+    </header>
+
+    <div class="doc__body">
+
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">1. Ikhtisar Proyek</h2><span class="pill">Overview</span>
+        </div>
+        <div class="section__body">
+          <p><strong>RASON Monitoring</strong> adalah platform web untuk analisis data radiosonde BMKG.
+          Setelah refactor (v1.1.0), fokus pengembangan berikutnya adalah memperluas sistem menjadi 
+          <strong>Data Intelligence Platform</strong> yang mencakup AI QC, laporan otomatis, dashboard nasional,
+          dan integrasi model numerik.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">2. Roadmap Versi</h2><span class="pill">Timeline</span>
+        </div>
+        <div class="section__body">
+          <table>
+            <thead><tr><th>Versi</th><th>Periode</th><th>Fokus</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>v1.1.0</td><td>Oktober 2025</td><td>Refactor, struktur modular, full API</td><td>✅ Selesai</td></tr>
+              <tr><td>v1.2.x</td><td>Nov–Des 2025</td><td>AI QC & laporan otomatis</td><td>🟡 Direncanakan</td></tr>
+              <tr><td>v1.3.x</td><td>Jan–Mar 2026</td><td>Dashboard nasional multi-site</td><td>🕓 Tahap desain</td></tr>
+              <tr><td>v2.0</td><td>Apr–Agu 2026</td><td>Integrasi NWP, Data Lake, AI Forecast</td><td>🔮 Rencana jangka panjang</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">3. Fase 1.2 — Smart QC & Reports</h2><span class="pill">AI & QC</span>
+        </div>
+        <div class="section__body">
+          <ul class="check">
+            <li><strong>AI-assisted QC:</strong> Model ML untuk klasifikasi sounding (Normal / Error / Burst / Freeze-out).</li>
+            <li><strong>Anomaly Detection:</strong> Deteksi otomatis sounding ekstrem (wind shear, lapse rate abnormal).</li>
+            <li><strong>Monthly Report:</strong> Laporan PDF otomatis (height, success rate, sensor trend).</li>
+            <li><strong>Notifications:</strong> Email/Telegram alert untuk site inaktif & error berulang.</li>
+            <li><strong>Database upgrade:</strong> Migrasi ke PostgreSQL untuk data historis.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">4. Fase 1.3 — National Dashboard</h2><span class="pill">Integrasi Multi-Site</span>
+        </div>
+        <div class="section__body">
+          <ul class="check">
+            <li><strong>National Map Overview:</strong> Peta seluruh site radiosonde Indonesia (status OK/Warn/Offline).</li>
+            <li><strong>Cross-Site Comparison:</strong> Grafik burst rate & height per site per bulan.</li>
+            <li><strong>Real-time Launch Monitor:</strong> Status inflight / standby via file log FTP.</li>
+            <li><strong>Central Admin Panel:</strong> Manajemen seluruh site dari satu halaman.</li>
+            <li><strong>Central Cache DB:</strong> Hasil QC tersimpan di basis data nasional.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">5. Fase 2.0 — Data Intelligence Hub</h2><span class="pill">Integrasi AI & NWP</span>
+        </div>
+        <div class="section__body">
+          <ul class="check">
+            <li><strong>Data Assimilation:</strong> Ekspor hasil decode ke format NetCDF untuk WRF/ICON.</li>
+            <li><strong>AI Nowcasting:</strong> Analisis radiosonde + satelit untuk prediksi konveksi.</li>
+            <li><strong>Climate Trend Analysis:</strong> Analisis tren tropopause, lapse rate, RH musiman.</li>
+            <li><strong>Data Sharing API:</strong> API publik untuk integrasi WebGIS / riset.</li>
+            <li><strong>Data Lake Integration:</strong> Penyimpanan file jangka panjang (S3/MinIO).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">6. Inovasi Mendatang</h2><span class="pill">Future Ideas</span>
+        </div>
+        <div class="section__body">
+          <ul class="check">
+            <li>Prediksi burst altitude berbasis kondisi awal (AI Flight Predictor).</li>
+            <li>Analisis performa per batch sensor atau balon (Calibration Analyzer).</li>
+            <li>Versi mobile (PWA) untuk monitoring lapangan.</li>
+            <li>Integrasi citra Himawari dan radar.</li>
+            <li>Portal dataset radiosonde publik untuk riset atmosfer.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">7. Kesimpulan</h2><span class="pill">Summary</span>
+        </div>
+        <div class="section__body">
+          <p>Rason Monitoring berkembang dari sistem QC internal menjadi platform analisis atmosfer nasional. 
+          Versi 1.2–2.0 akan memperkenalkan QC berbasis AI, laporan otomatis, dashboard nasional, dan integrasi model numerik.
+          Tujuan akhirnya adalah menciptakan <strong>National Radiosonde Data Intelligence Hub</strong> yang mendukung operasi, riset,
+          dan prediksi atmosfer modern BMKG.</p>
+        </div>
+      </section>
+
+    </div>
+
+    <footer class="doc__footer">
+      <div>© {{ current_year or "2025" }} • RASON Monitoring Development Roadmap</div>
+      <div class="brand">
+        <img src="{{ url_for('static', filename='images/terrindo.png') }}" alt="Terrindo">
+        <span>Powered by Terrindo</span>
+      </div>
+    </footer>
+  </main>
+</body>
+</html>

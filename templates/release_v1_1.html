@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Release v1.1.0 — RASON Monitoring</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: #0b1d3a;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 32px 16px;
+    }
+
+    .doc {
+      width: 100%;
+      max-width: 1100px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+
+    .doc__header {
+      background: linear-gradient(135deg, #0a2a6b 0%, #004aad 55%, #0078d7 100%);
+      color: #fff;
+      padding: 28px 32px;
+    }
+
+    .doc__title { margin: 0; font-size: 28px; font-weight: 800; }
+    .doc__subtitle { margin-top: 6px; font-size: 15px; opacity: 0.9; }
+    .doc__meta { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .doc__body { padding: 28px 32px 36px 32px; }
+    .section {
+      border: 1px solid #e7ecf3;
+      border-radius: 12px;
+      margin-bottom: 28px;
+      overflow: hidden;
+    }
+    .section__head {
+      background: #f6f9ff;
+      border-bottom: 1px solid #e7ecf3;
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section__title { font-size: 18px; font-weight: 800; color: #0a2a6b; margin: 0; }
+    .section__body { padding: 16px 18px 20px 18px; }
+    .pill {
+      padding: 3px 8px; border: 1px solid #e1e8f5; border-radius: 999px;
+      background: #f7fbff; color: #0a2a6b; font-size: 12px; font-weight: 700;
+    }
+
+    ul.check { list-style: none; margin: 0; padding-left: 0; }
+    ul.check li { padding-left: 28px; margin: 8px 0; position: relative; }
+    ul.check li::before {
+      content: "✔"; position: absolute; left: 0; top: 0;
+      color: #0a8f3a; font-weight: 800;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td {
+      padding: 10px 12px; border-bottom: 1px solid #eef2f8;
+      text-align: left; font-size: 14px;
+    }
+    thead th { background: #f6f9ff; color: #0a2a6b; font-weight: 800; }
+
+    .doc__footer {
+      background: #f8fbff;
+      border-top: 1px solid #e7ecf3;
+      padding: 18px 24px;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      color: #406189;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand img { height: 24px; }
+
+    @media print { body { background: #fff; } .doc { box-shadow: none; } }
+  </style>
+</head>
+<body>
+  <main class="doc">
+
+    <header class="doc__header">
+      <h1 class="doc__title">RASON Monitoring — Release v1.1.0</h1>
+      <p class="doc__subtitle">Refactor Release — Modular Architecture & Enhanced Security</p>
+      <div class="doc__meta">
+        <span class="badge">Version: v1.1.0</span>
+        <span class="badge">Date: 28 Oct 2025</span>
+        <span class="badge">Developed by: Terrindo</span>
+      </div>
+    </header>
+
+    <div class="doc__body">
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">1. Overview</h2><span class="pill">Summary</span></div>
+        <div class="section__body">
+          <p>Rason Monitoring (RasonWeb) adalah platform web terpadu untuk pemantauan, analisis, dan visualisasi data radiosonde BMKG (BUFR/BFR/BFH/BIN). 
+          Refactor Release v1.1.0 menandai selesainya fase utama pengembangan sistem dengan arsitektur modular, frontend seragam, serta fitur analitik dan keamanan yang lengkap.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">2. Project Objectives</h2><span class="pill">Goal</span></div>
+        <div class="section__body">
+          <ul class="check">
+            <li>Menstandarkan decoding & QC radiosonde di seluruh stasiun BMKG.</li>
+            <li>Menyediakan analisis otomatis berbasis fisika atmosfer.</li>
+            <li>Menampilkan hasil interaktif melalui dashboard web.</li>
+            <li>Monitoring kualitas data antar-site secara real-time.</li>
+            <li>Menjamin keamanan user & integrasi admin control.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">3. Development Timeline</h2><span class="pill">October 2025</span></div>
+        <div class="section__body">
+          <table>
+            <thead><tr><th>Phase</th><th>Periode</th><th>Fokus</th></tr></thead>
+            <tbody>
+              <tr><td>Phase 1</td><td>7–10 Okt</td><td>Setup Flask, login (hash+expiry), session & Gunicorn.</td></tr>
+              <tr><td>Phase 2</td><td>11–14 Okt</td><td>API `/upload_bufr`, `/api/time_accuracy`, `/api/height_reach`, Deep Physics QC.</td></tr>
+              <tr><td>Phase 3</td><td>15–20 Okt</td><td>UI konsisten, sidebar collapsible, Chart.js v4, DataTables.</td></tr>
+              <tr><td>Phase 4</td><td>21–25 Okt</td><td>Tambah halaman Height Reach, Data Availability, Trajectory 3D, Settings.</td></tr>
+              <tr><td>Phase 5</td><td>26–27 Okt</td><td>Access control, admin logout, expiry editor, active users list.</td></tr>
+              <tr><td>Phase 6</td><td>28 Okt</td><td>Refactor final, create_app(), Procfile, README, dokumentasi.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">4. Key Features</h2><span class="pill">Highlights</span></div>
+        <div class="section__body">
+          <ul class="check">
+            <li>Automatic BUFR/BFR/BFH/BIN decoding + SQLite cache.</li>
+            <li>Deep Physics QC (tropopause, freeze-out, shear, burst detection).</li>
+            <li>Interactive Charts & 3D Trajectory Viewer.</li>
+            <li>Secure User Management (expiry, allowed_pages, force logout).</li>
+            <li>Optimized Gunicorn + centralized logs.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">5. Architecture Overview</h2><span class="pill">System</span></div>
+        <div class="section__body">
+          <p><strong>Backend:</strong> Flask modular (core/, routes/, config/), SQLite cache, Gunicorn WSGI.<br>
+          <strong>Frontend:</strong> Chart.js, Leaflet, Deck.gl, DataTables dengan tema biru gradasi dan font Inter.<br>
+          <strong>Deployment:</strong> Gunicorn + Nginx (systemd) atau Railway Procfile.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">6. Future Roadmap</h2><span class="pill">Next</span></div>
+        <div class="section__body">
+          <ul class="check">
+            <li>Subscription Dashboard & Renewal Notification.</li>
+            <li>Live User Session Map (geolocation-based).</li>
+            <li>Cross-variable QC Correlation Matrix.</li>
+            <li>API Authentication dengan Token.</li>
+            <li>Mobile-optimized responsive layout.</li>
+            <li>Automatic BUFR sync ke central database.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">7. Impact & Benefits</h2><span class="pill">Results</span></div>
+        <div class="section__body">
+          <ul class="check">
+            <li>Mempercepat QC radiosonde hingga 80%.</li>
+            <li>Validasi otomatis dan seragam di semua stasiun.</li>
+            <li>Visualisasi interaktif berbasis sains.</li>
+            <li>Platform nasional terpusat untuk radiosonde BMKG.</li>
+            <li>Meningkatkan efisiensi dan reliabilitas operasional.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">8. Summary</h2><span class="pill">Conclusion</span></div>
+        <div class="section__body">
+          <p>Refactor Release <strong>v1.1.0</strong> adalah tonggak penting yang menyatukan seluruh modul Rason Monitoring menjadi platform stabil, aman, dan efisien. 
+          Fondasi ini mempersiapkan sistem menuju tahap berikutnya — <strong>AI-driven QC dan National Radiosonde Dashboard</strong> — 
+          untuk meningkatkan akurasi, efisiensi, dan nilai ilmiah data atmosfer nasional.</p>
+        </div>
+      </section>
+
+    </div>
+
+    <footer class="doc__footer">
+      <div>© {{ current_year or "2025" }} • RASON Monitoring Release v1.1.0</div>
+      <div class="brand">
+        <img src="{{ url_for('static', filename='images/terrindo.png') }}" alt="Terrindo">
+        <span>Powered by Terrindo</span>
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

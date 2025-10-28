@@ -1,0 +1,175 @@
+RASON MONITORING - DEVELOPMENT ROADMAP
+===========================================================
+Prepared by: Nanda Miftahul Khoyri
+Organization: Terrindo
+Last Updated: 28 October 2025
+
+-----------------------------------------------------------
+🧭 PROJECT SUMMARY
+-----------------------------------------------------------
+Rason Monitoring (RasonWeb) adalah platform web berbasis Flask untuk 
+pemantauan, decoding, dan analisis data radiosonde BMKG.
+
+Versi Refactor v1.1.0 menandai fase stabil sistem dengan struktur modular,
+fitur lengkap (Error Analysis, Time Accuracy, Height Reach, Data Availability),
+serta sistem login aman dengan kontrol akses per user.
+
+Langkah berikutnya adalah mengembangkan Rason Monitoring menjadi 
+**National Radiosonde Data Intelligence Platform**, 
+yang tidak hanya memantau data real-time, tapi juga menganalisis, 
+mengklasifikasikan, dan mengintegrasikan hasil radiosonde 
+ke dalam analisis cuaca dan iklim nasional.
+
+
+-----------------------------------------------------------
+📅 ROADMAP OVERVIEW
+-----------------------------------------------------------
+| Versi | Periode Target | Fokus Utama | Status |
+|--------|----------------|--------------|---------|
+| **v1.1.0 (Refactor Release)** | Okt 2025 | Arsitektur modular + QC dasar + full API | ✅ Completed |
+| **v1.2.x (Smart QC & Reports)** | Nov–Des 2025 | Analisis AI + laporan otomatis | 🔜 Planned |
+| **v1.3.x (National Dashboard)** | Jan–Mar 2026 | Integrasi multi-site & peta nasional | ⏳ Upcoming |
+| **v2.0 (Data Intelligence Hub)** | Apr–Agu 2026 | Integrasi NWP, AI forecasting & Data Lake | 🧩 Vision Stage |
+
+
+-----------------------------------------------------------
+🧩 VERSION 1.2.x — SMART QC & REPORTS
+-----------------------------------------------------------
+📅 Periode: November–Desember 2025  
+🎯 Tujuan: Mengubah Rason Monitoring menjadi sistem QC otomatis dengan laporan periodik.
+
+**Fitur Utama:**
+1. 🔍 **AI-assisted QC Detection**
+   - Model machine learning (RandomForest/XGBoost) untuk klasifikasi hasil sounding:
+     *Normal / Sensor Error / Burst Prematur / RH Freeze-out / Pressure Anomaly*
+   - Model belajar dari hasil “Deep Physics” sebelumnya.
+
+2. 🧮 **Anomaly Detection**
+   - Implementasi *unsupervised detection* (Isolation Forest) untuk deteksi sounding tidak wajar.
+   - Skor anomaly ditampilkan di Error Analysis Chart.
+
+3. 📄 **Automatic Monthly Report**
+   - Laporan PDF otomatis per bulan per site:
+     - Median burst height
+     - % success vs failed launch
+     - Grafik time accuracy
+     - Tren sensor & balloon
+   - Format PDF dengan header resmi BMKG / Terrindo.
+
+4. 📨 **Email / Telegram Notification**
+   - Pengingat otomatis jika site tidak upload data 3 hari berturut-turut.
+   - Log status tersedia di halaman Settings (admin view).
+
+5. ⚙️ **SQLite → PostgreSQL Migration (opsional)**
+   - Untuk mendukung query historis multi-user.
+
+**Output Utama:**  
+“Rason Monitoring AI QC Report” – laporan periodik dengan insight otomatis.
+
+
+-----------------------------------------------------------
+🗺️ VERSION 1.3.x — NATIONAL DASHBOARD
+-----------------------------------------------------------
+📅 Periode: Januari–Maret 2026  
+🎯 Tujuan: Menyatukan semua site ke satu tampilan nasional.
+
+**Fitur Utama:**
+1. 🗺️ **National Map Overview**
+   - Peta interaktif seluruh site radiosonde Indonesia.
+   - Status warna:
+     🟩 OK | 🟨 Warning | 🟥 Offline.
+   - Data ditarik dari `/api/latest_status` & `/api/data_availability`.
+
+2. 📊 **Cross-Site Comparison**
+   - Grafik perbandingan max height, burst rate, error rate antar site.
+   - Filter berdasarkan bulan / musim.
+
+3. 🔍 **Real-time Launch Monitor**
+   - Indikator balon aktif (inflight / preparing / offline).
+   - Integrasi dengan pembacaan EOSCAN*.log di FTP.
+
+4. 🔧 **Centralized Admin Panel**
+   - Admin dapat edit semua site dari satu halaman.
+   - Tambah site, ubah offset UTC, update koordinat langsung di UI.
+
+5. 💾 **Central Data Cache**
+   - Cache hasil QC dari semua site ke satu basis data nasional.
+
+**Output Utama:**  
+“Indonesia Radiosonde National Dashboard” – tampilan nasional real-time.
+
+
+-----------------------------------------------------------
+📊 VERSION 2.0 — DATA INTELLIGENCE HUB
+-----------------------------------------------------------
+📅 Periode: April–Agustus 2026  
+🎯 Tujuan: Menjadikan Rason Monitoring sebagai pusat data radiosonde nasional.
+
+**Fitur Utama:**
+1. 🌩️ **Data Assimilation Output**
+   - Konversi hasil decode ke format NetCDF untuk model numerik (WRF/ICON).
+   - Ekspor otomatis ke direktori operasional BMKG.
+
+2. 🤖 **AI-based Nowcasting**
+   - Gunakan radiosonde + satelit (Himawari) + radar (jika ada) 
+     untuk memprediksi potensi konveksi 3–6 jam ke depan.
+   - Indikator “storm potential” ditampilkan di dashboard.
+
+3. 📈 **Climate & Trend Analysis**
+   - Analisis jangka panjang (1–5 tahun):
+     - Tropopause height trends
+     - RH freeze-out frequency
+     - Stability indices vs season
+   - Output berupa grafik dan summary report otomatis.
+
+4. 🌐 **Data Sharing API**
+   - API publik terbatas untuk integrasi ke sistem lain (mis. WebGIS atau pusat klimatologi).
+   - Authentication berbasis token API.
+
+5. ☁️ **Data Lake Integration**
+   - Integrasi dengan MinIO/S3 untuk penyimpanan file radiosonde jangka panjang.
+   - Struktur penyimpanan:
+     `/year/month/site/filename.bufr + metadata.json`
+
+**Output Utama:**  
+“National Radiosonde Data Intelligence Hub”  
+yang menjadi sumber tunggal data radiosonde BMKG.
+
+
+-----------------------------------------------------------
+🚀 FUTURE INNOVATION IDEAS
+-----------------------------------------------------------
+• **AI Flight Predictor**  
+  Prediksi burst altitude dan flight duration berdasarkan kondisi awal.
+
+• **Batch Calibration Analyzer**  
+  Analisis performa per batch serial sensor / balloon dari database.
+
+• **Mobile PWA Interface**  
+  Versi mobile / tablet untuk observasi lapangan.
+
+• **Integration with Himawari / Satellite Overlay**  
+  Kombinasi profil vertikal dengan awan dan suhu permukaan.
+
+• **Open Research Dataset Portal**  
+  Dataset radiosonde publik untuk riset iklim.
+
+
+-----------------------------------------------------------
+📄 SUMMARY
+-----------------------------------------------------------
+Dengan roadmap ini, Rason Monitoring akan berkembang dari 
+alat monitoring internal menjadi sistem analisis cerdas berskala nasional.
+
+- v1.2.x  → QC cerdas & laporan otomatis  
+- v1.3.x  → Dashboard nasional real-time  
+- v2.0    → Data Intelligence Hub (AI + NWP + Climate)
+
+> "From raw telemetry to atmospheric intelligence —
+> Rason Monitoring will empower BMKG with full vertical insight."
+
+-----------------------------------------------------------
+Prepared by:
+🧑‍💻 Nanda Miftahul Khoyri  
+PT. Terrindo Media Raya · BMKG Collaboration  
+Date: 28 October 2025

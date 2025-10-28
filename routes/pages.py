@@ -206,5 +206,16 @@ def settings_page():
 @pages.route("/release")
 @login_required
 @page_access_required("release")
-def release_page(): return render_template("release_v1_0.html")
+def release_page(): return render_template("release_v1_1.html")
 
+@pages.route("/roadmap")
+@login_required
+@page_access_required("roadmap")
+def roadmap_page():
+    return render_template("roadmap.html")
+
+@pages.route("/user_guide")
+@login_required
+@page_access_required("user_guide")
+def user_guide_page():
+    return render_template("user_guide.html")
