@@ -1,0 +1,10 @@
+flask
+pandas
+numpy
+pybufrkit
+gunicorn
+python-dotenv
+metpy
+geopy
+db-sqlite3
+cryptography
