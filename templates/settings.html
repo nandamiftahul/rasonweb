@@ -353,7 +353,7 @@
         // Ambil semua user + user yang sedang aktif
         const [resUsers, resActive, resWho] = await Promise.all([
           fetch('/api/users'),
-          fetch('/api/active_users'),
+          fetch('/admin/active_users'),
           fetch('/api/whoami')
         ]);
     

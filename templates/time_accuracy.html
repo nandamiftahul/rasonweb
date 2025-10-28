@@ -482,15 +482,15 @@
   <div class="sidebar compact" id="sidebar">
     <h2>RASON PANEL</h2>
   
-    <a href="{{ url_for('main_page') }}" data-title="Main Page"><i class="bi bi-house-door"></i><span>Main Page</span></a>
-    <a href="{{ url_for('dashboard') }}" data-title="Data Resume"><i class="bi bi-bar-chart-fill"></i><span>Data Resume</span></a>
-    <a href="{{ url_for('map_view') }}"  data-title="Map"><i class="bi bi-map"></i><span>Map</span></a>
-    <a href="{{ url_for('trajectory3d_page') }}" data-title="Trajectory 3D"><i class="bi bi-globe2"></i><span>Trajectory 3D</span></a>
-    <a href="{{ url_for('time_accuracy') }}" data-title="Time Accuracy"><i class="bi bi-stopwatch"></i><span>Time Accuracy</span></a>
-    <a href="{{ url_for('height_reach') }}" data-title="Height Reach"><i class="bi bi-graph-up"></i><span>Height Reach</span></a>
-    <a href="{{ url_for('data_availability_page') }}" data-title="Data Availability"><i class="bi bi-calendar3"></i><span>Data Availability</span></a>
-    <a href="{{ url_for('error_analysis_page') }}" data-title="Error Analysis"><i class="bi bi-exclamation-triangle"></i><span>Error Analysis</span></a>
-    <a href="{{ url_for('settings_page') }}" data-title="Settings"><i class="bi bi-gear"></i><span>Settings</span></a>
+    <a href="{{ url_for('pages.main_page') }}" data-title="Main Page"><i class="bi bi-house-door"></i><span>Main Page</span></a>
+    <a href="{{ url_for('pages.dashboard') }}" data-title="Data Resume"><i class="bi bi-bar-chart-fill"></i><span>Data Resume</span></a>
+    <a href="{{ url_for('pages.map_view') }}"  data-title="Map"><i class="bi bi-map"></i><span>Map</span></a>
+    <a href="{{ url_for('pages.trajectory3d_page') }}" data-title="Trajectory 3D"><i class="bi bi-globe2"></i><span>Trajectory 3D</span></a>
+    <a href="{{ url_for('pages.time_accuracy') }}" data-title="Time Accuracy"><i class="bi bi-stopwatch"></i><span>Time Accuracy</span></a>
+    <a href="{{ url_for('pages.height_reach') }}" data-title="Height Reach"><i class="bi bi-graph-up"></i><span>Height Reach</span></a>
+    <a href="{{ url_for('pages.data_availability_page') }}" data-title="Data Availability"><i class="bi bi-calendar3"></i><span>Data Availability</span></a>
+    <a href="{{ url_for('pages.error_analysis_page') }}" data-title="Error Analysis"><i class="bi bi-exclamation-triangle"></i><span>Error Analysis</span></a>
+    <a href="{{ url_for('pages.settings_page') }}" data-title="Settings"><i class="bi bi-gear"></i><span>Settings</span></a>
   </div>
 
 
@@ -907,7 +907,7 @@
     });
     
     function logoutUser() {
-      window.location.href = "{{ url_for('logout') }}";
+      window.location.href = "{{ url_for('pages.logout') }}";
     }
     
     loadUserInfo();
