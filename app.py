@@ -3178,11 +3178,14 @@ def api_data_availability():
 
             for site in sites:
                 site_name = site["name"] if isinstance(site, dict) else site
-                ftp.cwd(f"{cfg['base_path']}/{site_name}")
                 try:
+                    ftp.cwd(f"{cfg['base_path']}/{site_name}")
                     files = ftp.nlst()
-                except Exception:
-                    files = []
+                except Exception as e:
+                    print(f"⚠️ Folder missing for site {site_name}: {e}")
+                    results.append({"name": site_name, "days": {}})
+                    ftp.cwd(cfg["base_path"])
+                    continue
                 day_data = {}
             
                 for day in range(1, end_day + 1):
