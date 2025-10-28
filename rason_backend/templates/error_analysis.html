@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Error Analysis - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='libs/chartjs/chart.umd.js') }}"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+
+    /* Sidebar (same as main.html) */
+    .sidebar {
+      width: 230px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 40px 10px 20px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 10;
+      transition: transform 0.3s ease;
+    }
+    .sidebar.hidden { transform: translateX(-240px); }
+    .sidebar h2 {
+      font-size: 20px;
+      margin-bottom: 30px;
+      color: #e0f2fe;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 6px rgba(255,255,255,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding-bottom: 8px;
+    }
+    .sidebar a {
+      display: flex;
+      align-items: center;
+      gap: 10px;             /* jarak antara ikon dan teks */
+      font-size: 15px;
+    }
+    .sidebar a i {
+      font-size: 18px;
+      width: 22px;
+      text-align: center;
+      color: #e0f2fe;
+    }
+    .sidebar a:hover i {
+      color: #38bdf8;
+    }
+    /* 🔹 Sembunyikan tulisan RASON PANEL saat compact */
+    .sidebar h2 {
+      transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
+    }
+    
+    .sidebar.compact h2 {
+      opacity: 0;
+      height: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+    
+    /* === Compact Sidebar Mode === */
+    .sidebar {
+      width: 230px;
+      transition: width 0.3s ease, transform 0.3s ease;
+    }
+    
+    .sidebar.compact {
+      width: 70px; /* hanya tampil ikon */
+      align-items: flex-start;
+      padding: 60px 5px;
+    }
+    
+    .sidebar a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .sidebar a i {
+      font-size: 18px;
+      width: 22px;
+      text-align: center;
+      color: #e0f2fe;
+      flex-shrink: 0;
+    }
+    
+    /* 🔹 Sembunyikan teks saat compact */
+    .sidebar.compact a span {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    /* 🔹 Saat hover, tampilkan tooltip kecil */
+    .sidebar.compact a:hover::after {
+      content: attr(data-title);
+      position: absolute;
+      left: 70px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 5px 10px;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      white-space: nowrap;
+      z-index: 999;
+      transform: translateY(-2px);
+    }
+    
+    /* Sidebar text */
+    .sidebar a span {
+      padding-left: 6px;   /* 🧩 spasi tambahan setelah ikon */
+      transition: opacity 0.3s ease, width 0.3s ease;
+    }
+    
+    /* Toggle button style */
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      transition: left 0.3s ease;
+    }
+    .toggle-btn.compact-position {
+      left: 60px;
+    }
+    
+    /* 🔹 Sembunyikan tulisan RASON PANEL saat compact */
+    .sidebar h2 {
+      transition: opacity 0.3s ease, height 0.3s ease, margin 0.3s ease;
+    }
+    
+    .sidebar.compact h2 {
+      opacity: 0;
+      height: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+    .sidebar a {
+      display: block;
+      text-decoration: none;
+      color: white;
+      width: 100%;
+      padding: 12px 15px;
+      border-radius: 8px;
+      text-align: left;
+      margin: 8px 0;
+      transition: background 0.3s;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.15); }
+    .logout {
+      margin-top: auto;
+      font-size: 14px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: #fca5a5;
+      text-decoration: none;
+    }
+    .logout:hover { background: rgba(255,255,255,0.2); }
+
+    /* Toggle Button */
+    .toggle-btn {
+      position: fixed;
+      top: 50%;
+      left: 220px;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 50;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+    .toggle-btn:hover { background: rgba(255,255,255,0.4); }
+    .toggle-btn.hidden-position { left: 10px; }
+
+    /* Main */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      margin-left: 230px;
+      padding: 40px 40px 0;
+      box-sizing: border-box;
+      padding-bottom: 50px;
+    }
+    .main.expanded { margin-left: 0; }
+
+    /* Header (same as main.html) */
+    .header-box {
+      position: relative;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 20px 30px;
+      box-shadow: 0 6px 25px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 35px;
+    }
+    .header-icon {
+      width: 50px; height: 50px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: #dbeafe;
+    }
+    .header-text h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px; }
+    .header-text p { margin: 4px 0 0; font-size: 14px; color: #dbeafe; opacity: 0.9; }
+    .header-logos {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .header-logos img { height: 36px; opacity: 0.9; }
+    .header-clock {
+      display: flex; flex-direction: column; align-items: flex-end;
+      justify-content: center; line-height: 1.1; font-size: 18px;
+      color: #ffffff; font-weight: 600; letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(0,0,0,0.4);
+    }
+
+    /* Charts */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-auto-rows: 420px;
+      gap: 30px;
+      margin-top: 25px;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      padding: 8px;
+    }
+
+    table { width:100%; border-collapse:collapse; margin-top:25px; font-size:13px; }
+    th,td { text-align:center; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.2); }
+
+    .status-ok { color:#6eff9e; }
+    .status-err { color:#ff6e6e; }
+
+    /* Footer (same as main.html) */
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 230px;
+      width: calc(100% - 230px);
+      height: 38px;
+      background: #ffffff;
+      padding: 4px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid #d1d5db;
+      border-radius: 0;
+      z-index: 5;
+      transition: all 0.3s ease;
+    }
+    .footer span { color: #333; font-weight: 500; margin-right: 6px; font-size: 12px; opacity: 0.8; }
+    .footer img { height: 28px; opacity: 0.85; margin: 0 6px; filter: saturate(90%); }
+    .main.expanded ~ .footer { left: 0; width: 100%; }
+    /* === Deep Physics Explanation Box === */
+    .explanation-box {
+      margin-top: 25px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    
+    .explanation-box h3 {
+      margin-top: 0;
+      font-size: 20px;
+      color: #fff;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      padding-bottom: 6px;
+    }
+    
+    .scroll-area {
+      max-height: 400px;              /* 🔥 tinggi fix, biar scrollable */
+      overflow-y: auto;
+      background: rgba(0,0,0,0.45);   /* solid readable background */
+      border-radius: 6px;
+      padding: 15px;
+      color: #e0e7ff;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .scroll-area::-webkit-scrollbar {
+      width: 8px;
+    }
+    .scroll-area::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.4);
+      border-radius: 4px;
+    }
+    /* === Filter === */
+    .filter-bar{
+      background:rgba(255,255,255,0.1);padding:12px 16px;border-radius:10px;
+      display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:20px;
+    }
+    .filter-bar select,.filter-bar input,.filter-bar button{
+      background:rgba(255,255,255,0.1);color:white;border:0;border-radius:8px;
+      padding:8px 10px;font-family:inherit;
+    }
+    .filter-bar button{cursor:pointer;background:#0078d7;border:none;}
+    #fileList{margin-top:10px;}
+    #fileList button{background:rgba(255,255,255,0.1);border:0;color:white;
+      border-radius:6px;padding:6px 10px;margin:3px 0;cursor:pointer;}
+    #fileList button:hover{background:rgba(255,255,255,0.25);}
+    /* === 👤 User icon di pojok kiri atas sidebar === */
+    .user-icon {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      font-size: 26px;
+      color: #e0f2fe;
+      cursor: pointer;
+      transition: color 0.3s ease;
+      z-index: 20;
+    }
+    .user-icon:hover { color: #38bdf8; }
+    
+    /* === 💬 Popup user info === */
+    .user-popup {
+      position: absolute;
+      top: 45px;
+      left: 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #fff;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      display: none;
+      z-index: 999;
+      width: 190px;
+    }
+    .user-popup.show { display: block; }
+    .user-popup p {
+      margin: 4px 0;
+      color: #e0f2fe;
+    }
+    .user-popup b { color: #fff; }
+    
+    /* 🔘 Tombol logout di dalam popup */
+    .user-popup button {
+      margin-top: 8px;
+      width: 100%;
+      padding: 6px 0;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.2);
+      color: #fca5a5;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .user-popup button:hover {
+      background: rgba(255,255,255,0.35);
+      color: #fff;
+    }
+    
+  </style>
+</head>
+
+<body>
+  <button class="toggle-btn compact-position" id="toggleBtn" onclick="toggleSidebar()">☰</button>
+  <!-- 👤 User Profile Icon -->
+  <div class="user-icon" onclick="toggleUserInfo()">
+    <i class="bi bi-person-circle"></i>
+  </div>
+  
+  <!-- 💬 Popup Info -->
+  <div class="user-popup" id="userPopup">
+    <p><b>Username:</b> <span id="userName">-</span></p>
+    <p><b>Expiry:</b> <span id="userExpiry">-</span></p>
+    <button id="logoutBtn" onclick="logoutUser()">Logout</button>
+  </div>
+  
+
+  <!-- Sidebar -->
+  <div class="sidebar compact" id="sidebar">
+    <h2>RASON PANEL</h2>
+  
+    <a href="{{ url_for('pages.main_page') }}" data-title="Main Page"><i class="bi bi-house-door"></i><span>Main Page</span></a>
+    <a href="{{ url_for('pages.dashboard') }}" data-title="Data Resume"><i class="bi bi-bar-chart-fill"></i><span>Data Resume</span></a>
+    <a href="{{ url_for('pages.map_view') }}"  data-title="Map"><i class="bi bi-map"></i><span>Map</span></a>
+    <a href="{{ url_for('pages.trajectory3d_page') }}" data-title="Trajectory 3D"><i class="bi bi-globe2"></i><span>Trajectory 3D</span></a>
+    <a href="{{ url_for('pages.time_accuracy') }}" data-title="Time Accuracy"><i class="bi bi-stopwatch"></i><span>Time Accuracy</span></a>
+    <a href="{{ url_for('pages.height_reach') }}" data-title="Height Reach"><i class="bi bi-graph-up"></i><span>Height Reach</span></a>
+    <a href="{{ url_for('pages.data_availability_page') }}" data-title="Data Availability"><i class="bi bi-calendar3"></i><span>Data Availability</span></a>
+    <a href="{{ url_for('pages.error_analysis_page') }}" data-title="Error Analysis"><i class="bi bi-exclamation-triangle"></i><span>Error Analysis</span></a>
+    <a href="{{ url_for('pages.settings_page') }}" data-title="Settings"><i class="bi bi-gear"></i><span>Settings</span></a>
+  </div>
+  
+  <!-- Main -->
+  <div class="main" id="mainContent">
+    <div class="header-box">
+      <div class="header-icon">❗</div>
+      <div class="header-text">
+        <h1>Error Analysis</h1>
+        <p>Comprehensive sensor performance and atmospheric diagnostics</p>
+      </div>
+      <div class="header-logos">
+        <div class="header-clock">
+          <div id="utcClock">--:--:-- UTC</div>
+          <div id="utcDate" style="font-size:12px; opacity:0.8;">-- --- ----</div>
+        </div>
+        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG"
+     style="height: 55px; width: auto;">
+      </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="filter-bar">
+    <label>Site:</label>
+    <select id="siteSelect">
+      <option value="">Loading sites...</option>
+    </select>
+      <label>Date:</label><input type="date" id="dateSelect">
+      <label>Hour:</label><select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
+      <label>File:</label><select id="typeSelect">
+        <option value="bfr">BFR</option><option value="bufr">BUFR</option><option value="bfh">BFH</option><option value="bin">BIN</option>
+      </select>
+      <button id="filterBtn">📁 List Files</button>
+    </div>
+
+    <div id="fileList" style="margin-top:15px;"></div>
+    <div id="summary" style="margin-top:20px;"></div>
+    <div id="analysisBox" style="margin-top:20px;"></div>
+
+    <!-- Chart Grid -->
+    <div class="chart-grid">
+      <canvas id="chartRH"></canvas>
+      <canvas id="chartTemp"></canvas>
+      <canvas id="chartWindDir"></canvas>
+      <canvas id="chartWindSpeed"></canvas>
+    </div>
+
+    <!-- === Enhanced Scrollable Table === -->
+    <div class="table-container">
+      <table id="levelTable">
+        <thead>
+          <tr>
+            <th>Pressure<br><small>(hPa)</small></th>
+            <th>Height<br><small>(m)</small></th>
+            <th>Temp<br><small>(°C)</small></th>
+            <th>Dewpoint<br><small>(°C)</small></th>
+            <th>RH<br><small>(%)</small></th>
+            <th>Wind Speed<br><small>(m/s)</small></th>
+            <th>Wind Dir<br><small>(°)</small></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <style>
+      /* Scrollable table */
+      .table-container {
+        max-height: 420px;
+        overflow-y: auto;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.25);
+        margin-top: 25px;
+        background: rgba(255,255,255,0.05);
+      }
+      
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      
+      /* ✅ Header solid background (tidak transparan) */
+      thead th {
+        position: sticky;
+        top: 0;
+        background: #1e3a8a;                /* 🔵 solid navy (bisa diganti sesuai tema) */
+        color: #ffffff;
+        font-weight: 600;
+        text-align: center;
+        padding: 10px 6px;
+        border-bottom: 2px solid rgba(255,255,255,0.3);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      }
+      
+      /* Body cells */
+      tbody td {
+        text-align: center;
+        padding: 6px 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+      }
+      
+      tbody tr:nth-child(even) {
+        background: rgba(255,255,255,0.08);
+      }
+      
+      /* Highlighted anomaly row */
+      .row-anomaly {
+        background: rgba(255, 90, 90, 0.45) !important;
+        font-weight: 600;
+        color: #fff;
+      }
+      .row-warning {
+        background: rgba(255, 210, 80, 0.4) !important;
+        font-weight: 600;
+        color: #222;
+      }
+      
+      /* Scrollbar styling */
+      .table-container::-webkit-scrollbar {
+        width: 10px;
+      }
+      .table-container::-webkit-scrollbar-thumb {
+        background-color: rgba(255,255,255,0.3);
+        border-radius: 10px;
+      }
+
+    </style>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+  </div>
+
+  <script>
+  // === Apply saved sidebar state when page loads ===
+  window.addEventListener("DOMContentLoaded", () => {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.getElementById("mainContent");
+    const btn = document.getElementById("toggleBtn");
+    const footer = document.querySelector(".footer");
+
+    // 🧩 baca preferensi terakhir dari localStorage
+    const saved = localStorage.getItem("sidebarState");
+
+    if (saved === "compact") {
+      sidebar.classList.add("compact");
+      main.style.marginLeft = "70px";
+      btn.classList.add("compact-position");
+      btn.textContent = "☰";
+
+      if (footer) {
+        footer.style.left = "70px";
+        footer.style.width = "calc(100% - 70px)";
+      }
+    } else {
+      sidebar.classList.remove("compact");
+      main.style.marginLeft = "230px";
+      btn.classList.remove("compact-position");
+      btn.textContent = "❮";
+
+      if (footer) {
+        footer.style.left = "230px";
+        footer.style.width = "calc(100% - 230px)";
+      }
+    }
+  });
+
+  // === Toggle sidebar and save preference ===
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const main = document.getElementById("mainContent");
+    const btn = document.getElementById("toggleBtn");
+    const footer = document.querySelector(".footer");
+
+    const isCompact = sidebar.classList.toggle("compact");
+    main.style.marginLeft = isCompact ? "70px" : "230px";
+    btn.textContent = isCompact ? "☰" : "❮";
+    btn.classList.toggle("compact-position", isCompact);
+
+    if (footer) {
+      footer.style.left = isCompact ? "70px" : "230px";
+      footer.style.width = isCompact ? "calc(100% - 70px)" : "calc(100% - 230px)";
+    }
+
+    // ✅ simpan preferensi ke localStorage
+    localStorage.setItem("sidebarState", isCompact ? "compact" : "expanded");
+  }
+
+
+    function updateUTCClock() {
+      const now = new Date();
+      const utcHours = String(now.getUTCHours()).padStart(2, "0");
+      const utcMinutes = String(now.getUTCMinutes()).padStart(2, "0");
+      const utcSeconds = String(now.getUTCSeconds()).padStart(2, "0");
+      const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" ");
+      document.getElementById("utcClock").textContent = `${utcHours}:${utcMinutes}:${utcSeconds} UTC`;
+      document.getElementById("utcDate").textContent = dateStr;
+    }
+    updateUTCClock(); setInterval(updateUTCClock, 1000);
+
+async function populateSitesEA() {
+  const select = document.getElementById("siteSelect");
+  if (!select) return;
+  select.innerHTML = `<option value="">Loading sites...</option>`;
+
+  try {
+    const res = await fetch("/api/sites_config");
+    if (!res.ok) throw new Error("Failed to load sites list");
+    const data = await res.json();
+    const sites = data.sites || [];
+
+    if (!sites.length) {
+      select.innerHTML = `<option value="">(No sites configured)</option>`;
+      return;
+    }
+
+    select.innerHTML = "";
+
+    // ✅ Loop menyesuaikan struktur baru: { name, lat, lon }
+    for (const s of sites) {
+      const siteName = s.name || s; // fallback kalau backend masih string
+      const nameDisplay = siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const opt = document.createElement("option");
+      opt.value = siteName;
+      opt.textContent = nameDisplay;
+      select.appendChild(opt);
+    }
+
+    // 🔄 Restore pilihan terakhir
+    const saved = localStorage.getItem("siteSelect");
+    if (saved && sites.some(x => (x.name || x) === saved)) {
+      select.value = saved;
+    }
+
+  } catch (err) {
+    console.error("❌ Failed to populate sites:", err);
+    select.innerHTML = `<option value="">(Error loading sites)</option>`;
+  }
+}
+
+window.addEventListener("DOMContentLoaded", populateSitesEA);
+
+// === Simpan & restore filter lainnya ===
+function eaSaveFilterState() {
+  localStorage.setItem("ea_siteSelect", document.getElementById("siteSelect").value);
+  localStorage.setItem("ea_dateSelect", document.getElementById("dateSelect").value);
+  localStorage.setItem("ea_hourSelect", document.getElementById("hourSelect").value);
+  localStorage.setItem("ea_typeSelect", document.getElementById("typeSelect").value);
+}
+
+window.addEventListener("load", () => {
+  const date = localStorage.getItem("ea_dateSelect");
+  const hour = localStorage.getItem("ea_hourSelect");
+  const type = localStorage.getItem("ea_typeSelect");
+  if (date) document.getElementById("dateSelect").value = date;
+  if (hour) document.getElementById("hourSelect").value = hour;
+  if (type) document.getElementById("typeSelect").value = type;
+});
+
+    // === FILTER ===
+    $("#filterBtn").click(function(){
+      const site=$("#siteSelect").val(),date=$("#dateSelect").val(),hour=$("#hourSelect").val(),ftype=$("#typeSelect").val();
+      if(!date)return alert("Pilih tanggal!");
+      $("#fileList").html("⏳ Searching...");
+      $.post("/api/filter",{site,date,hour,ftype},function(r){
+        if(r.status!=="ok"){ $("#fileList").html("<b style='color:#ff6e6e'>"+r.message+"</b>"); return; }
+        let html="<h3>Hasil File:</h3>";
+        r.files.forEach(f=>html+=`<div><button class='loadBtn' data-file='${f}'>🔍 Analyze ${f}</button></div>`);
+        $("#fileList").html(html);
+      },"json");
+    });
+
+    // === LOAD ===
+    $(document).on("click",".loadBtn",function(){
+      const site=$("#siteSelect").val(),file=$(this).data("file");
+      $("#summary").html("⏳ Loading "+file+"...");
+      $.post("/upload_bufr",{remote_site:site,remote_file:file},res=>{
+        if(!res.success){$("#summary").html("<b style='color:#ff6e6e'>Error: "+res.error+"</b>");return;}
+        loadAnalysis();
+      },"json");
+    });
+
+    const rhFromT_Td=(T,Td)=>{if(T==null||Td==null)return null;const a=17.625,b=243.04;const gT=(a*T)/(b+T),gTd=(a*Td)/(b+Td);let rh=100*Math.exp(gTd-gT);return Math.min(100,Math.max(0,rh));};
+    let cT,cRH,cWS,cWD;
+    
+    function loadAnalysis(){
+      let meta = {};
+      
+      $.getJSON("/metadata", m => { meta = m; }).then(() => {
+        $.getJSON("/all_levels", levels => {
+          if(!levels.length){
+            $("#summary").html("<p>⚠️ No level data available.</p>");
+            return;
+          }
+    
+          // --- Fallback computed values dari level ---
+          const H = levels.map(l => l.height_m);
+          const T = levels.map(l => l.temp_C);
+          const Td = levels.map(l => l.dewpoint_C);
+          const RH = levels.map(l => rhFromT_Td(l.temp_C,l.dewpoint_C));
+          const P = levels.map(l => l.pressure_hPa);
+          const WS = levels.map(l => l.wind_speed_mps || Math.sqrt((l.wind_u||0)**2 + (l.wind_v||0)**2) || null);
+          const WD = levels.map(l => l.wind_dir_deg || null);
+    
+          const maxH = Math.max(...H.filter(v => v != null && !isNaN(v)));
+          const minP = Math.min(...P.filter(v => v != null && !isNaN(v)));
+          const endTimeLevel = levels[levels.length-1]?.time_utc || null;
+    
+          // --- Helper formatters ---
+          function fmtTime(iso) {
+            if (!iso || iso === "-" || iso === "null") return "N/A";
+            const d = new Date(iso);
+            if (isNaN(d)) return "N/A";
+            const dd = String(d.getUTCDate()).padStart(2,"0");
+            const mm = d.toLocaleString('en', { month: 'short' });
+            const yyyy = d.getUTCFullYear();
+            const h = String(d.getUTCHours()).padStart(2,"0");
+            const mi = String(d.getUTCMinutes()).padStart(2,"0");
+            const s = String(d.getUTCSeconds()).padStart(2,"0");
+            return `${dd} ${mm} ${yyyy} ${h}:${mi}:${s} UTC`;
+          }
+    
+          function fmtNum(v, unit="") {
+            if (v == null || isNaN(v)) return "—";
+            return `${Number(v).toFixed(1)}${unit}`;
+          }
+    
+          // --- Ambil meta atau fallback dari level ---
+          const launch = fmtTime(meta.launch_time);
+          // Jika end_time kosong, ambil dari level terakhir dengan waktu berbeda signifikan
+          let end = "N/A";
+          if (meta.end_time) end = fmtTime(meta.end_time);
+          else {
+            const last = levels[levels.length-1];
+            if (last && last.time_utc) end = fmtTime(last.time_utc);
+          }
+          const hmax = meta.max_height && meta.max_height > 0 ? fmtNum(meta.max_height/1000, " km") : fmtNum(maxH/1000, " km");
+          const pmin = meta.end_pressure && meta.end_pressure > 0 ? fmtNum(meta.end_pressure, " hPa") : fmtNum(minP, " hPa");
+          // --- Termination code human readable (tanpa ubah backend) ---
+          const termCode = Number(meta.reason_for_termination);
+          let termTxt = "—";
+          switch(termCode){
+            case 0: termTxt = "Not specified"; break;
+            case 1: termTxt = "Balloon Burst"; break;
+            case 2: termTxt = "Battery Exhausted"; break;
+            case 3: termTxt = "Ascent Stop"; break;
+            case 4: termTxt = "Telemetry Interrupted"; break;
+            case 5: termTxt = "Manual Termination"; break;
+            case 6: termTxt = "Other"; break;
+            case 11: termTxt = "Temperature KO"; break;
+            default:
+              termTxt = inferTermination(H, WS, RH, P); // fallback analisis otomatis
+          }
+          
+          const term = `${termCode || ""} – ${termTxt}`;
+    
+    
+          // --- tampilkan summary ---
+          let html = `
+            <h3>${meta.radiosonde_serial_number || "Unknown Serial"}</h3>
+            <p>
+              <b>Launch:</b> ${launch}<br>
+              <b>Max Height:</b> ${hmax} | <b>End Pressure:</b> ${pmin}<br>
+              <b>Termination:</b> ${term}
+            </p>
+          `;
+          $("#summary").html(html);
+    
+          // --- lanjutkan chart & analisis ---
+          drawCharts(H, T, Td, RH, WS, WD);
+          renderTable(levels, RH, WS, WD);
+          deepPhysics(levels, RH, WS);
+        });
+      });
+    }
+    
+    // 🔍 Deteksi jenis termination berdasarkan profil terakhir
+    function inferTermination(H, WS, RH, P){
+      const maxH = Math.max(...H.filter(v=>v!=null));
+      const minP = Math.min(...P.filter(v=>v!=null));
+      if (minP > 100) return "🎯 Burst below 100 hPa (early termination)";
+      if (maxH < 10000) return "⚠️ Early stop (<10 km)";
+      if (RH.slice(-5).every(v=>v<5)) return "💧 Sensor freeze-out (dry cutoff)";
+      if (WS.slice(-5).every(v=>v<1)) return "🪁 Balloon drift stop (signal lost)";
+      return "✅ Normal burst";
+    }
+
+    function drawCharts(H,T,Td,RH,WS,WD){
+      const gridColor='rgba(255,255,255,0.15)';
+
+      const baseX = {
+        title:{
+          display:true,
+          text:'Height (m)',
+          color:'#fff',
+          font:{size:22, weight:'bold'}   // 🔥 ukuran besar untuk label axis X
+        },
+        min:0,max:30000,
+        ticks:{
+          color:'#fff',
+          font:{size:20, weight:'600'},   // 🔥 ukuran tick besar di axis X
+        },
+        grid:{color:gridColor}
+      };
+      
+      const commonOpt = {
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{
+            labels:{color:'#fff',font:{size:16,weight:'600'}} // 🔥 legend besar
+          },
+          tooltip:{mode:'nearest'}
+        },
+        scales:{
+          x: baseX,
+          y:{
+            title:{
+              display:true,
+              text:'Value',
+              color:'#fff',
+              font:{size:22,weight:'bold'}   // 🔥 ukuran besar untuk label axis Y
+            },
+            ticks:{
+              color:'#fff',
+              font:{size:20, weight:'600'},   // 🔥 ukuran tick besar di axis Y
+            },
+            grid:{color:gridColor}
+          }
+        },
+        elements:{point:{radius:2},line:{borderWidth:2,tension:0.25}}
+      };
+
+      if(cT) cT.destroy();
+      cT=new Chart(document.getElementById('chartTemp'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'Temp (°C)',data:T,borderColor:'orange',backgroundColor:'rgba(255,165,0,0.25)',fill:true},
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cT.options.scales.y.title={display:true,text:'Temperature (°C)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cT.update();
+
+      if(cRH) cRH.destroy();
+      cRH=new Chart(document.getElementById('chartRH'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'RH (%)',data:RH,borderColor:'lime',backgroundColor:'rgba(0,255,0,0.25)',fill:true}
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cRH.options.scales.y.title={display:true,text:'Relative Humidity (%)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cRH.options.scales.y.min=0;cRH.options.scales.y.max=100;
+      cRH.update();
+
+      if(cWS) cWS.destroy();
+      cWS=new Chart(document.getElementById('chartWindSpeed'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'Wind Speed (m/s)',data:WS,borderColor:'#00bfff',backgroundColor:'rgba(0,191,255,0.25)',fill:true}
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cWS.options.scales.y.title={display:true,text:'Wind Speed (m/s)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cWS.update();
+
+      if(cWD) cWD.destroy();
+      cWD=new Chart(document.getElementById('chartWindDir'),{
+        type:'line',
+        data:{labels:H,datasets:[
+          {label:'Wind Direction (°)',data:WD,borderColor:'#ffcc00',backgroundColor:'rgba(255,204,0,0.25)',fill:true}
+        ]},
+        options:structuredClone(commonOpt)
+      });
+      cWD.options.scales.y.title={display:true,text:'Wind Direction (°)',color:'#fff',font: { size: 22, weight: 'bold' }};
+      cWD.options.scales.y.min=0;cWD.options.scales.y.max=360;
+      cWD.update();
+    }
+
+function renderTable(levels,RH,WS,WD){
+  const tb=$("#levelTable tbody");
+  tb.empty();
+
+  for(let i=0;i<levels.length;i++){
+    const l=levels[i];
+    const p=l.pressure_hPa;
+    const h=l.height_m;
+    const t=l.temp_C;
+    const td=l.dewpoint_C;
+    const rh=RH[i];
+    const ws=WS[i];
+    const wd=WD[i];
+
+    // === Deteksi Anomali ===
+    let cls="";
+    if(t!=null && t<-75) cls="row-anomaly";                    // cold point ekstrem
+    else if(rh!=null && rh<5) cls="row-warning";               // kelembapan rendah banget
+    else if(i>0 && ws!=null && WS[i-1]!=null && Math.abs(ws-WS[i-1])>10)
+      cls="row-warning";                                       // lonjakan angin mendadak
+    else if(i>0 && wd!=null && WD[i-1]!=null){
+      const dwd=Math.abs(((wd-WD[i-1]+540)%360)-180);
+      if(dwd>60) cls="row-warning";                            // perubahan arah besar
+    }
+
+    tb.append(`
+      <tr class="${cls}">
+        <td>${p?.toFixed?.(1) || '-'}</td>
+        <td>${h?.toFixed?.(0) || '-'}</td>
+        <td>${t?.toFixed?.(1) || '-'}</td>
+        <td>${td?.toFixed?.(1) || '-'}</td>
+        <td>${rh?.toFixed?.(1) || '-'}</td>
+        <td>${ws?.toFixed?.(1) || '-'}</td>
+        <td>${wd?.toFixed?.(0) || '-'}</td>
+      </tr>
+    `);
+  }
+
+  $("#levelTable").show();
+}
+
+
+    async function deepPhysics(levels, RH, WS) {
+      const meta = await $.getJSON("/metadata");
+      const flightOK = !(meta.flight_issues && meta.flight_issues.length);
+    
+      const H  = levels.map(l => l.height_m || null);
+      const T  = levels.map(l => l.temp_C || null);
+      const P  = levels.map(l => l.pressure_hPa || null);
+      const WD = levels.map(l => l.wind_dir_deg || null);
+    
+      function angDiff(a,b){ return Math.abs(((a - b + 540) % 360) - 180); }
+    
+      const issues=[], notes=[];
+      const meanRH = RH.reduce((a,b)=>a+(b||0),0)/RH.length;
+      const Tmin = Math.min(...T.filter(v=>v!=null));
+      const Pmin = Math.min(...P.filter(v=>v!=null));
+    
+      // === 1. Cold point tropopause ===
+      const validT = T.filter(v => v != null && !isNaN(v));
+      if (validT.length > 0) {
+        const Tmin = Math.min(...validT);
+        const iMin = T.indexOf(Tmin);
+      
+        if (Tmin < -75 && iMin !== -1) {
+          const h = H[iMin] ?? null;
+          const p = P[iMin] ?? null;
+          const msg = (h && p)
+            ? `🧊 Strong cold point (<−75 °C) — tropopause region at ${(h/1000).toFixed(1)} km (~${p.toFixed(0)} hPa).`
+            : `🧊 Strong cold point (<−75 °C) — tropopause region (Tmin = ${Tmin.toFixed(1)} °C).`;
+          (flightOK ? notes : issues).push(msg);
+        }
+      }
+
+      // === 2. RH freeze-out ===
+      for (let i=0;i<T.length;i++){
+        if(T[i]<-40 && RH[i]<5){
+          (flightOK?notes:issues).push("💧 Very dry upper layer (<5 % RH below −40 °C).");
+          break;
+        }
+      }
+    
+      // === 3. Pressure anomaly (filter out post-burst reversals) ===
+      const totalLevels = P.length;
+      const cutoffIndex = Math.max(0, totalLevels - 10); // ignore last ~10 levels (burst descent phase)
+      
+      for (let i = 1; i < cutoffIndex; i++) {
+        if (P[i] != null && P[i - 1] != null && P[i] > P[i - 1]) {
+          const hMid = ((H[i] || 0) + (H[i - 1] || 0)) / 2;
+          // hindari false alarm karena rounding kecil (<0.5 hPa)
+          if (P[i] - P[i - 1] < 0.5) continue;
+      
+          const msg = `⚠️ Pressure reversal detected (${P[i - 1].toFixed(1)} → ${P[i].toFixed(1)} hPa) at ~${(hMid / 1000).toFixed(1)} km → barometric sensor glitch.`;
+          issues.push(msg);
+        }
+      }
+
+    
+      // === Helper untuk buat rentang (km) dari daftar tinggi ===
+      function compressHeights(arr){
+        if(!arr.length) return "";
+        arr.sort((a,b)=>a-b);
+        const km=arr.map(v=>v/1000);
+        const groups=[[km[0]]];
+        for(let i=1;i<km.length;i++){
+          const lastGroup=groups[groups.length-1];
+          if(km[i]-lastGroup[lastGroup.length-1] <= 1.0) lastGroup.push(km[i]);
+          else groups.push([km[i]]);
+        }
+        return groups.map(g=>{
+          const a=g[0].toFixed(1), b=g[g.length-1].toFixed(1);
+          return (Math.abs(b-a)<0.2)?`${a} km`:`${a}–${b} km`;
+        }).join(", ");
+      }
+    
+      // === 4. Strong vertical wind shear (smoothed & filtered) ===
+      const shearHeights=[];
+      const win=5; // jendela perataan ~500 m
+      for(let i=win;i<WS.length;i++){
+        if(H[i]==null||H[i-win]==null) continue;
+        const dH=(H[i]-H[i-win])/1000;        // km
+        if(dH<=0.3) continue;                 // minimal 300 m
+        const dWS=Math.abs(WS[i]-WS[i-win]);
+        const grad=dWS/dH;                    // m/s per km
+        if(grad>10) shearHeights.push((H[i]+H[i-win])/2);
+      }
+      // hapus noise (kurangi duplikat <0.5 km)
+      const filteredShear=[];
+      for(let i=0;i<shearHeights.length;i++){
+        if(i==0 || (shearHeights[i]-shearHeights[i-1])>500) filteredShear.push(shearHeights[i]);
+      }
+      if(filteredShear.length){
+        const where=compressHeights(filteredShear);
+        const msg=`🌪️ Strong vertical wind shear (>10 m/s per km) at ${where} — turbulent or jet layer.`;
+        (flightOK?notes:issues).push(msg);
+      }
+      
+      // === 5. Directional shear (filtered) ===
+      const dirShiftHeights=[];
+      for(let i=win;i<WD.length;i++){
+        if(WD[i]==null||WD[i-win]==null||H[i]==null||H[i-win]==null) continue;
+        const dh=H[i]-H[i-win];
+        if(dh<=300||dh>=1500) continue;
+        const dwd=angDiff(WD[i],WD[i-win]);
+        const rate=dwd/(dh/1000);
+        if(rate>60) dirShiftHeights.push((H[i]+H[i-win])/2);
+      }
+      const filteredDir=[];
+      for(let i=0;i<dirShiftHeights.length;i++){
+        if(i==0 || (dirShiftHeights[i]-dirShiftHeights[i-1])>500) filteredDir.push(dirShiftHeights[i]);
+      }
+      if(filteredDir.length){
+        const where=compressHeights(filteredDir);
+        const msg=`🌀 Rapid directional shift (>60°/km) at ${where} — frontal or jet-transition zone.`;
+        (flightOK?notes:issues).push(msg);
+      }
+    
+    
+      // === 6. Burst low ===
+      if(Pmin>100 && !flightOK)
+        issues.push("🎯 Balloon burst below 100 hPa → premature termination.");
+
+      // === 7. RH sensor saturation check ===
+      try {
+        let rhSensorError = false;
+        let possibleCloud = false;
+        let throughCumulonimbus = false;
+      
+        const RH_valid = RH.map(v => (v != null ? v : null));
+        const T_valid  = T.map(v => (v != null ? v : null));
+        const P_valid  = P.map(v => (v != null ? v : null));
+        const H_valid  = H.map(v => (v != null ? v : null));
+      
+        // --- 1️⃣ Sensor freeze / unrealistic RH (cold & humid) ---
+        for (let i = 0; i < RH_valid.length; i++) {
+          if (T_valid[i] != null && RH_valid[i] != null && T_valid[i] < -40 && RH_valid[i] > 90) {
+            rhSensorError = true;
+            break;
+          }
+        }
+      
+        // --- 2️⃣ Realistic saturated air near surface (warm & humid) ---
+        for (let i = 0; i < RH_valid.length; i++) {
+          if (
+            H_valid[i] != null && T_valid[i] != null && RH_valid[i] != null &&
+            H_valid[i] < 3000 && T_valid[i] > 0 && RH_valid[i] >= 99
+          ) {
+            possibleCloud = true;
+            break;
+          }
+        }
+      
+        // --- 3️⃣ Ascent rate anomaly (possible cloud crossing) ---
+        // hitung vertical ascent rate dari tinggi antar level (jika tersedia)
+        const ascent = [];
+        for (let i = 1; i < H_valid.length; i++) {
+          const dh = H_valid[i] - H_valid[i - 1];
+          if (dh > 0 && dh < 10) continue; // skip noise kecil
+          ascent.push(dh);
+        }
+      
+        if (ascent.length > 10) {
+          const meanAscent = ascent.reduce((a, b) => a + b, 0) / ascent.length;
+          const slowSegments = ascent.filter(v => v < 0.5 * meanAscent);
+          if (slowSegments.length / ascent.length > 0.1) {
+            throughCumulonimbus = true; // perlambatan signifikan
+          }
+        }
+      
+        // --- 4️⃣ Interpretasi hasil ---
+        if (rhSensorError) {
+          issues.push("💦 RH sensor likely saturated or frozen (RH>90% while T<−40 °C) → unrealistic humidity, possible sensor error.");
+        }
+        if (possibleCloud) {
+          notes.push("☁️ High RH (>99%) with T>0 °C below 3 km → balloon likely passed through cloud or rainfall layer.");
+        }
+        if (throughCumulonimbus) {
+          notes.push("🌧️ Ascent rate slowed significantly → possible deep convective cloud crossing (Cumulonimbus).");
+        }
+      
+      } catch (err) {
+        console.warn("RH/cloud detection failed:", err);
+      }
+
+      // === Summary render ===
+      let html="<h3>🧠 Physical Interpretation</h3>";
+      if(!issues.length && !notes.length)
+        html+="<p class='status-ok'>✅ Stable flight and normal atmospheric profile.</p>";
+      else{
+        if(issues.length){
+          html+="<h4 style='color:#ff6e6e;'>⚠️ Potential Operational Issues</h4><ul>";
+          issues.forEach(i=>html+=`<li>${i}</li>`);
+          html+="</ul>";
+        }
+        if(notes.length){
+          html+="<h4 style='color:#6eff9e;'>🌍 Atmospheric Features</h4><ul>";
+          notes.forEach(i=>html+=`<li>${i}</li>`);
+          html+="</ul>";
+        }
+      }
+      $("#analysisBox").html(html);
+    }
+    // === Load user info from backend ===
+    async function loadUserInfo() {
+      try {
+        const res = await fetch("/api/my_info");
+        const data = await res.json();
+        document.getElementById("userName").textContent = data.user || "-";
+        document.getElementById("userExpiry").textContent = data.expiry || "-";
+      } catch (err) {
+        console.error("❌ Failed to load user info:", err);
+      }
+    }
+    
+    function toggleUserInfo() {
+      document.getElementById("userPopup").classList.toggle("show");
+    }
+    
+    // Close popup if clicked outside
+    document.addEventListener("click", (e) => {
+      const popup = document.getElementById("userPopup");
+      const icon = document.querySelector(".user-icon");
+      if (!popup.contains(e.target) && !icon.contains(e.target)) {
+        popup.classList.remove("show");
+      }
+    });
+    
+    function logoutUser() {
+      window.location.href = "{{ url_for('pages.logout') }}";
+    }
+    
+    loadUserInfo();
+ </script>
+</body>
+</html>

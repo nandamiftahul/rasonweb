@@ -1,0 +1,77 @@
+{
+  "admin": {
+    "password": "scrypt:32768:8:1$Ijov8sfK5Xhn0zX5$3fc90a2d7cd91bf0bf0910d25cf0518204d0c7492bf61c77e6aea6a3aa6aec92da2d27caa315dd4732ac3be9a9990fb2fa29590e7ccdf7573cfd3b52debc57f0",
+    "expiry": "gAAAAABo_yT3yKI-R-3FtgiGKm57xm_rs3r8rghS7NANrYPtJlqV2-83jc5k5y5mfIIIl9hBabbyOusto9abdEv2zRCprjfdyA==",
+    "pages": "gAAAAABo_yT3JTbidh7hWNTwH3arNeat1T868Uu4zbyJXe9M7OYVbKLz0Fi3l_SJqloa-XCIEU79OXjHTfqXxHwBuehZLzx8lA=="
+  },
+  "trial1": {
+    "password": "scrypt:32768:8:1$4mFktFBkTMP9jtfp$675f15688b144c145d40e5d55cf9e678e018e1d5022255149e869002b50a15ae9233845ba1cb9d9fa9e4c43b334be6a89e9c67746962307a1408a1e5dc1c451d",
+    "expiry": "gAAAAABo_yT3lG0O_is_8W5f_LEhD6W0mZ0AZGDdvvs3Wghs1SE0m5IW337uWRcBeyyoQMy7om8rNjwoOAfMjFojElnoo6DEug==",
+    "pages": "gAAAAABo_yT3_-Qhan-_AF5Mid2d26esLpisAV6Ks02fsTxGgKiL8dmCNeGNVEYDtyuiqLHF7msSLvm6zD1HyTY8d5bRnacY3nl9RvKMWchSMz_TqlxkSs7IRqvRPMk60f_FdO4op9Jwkm3czKqUEvWJklv5FCZ3KQ=="
+  },
+  "trial2": {
+    "password": "scrypt:32768:8:1$KiDlvqPEFNmqADL6$42f3f9042e7459a265cb544229d5a80ca702f96b3140e55c78186dc8081fceff203eee60c54a5d68db53614d2116c3912a6eff812516fed2cbc2a1d691451171",
+    "expiry": "gAAAAABo_yT3aqflC0OtkJbepH82WqF5EC3by5Dy6W3U3KBiswMXMajRxrsy7C9GEa8Q_s1jPdRqKfkPJOtKf-EbCCEb1j4nWg==",
+    "pages": "gAAAAABo_yT3EHCqTpzqa9CkppwjehG_kSHAvtfzfxiUGJSRwkgRvqnN_Zm3_8Sgx-dYH8UK3b0W2wKNfnHAK1hlFretuHZHk2HqIZbEsgx_xp4VkQrQ2ds="
+  },
+  "guest": {
+    "password": "scrypt:32768:8:1$HnVF3pO3yel36idR$de5e91f00497f57a35f8a5953368fcf002bc65228cf066145c84ae32c711c98c19370a9ef55e24301aa2e62aeb99996a58aca68c1e450fec3f34b9cceb486f16",
+    "expiry": "gAAAAABo_yT3XgveYKZMfFRCTbHqEiObaqNHnPql0Wk7GU5TnsU35ul-2NlSaGFV2eSR5XIe4oOsRgwa30AA0xi983lPizTACw==",
+    "pages": "gAAAAABo_yT33RIxkdl7TbXY_c_4VYojrzrBZ7Dl1UXmpGw6SfkrqA35ooUyHe6gPrd2Qa7Xie9cAFJ_NcMcRwY3pSDBX6EZP82FZcLBRXbF99npPP0PrlpFpNJ49j9t0v8IJhUDCJ5W"
+  },
+  "user1": {
+    "password": "scrypt:32768:8:1$ulLbm1b70pLAKEv0$89368221ac97aaf013d5d47aa53a7991c3d300d6e410c9392f2b1cdb344856f71e308ead0467b80030b1c0656ff689b6c9633f1112c32fcdf593774004b7cbbf",
+    "expiry": "gAAAAABo_yT3jXUOhZNM1-0f5X-nIZjtBAzoZYE5HRd6CwZYSFep18QFJ_WHKwDmPybc6cEkUtd62qJ61JhUxxlakVddTQUBFQ==",
+    "pages": "gAAAAABo_yT3XH_uqa7RKE_hbrWheEAjjkPvHz2CbAg3UflujYsjUeRdT7lPRYHauGEdhICE1CiWDSWG0d2v91NClyYtVXV2L-KdnUZdJhCF8xwtnd4wi80="
+  },
+  "user2": {
+    "password": "scrypt:32768:8:1$Vbyyam2QyzNYLg4o$9acc229a7cb8f4f6296c05ca9cec33c8676227bf1242864a26e4c3e29e04643c0fb304dd59ec01a4f3e7ed3ac59f696c540e13ee4d81f96e124857cb83ead05e",
+    "expiry": "gAAAAABo_yT3VHp8DjY3P9djoOdBVJ07AO5m8NPcFU4nPOdg6RagGNS5VkjUP-hPdzWXtEykPiwOYjKAcnV11_o0PjvxW-_j8g==",
+    "pages": "gAAAAABo_yT3SMsLtMtlgHwTtYfH7xUlvLnyC-Y3Rrw9VQnpKxT2mW9ojaOQ9VLpROgwJ7KActVemVhy0wwFE-oXn3CGR_5H_B0LyTdajNpwLXYzesMPpNk="
+  },
+  "user3": {
+    "password": "scrypt:32768:8:1$uxDJ4iM3IEhjtC60$307c4a97efa86dcd758cf637dcbc629de49c5310b38e24a5ef4eecda263ac6367667528d289d3d62c948c764bd4adbd001cadac27f5f7a77d98da5fe2422f96a",
+    "expiry": "gAAAAABo_yT3cCbmuQamkdEy-4E_RB66eSL2_Uft-dfdLcsM9kqNAFepEMKMAq37x4qmEjBT1Hfh8xHhpZbltuzFPeiAYnn5kQ==",
+    "pages": "gAAAAABo_yT3TIaVZMPkjLfwg5OOubCvSbhkg4eeg0J3sAWKmTQH6XZmIcxL8dcO-vg2SUFl7MMQ_7vju6cKnxt-aVMYaBKrgBBlfuaSuHbxnzMqHyxnzYI="
+  },
+  "bmkg": {
+    "password": "scrypt:32768:8:1$hTq811WApIyKWwwc$1be9ce5c9b89818f3acd35c6b6e76d94be8c314fbe35b95fc39e800f42ed6f6d73ac17bb9d8bd6b9a9070d4d91c73a83e2c64160d231c33d70b956c7cae77641",
+    "expiry": "gAAAAABo_yT3-81nJMCEVu6lNxQSqyi2TUejIleusOYPZ9n6iPZid56SGhpDRiHrxf27dfgTGZhp4JQyXvBNKiscjnN2-BOsqg==",
+    "pages": "gAAAAABo_yT3nuwzcuFqSVyh0zScCffTT-88LZDwBiPNUoXsGDcGyiznFyS-3NY3L8h82fb1ZgHCiVHmoc_m1YKHVVNgi6cDDCgzco1DdRPZXc1z1BeSMOM="
+  },
+  "cilacap": {
+    "password": "scrypt:32768:8:1$uP0YAAqMhr7aPtZk$a2ebd52d6e41a41ceb404281caf6a5816774bd8863d8224eba45e660892336bbac8ec42cc5cc66ff88beeec51697e59b425899a07efa7d63e2f989d5ecd51b39",
+    "expiry": "gAAAAABo_yT3UxnNScmvLH_KeaMH7iCici-v5NS8P9cdBogqRn44JcLryJJz4gYwKRSHINRfvjIV_zJEnji7PK5a0xY5VIdZ4g==",
+    "pages": "gAAAAABo_yT3U4-qqVK5okFr10KJQKmTbJc4CKs0hp8SrHrpAh-LPiPb5qsq6zaiM7080rNVeBpXJ02s6ShSQDC_LFRTk_O9Z7dsbOKbdtk95X9msDYv2KQ="
+  },
+  "aceh": {
+    "password": "scrypt:32768:8:1$Kh3zf3VTtGixJttV$668fe90a60362b664f8628d7145df0feb9e9693c983fe8e7a54d01e8ab1720ac425277471443bf3d84eafe9c01fef21b9b2383a378ba30aa7043622348f44a39",
+    "expiry": "gAAAAABo_yT3oSFuoQcC2BsGIQQYIfspsLUiFylvqkpkTtzcDwUoPB5jeMavn9yhFD7jZHACJhpWJGPen_e_qB22AZmkM_EZhw==",
+    "pages": "gAAAAABo_yT3VY16pUS9IpqbS5n26K7gp7gTm2lK-O-H0fUP-6NUGV3F4wmFyevQImGzB6FeXTNvNlH-wGLaIkRQOSND1P-k_mOKIBmL0InFR8onGNaFGPc="
+  },
+  "pangkalanbun": {
+    "password": "scrypt:32768:8:1$EInUTyj562EquwRX$88aaa9ddfb939c53cca100c656834333ed6ca5610928f3de500f615d6a4d0980ccf9a8bb1f579550237c789ad46413bd8e1f515996e83ee35ee865d8287a8c27",
+    "expiry": "gAAAAABo_yT3a9HniLjR1cHfYIPJiBJy7OUSDEvfpChD4kC4DUeogizEvGn9l4eLXy4Mbda61b5Y1IArb0DELkyBWKw5_rW2Bg==",
+    "pages": "gAAAAABo_yT3X2mhutGHJwiu4yz5RB1u0cDDMvkdHzxem_oX4eC5d4FTztehBgFUzpJ-S73Ldom_fET8T3ffoTCfoYtLBuBI1FvOPmC2ekxXlfl1zzChEqo="
+  },
+  "tarakan": {
+    "password": "scrypt:32768:8:1$HJRzruF6dRgtjgjH$c3c5a93b2620cc8cc2984bd92454e675e00a556ee77551f0c268c856341081e68b72e097f68d31bf0490bd7194b56d754c0929728a0070cedbd70492c9c0b4f8",
+    "expiry": "gAAAAABo_yT30K_Ky06R3XGARkZDxWiYi1Pr5ontrRIsfTGwm-aFmj4q8bOOGNdN_dRgyfeyuGpszklQ-RoP6gU1MoDSueY4Ag==",
+    "pages": "gAAAAABo_yT3T6hkpJpXV5pSi1zZycHN1xBrsJ5gtNv5Df2SuKtveyETIXxcXF0-WGuQIVFeT01OXGN6MCTwn--iOa_Mgczdh68ikfpg051DNQ8Jp7aMfB4="
+  },
+  "sorong": {
+    "password": "scrypt:32768:8:1$fryoI0iDAPgzz87H$4fe80efe551a3fed5be46bfb9164bdeed20da70512b32d0a40b506da65bd7d09bd7a369cb00dfd4b29c6cf8474a7b37311b956b83b0f9e3c665bfc99b245649b",
+    "expiry": "gAAAAABo_yT3TFPrn7wFaAGWiEwBnapdMoL4m_A9IO0rP1ByrdNgV7qTI-feg437j41dp1-wQL4ifRofXdc1NyFUaUx_KQ7hEQ==",
+    "pages": "gAAAAABo_yT3uG6IvYQuQQF5e39jwKIERzPF-jhMXRSYCwTbDPWQg3SYzkjuHDDQ8pzHoEYHbwALy2Dlq69SgZ5e_VFZ67LRrhq9l1xTAnKfluqQVPAhSiE="
+  },
+  "ranai": {
+    "password": "scrypt:32768:8:1$4hpqXdO6yp6wV1xt$168ec19f597b9c1fc002ba9fe52435cd0d46ecd61f17ea0859430148d3b58c00b9d45d9d2001cd7c9aab13d0d42828c45c129da6f700d8e9c7f1fea8e5ab07bf",
+    "expiry": "gAAAAABo_yT3SEaw0YxFzpIf8kflPkPmw75a-LUf8LzAVPFpIAYWiKIXY90IwiGtJurjGLT7g6M4r23BerRaiO1liijHUvctkA==",
+    "pages": "gAAAAABo_yT3cCb9yQnp0Ix5M_p40f2lIuwoniIx6RI_zc7Lo8TheyHr7cUnBfeG0MOWGv7qM9VeOspWPwVe9_On88YJ7B37q4ldbS5m5WVW2JyKvdtgGXY="
+  },
+  "test": {
+    "password": "scrypt:32768:8:1$nNUFfdaBPqRacxY4$0474d22e9badf58d1c36c3064d076902f5663991f8b853b142a8628255fc8395e494ae32cbfc51210ffedd39bf49982a9ef0e77bc421ed9d6855a9ca661e0de2",
+    "expiry": "gAAAAABo_yT3LTzUafwUh-7Q-ETeWWuCMvgxdWK8y16ebq-IYjKdSCdNqqC4c5_ZJLmgTvAwn0-9d34_JYAeyz2tqEldLHOmdA==",
+    "pages": "gAAAAABo_yT3zTuyy7AUGHXDYQMA5FDNcQTlHPsQCMkHvPicvS-7sI7soguEISLddKLWKPqekyw1BI4Z7VHZ-0LQiSQ6k_Na2N1et14pg_3jCM4yengGc7U="
+  }
+}

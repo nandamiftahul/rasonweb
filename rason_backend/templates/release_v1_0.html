@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>RASON Monitoring — Release Document v1.0</title>
+
+  <!-- Fonts (local) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* ===== Base ===== */
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #0b1d3a;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    /* ===== Document Card ===== */
+    .doc {
+      width: 100%;
+      max-width: 1100px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+    }
+
+    /* ===== Header ===== */
+    .doc__header {
+      background: linear-gradient(135deg, #0a2a6b 0%, #004aad 55%, #0078d7 100%);
+      color: #fff;
+      padding: 28px 32px;
+      position: relative;
+    }
+    .doc__title {
+      margin: 0;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+    .doc__subtitle {
+      margin: 6px 0 0 0;
+      opacity: 0.92;
+      font-weight: 500;
+      font-size: 15px;
+    }
+    .doc__meta {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      font-size: 13px;
+      opacity: 0.95;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    /* ===== Body ===== */
+    .doc__body {
+      padding: 28px 32px 36px 32px;
+    }
+    .section {
+      margin-bottom: 28px;
+      border: 1px solid #e7ecf3;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .section__head {
+      padding: 16px 18px;
+      background: #f6f9ff;
+      border-bottom: 1px solid #e7ecf3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .section__title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: #0a2a6b;
+      letter-spacing: 0.2px;
+    }
+    .section__body {
+      padding: 16px 18px 20px 18px;
+      background: #fff;
+    }
+
+    /* ===== Lists & Tables ===== */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    @media (max-width: 900px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    ul.check {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    ul.check li {
+      position: relative;
+      padding-left: 28px;
+      margin: 10px 0;
+      line-height: 1.5;
+    }
+    ul.check li::before {
+      content: "✔";
+      position: absolute;
+      left: 0;
+      top: -1px;
+      font-weight: 800;
+      color: #0a8f3a;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 10px 16px;
+      align-items: start;
+    }
+    .kv .k {
+      color: #4a5b7a;
+      font-weight: 600;
+    }
+    .kv .v {
+      color: #0b1d3a;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #e7ecf3;
+      overflow: hidden;
+      border-radius: 10px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid #eef2f8;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    thead th {
+      background: #f6f9ff;
+      color: #0a2a6b;
+      font-weight: 800;
+      border-bottom: 1px solid #e7ecf3;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 999px;
+      border: 1px solid #e1e8f5;
+      background: #f7fbff;
+      color: #0a2a6b;
+    }
+
+    /* ===== Footer ===== */
+    .doc__footer {
+      padding: 18px 24px 26px 24px;
+      background: #f8fbff;
+      border-top: 1px solid #e7ecf3;
+      color: #406189;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand img {
+      height: 24px;
+      width: auto;
+    }
+
+    /* ===== Print ===== */
+    @media print {
+      body { background: #fff; padding: 0; }
+      .doc { box-shadow: none; border-radius: 0; }
+      .doc__header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .section__head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .doc__footer { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      a[href]:after { content: ""; }
+    }
+  </style>
+</head>
+<body>
+  <main class="doc">
+
+    <!-- ===== Header ===== -->
+    <header class="doc__header">
+      <h1 class="doc__title">Radiosonde Monitoring (RASON) — Release Document</h1>
+      <p class="doc__subtitle">Versi 1.0 • Ringkasan fitur, arsitektur, dan penilaian profesionalisme</p>
+      <div class="doc__meta">
+        <span class="badge">Release: <strong>&nbsp;v1.0</strong></span>
+        <span class="badge">Tanggal: <strong>&nbsp;{{ current_date or "10 Oct 2025" }}</strong></span>
+        <span class="badge">Status: <strong>&nbsp;Production-ready</strong></span>
+      </div>
+    </header>
+
+    <!-- ===== Body ===== -->
+    <div class="doc__body">
+
+      <!-- Overview -->
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">1. Tujuan & Ruang Lingkup</h2>
+          <span class="pill">Overview</span>
+        </div>
+        <div class="section__body">
+          <p><strong>RASON Monitoring</strong> adalah platform berbasis Flask untuk pemantauan, analisis, dan visualisasi operasi <em>radiosonde</em> multi-site (BMKG). Sistem mengintegrasikan pengambilan data dari FTP, decoding berkas (BUFR/BFR/BIN), penyajian <em>dashboard</em>, peta 2D/3D, serta <em>QC metrics</em> operasional.</p>
+          <div class="kv" style="margin-top:12px;">
+            <div class="k">Target Pengguna</div><div class="v">Operator radiosonde, analis meteorologi, dan admin sistem</div>
+            <div class="k">Lingkup v1.0</div><div class="v">Monitoring harian, visualisasi 2D/3D, resume data, dan QC waktu/ketinggian</div>
+            <div class="k">Lingkungan</div><div class="v">Jaringan internal / server on-premise; kompatibel mode offline (tanpa CDN)</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Feature Summary -->
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">2. Ringkasan Fitur Utama (v1.0)</h2>
+          <span class="pill">Feature Set</span>
+        </div>
+        <div class="section__body">
+          <div class="grid-2">
+            <div>
+              <h3 style="margin:6px 0 8px 0;">Frontend & Navigasi</h3>
+              <ul class="check">
+                <li><strong>Main Page</strong> dengan menu terstruktur dan peta Indonesia (lokal asset).</li>
+                <li><strong>Data Resume</strong> tabel sortable, unit di bawah header (interoperable & readable).</li>
+                <li><strong>Map</strong> (MapLibre + Esri Satellite default) dengan status site & filter.</li>
+                <li><strong>Trajectory 3D</strong> (Deck.gl) dengan kompas, ikon balon, dan non-loop playback.</li>
+                <li><strong>Time Accuracy</strong> & <strong>Height Reach</strong> chart operasional.</li>
+                <li><strong>Data Availability</strong> matriks bulanan site/jam.</li>
+                <li><strong>Settings</strong> (konfigurasi FTP, path, filter) & <strong>Login/Logout</strong>.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 style="margin:6px 0 8px 0;">Backend & Analitik</h3>
+              <ul class="check">
+                <li>Endpoint filter: <code>/api/filter</code> (site, tanggal, jam, tipe file).</li>
+                <li>Upload/Fetch: <code>/upload_bufr</code> (lokal/FTP) → simpan ke <code>uploads/</code>.</li>
+                <li>Multi-site FTP crawler: <code>fetch_all_sites</code> dgn parsing tanggal otomatis.</li>
+                <li>Decoding <strong>BUFR/BFR/BIN</strong> (pybufrkit), WMO AA/BB/CC/DD generator (auto site-code).</li>
+                <li><strong>QC Waktu</strong>: auto adjustment Local→UTC bila jam “preparing” ≠ 00Z/12Z.</li>
+                <li><strong>Burst/Termination</strong>: deteksi ambang & mapping kode >10 (kasus Meteomodem/EoScan).</li>
+                <li><strong>Hodograph</strong> (MetPy) dengan label N/E/S/W & pewarnaan ketinggian.</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3 style="margin:18px 0 10px 0;">Daftar Halaman</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Halaman</th>
+                <th>Deskripsi</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>🏠 Main Page</td><td>Beranda, menu fitur, peta Indonesia (lokal).</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>📊 Data Resume</td><td>Tabel ringkas hasil radiosonde per site/file.</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>🗺️ Map</td><td>MapLibre + Esri Satellite, filter & status site.</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>🌐 Trajectory 3D</td><td>Deck.gl lintasan 3D, kompas, ikon balon.</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>⏱️ Time Accuracy</td><td>Ketepatan waktu peluncuran (00Z/12Z).</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>📈 Height Reach</td><td>Grafik ketinggian maksimum per peluncuran.</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>📅 Data Availability</td><td>Matriks ketersediaan per tanggal/jam/site.</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>⚙️ Settings</td><td>Konfigurasi FTP, path lokal, filter.</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>🚪 Login/Logout</td><td>Session-based auth.</td><td><span class="pill">Selesai</span></td></tr>
+              <tr><td>🚧 Under Development</td><td>Placeholder seragam untuk fitur baru.</td><td><span class="pill">Selesai</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Architecture -->
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">3. Arsitektur & Teknologi</h2>
+          <span class="pill">Stack</span>
+        </div>
+        <div class="section__body">
+          <div class="grid-3">
+            <div>
+              <h4 style="margin:0 0 8px 0;">Backend</h4>
+              <ul class="check">
+                <li>Python (Flask), modular routing.</li>
+                <li>Flask-Login (session), akses terproteksi.</li>
+                <li>FTP (ftplib) multi-site, robust error handling.</li>
+                <li>Decoding: pybufrkit, analisis: MetPy, Matplotlib.</li>
+              </ul>
+            </div>
+            <div>
+              <h4 style="margin:0 0 8px 0;">Frontend</h4>
+              <ul class="check">
+                <li>Inter font lokal, tema konsisten (gradien biru).</li>
+                <li>MapLibre GL + Esri Satellite (lokal config).</li>
+                <li>Deck.gl untuk 3D trajectory.</li>
+                <li>DataTables lokal (tanpa CDN).</li>
+              </ul>
+            </div>
+            <div>
+              <h4 style="margin:0 0 8px 0;">Operasional</h4>
+              <ul class="check">
+                <li>Resource lokal → siap offline / jaringan internal.</li>
+                <li>Struktur folder rapi: <code>static/</code>, <code>templates/</code>, <code>uploads/</code>.</li>
+                <li>Siap kontainerisasi (Docker) & reverse proxy (Nginx).</li>
+                <li>Kebijakan UI responsif (desktop & mobile).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Professionalism -->
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">4. Penilaian Profesionalisme</h2>
+          <span class="pill">Production Readiness</span>
+        </div>
+        <div class="section__body">
+          <div class="grid-2">
+            <div>
+              <h4 style="margin:0 0 8px 0;">Kriteria Terpenuhi</h4>
+              <ul class="check">
+                <li>Arsitektur modular & maintainable.</li>
+                <li>Konsistensi UI/UX & branding institusional.</li>
+                <li>Visualisasi ilmiah (Map 2D/3D, Hodograph, QC).</li>
+                <li>Penanganan edge-case (UTC vs lokal, burst/termination).</li>
+                <li>Resource lokal → kestabilan operasional.</li>
+              </ul>
+            </div>
+            <div>
+              <h4 style="margin:0 0 8px 0;">Rekomendasi Lanjutan (Opsional)</h4>
+              <ul class="check">
+                <li>Role-based access (Admin/Operator/Viewer).</li>
+                <li>Export otomatis PDF/DOCX laporan peluncuran.</li>
+                <li>Alert (email/Telegram) untuk site offline/data hilang.</li>
+                <li>Persist ke DB (SQLite/Postgres) untuk query cepat.</li>
+                <li>Docker Compose (Flask + Nginx + Redis optional).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Known Limitations -->
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">5. Batasan Diketahui (v1.0)</h2>
+          <span class="pill">Known Limitations</span>
+        </div>
+        <div class="section__body">
+          <ul class="check">
+            <li>Export laporan otomatis (PDF/DOCX) masih draft.</li>
+            <li>Dashboard agregat lintas bulan/tahun memerlukan optimasi query FTP.</li>
+            <li>Belum ada database persisten untuk histori jangka panjang.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Version -->
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">6. Informasi Versi & Rilis</h2>
+          <span class="pill">Versioning</span>
+        </div>
+        <div class="section__body">
+          <div class="kv">
+            <div class="k">Nama Produk</div><div class="v">RASON Monitoring</div>
+            <div class="k">Versi</div><div class="v">v1.0</div>
+            <div class="k">Tanggal Rilis</div><div class="v">{{ current_date or "10 October 2025" }}</div>
+            <div class="k">Lingkungan Target</div><div class="v">Server internal BMKG / On-premise</div>
+            <div class="k">Kontak</div><div class="v">Tim Operasi Radiosonde / Admin Sistem</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Conclusion -->
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">7. Kesimpulan</h2>
+          <span class="pill">Summary</span>
+        </div>
+        <div class="section__body">
+          <p><strong>RASON Monitoring v1.0</strong> dinyatakan <strong>siap operasional</strong> untuk pemantauan dan analisis radiosonde multi-site, dengan UI/UX profesional, fitur visualisasi ilmiah, dan integrasi FTP yang stabil. Langkah berikutnya bersifat penguatan enterprise (role, export otomatis, alerting, database, dan orkestrasi deployment).</p>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ===== Footer ===== -->
+    <footer class="doc__footer">
+      <div>© {{ current_year or "2025" }} • RASON Monitoring v1.0</div>
+      <div class="brand">
+        <img src="{{ url_for('static', filename='images/logo_terrindo.png') }}" alt="Terrindo" />
+        <img src="{{ url_for('static', filename='images/logo_bmkg.png') }}" alt="BMKG" />
+        <img src="{{ url_for('static', filename='images/logo_meteomodem.png') }}" alt="Meteomodem" />
+        <span>Powered by Terrindo · BMKG · Meteomodem</span>
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Radiosonde 3D Trajectory</title>
+
+<!-- Fonts & Icons -->
+<link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<!-- jQuery (konsisten dengan page lain) -->
+<script src="{{ url_for('static', filename='libs/jquery/jquery-3.6.0.min.js') }}"></script>
+
+<!-- MapLibre & deck.gl -->
+<link href="{{ url_for('static', filename='libs/maplibre/maplibre-gl.css') }}" rel="stylesheet">
+<script src="{{ url_for('static', filename='libs/maplibre/maplibre-gl.js') }}"></script>
+<script src="{{ url_for('static', filename='libs/deckgl/deck.gl.min.js') }}"></script>
+
+<style>
+  * { box-sizing: border-box; }
+  body{
+    margin:0; font-family:"Inter",sans-serif;
+    display:flex; flex-direction:row; min-height:100vh;
+    background:linear-gradient(to bottom right,#0a2a6b,#004aad,#0078d7);
+    color:white; overflow-y:auto; transition:all .3s ease;
+  }
+
+  /* === Sidebar (sama seperti Map Viewer) === */
+  .sidebar{
+    width:230px; background:rgba(255,255,255,.08); backdrop-filter:blur(8px);
+    border-right:1px solid rgba(255,255,255,.15);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding:40px 10px 20px; position:fixed; top:0; left:0; height:100vh; z-index:10;
+    transition:width .3s ease, transform .3s ease;
+  }
+  .sidebar h2{
+    font-size:20px; margin-bottom:30px; color:#e0f2fe; text-align:center; font-weight:700;
+    letter-spacing:1.2px; text-transform:uppercase; text-shadow:0 0 6px rgba(255,255,255,.3);
+    border-bottom:1px solid rgba(255,255,255,.15); padding-bottom:8px;
+    transition:opacity .3s ease, height .3s ease, margin .3s ease;
+  }
+  .sidebar a{
+    display:flex; align-items:center; gap:10px; text-decoration:none; color:white;
+    width:100%; padding:12px 15px; border-radius:8px; text-align:left; margin:8px 0;
+    transition:background .3s ease; white-space:nowrap; overflow:hidden;
+  }
+  .sidebar a:hover{ background:rgba(255,255,255,.15); }
+  .sidebar a i{ font-size:18px; width:22px; text-align:center; color:#e0f2fe; flex-shrink:0; }
+  .sidebar a span{ padding-left:6px; transition:opacity .3s ease, width .3s ease; }
+
+  .sidebar.compact{ width:70px; align-items:flex-start; padding:60px 5px; }
+  .sidebar.compact h2{ opacity:0; height:0; margin:0; overflow:hidden; }
+  .sidebar.compact a span{ opacity:0; width:0; overflow:hidden; }
+  .sidebar.compact a:hover::after{
+    content:attr(data-title); position:absolute; left:70px;
+    background:rgba(0,0,0,.8); padding:5px 10px; border-radius:6px; color:#fff; font-size:13px;
+    white-space:nowrap; z-index:999; transform:translateY(-2px);
+  }
+
+  /* Toggle Button */
+  .toggle-btn{
+    position:fixed; top:50%; left:220px; transform:translateY(-50%);
+    width:28px; height:28px; border:none; border-radius:50%;
+    background:rgba(255,255,255,.25); color:white; font-size:14px; cursor:pointer;
+    z-index:50; transition:all .3s ease; display:flex; align-items:center; justify-content:center;
+    backdrop-filter:blur(5px);
+  }
+  .toggle-btn:hover{ background:rgba(255,255,255,.4); }
+  .toggle-btn.compact-position{ left:60px; }
+
+  /* === Main === */
+  .main{
+    flex:1; display:flex; flex-direction:column; min-height:100vh;
+    margin-left:230px; padding:40px 40px 0; padding-bottom:50px; box-sizing:border-box;
+  }
+  .main.expanded{ margin-left:0; }
+
+  /* Header box (sama) */
+  .header-box{
+    position:relative; background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.2); border-radius:12px; padding:20px 30px;
+    box-shadow:0 6px 25px rgba(0,0,0,.3); backdrop-filter:blur(10px);
+    display:flex; align-items:center; gap:18px; margin-bottom:14px;
+  }
+  .header-icon{
+    width:50px; height:50px; background:rgba(255,255,255,.15); border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:26px; color:#dbeafe;
+  }
+  .header-text h1{ margin:0; font-size:26px; font-weight:600; letter-spacing:.5px; }
+  .header-text p{ margin:4px 0 0; font-size:14px; color:#dbeafe; opacity:.9; }
+  .header-logos{ position:absolute; right:20px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:12px; }
+  .header-logos img{ height:36px; opacity:.9; }
+  .header-clock{ display:flex; flex-direction:column; align-items:flex-end; justify-content:center; line-height:1.1; font-size:18px; color:#fff; font-weight:600; letter-spacing:1px; text-shadow:0 0 6px rgba(0,0,0,.4); }
+
+  /* Filter bar (adopt Map Viewer) */
+  .filter-bar{
+    background:rgba(255,255,255,.1);
+    padding:12px 16px; border-radius:10px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .filter-bar label{ font-size:13px; color:#e0f2fe; }
+  .filter-bar select,.filter-bar input,.filter-bar button{
+    background:rgba(255,255,255,.1); color:white; border:0; border-radius:8px;
+    padding:8px 10px; font-family:inherit; font-size:13px;
+  }
+  .filter-bar button{ cursor:pointer; background:#0078d7; border:none; font-weight:600; }
+  .filter-bar button:hover{ background:#0a6cc2; }
+  .filter-bar .uploader{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    border-left:1px solid rgba(255,255,255,.2); padding-left:10px; margin-left:4px;
+  }
+  .statusText{ font-size:12px; color:#e0f2fe; font-weight:600; min-width:160px; white-space:nowrap; }
+
+  /* Map container (sejajar header) */
+  #map-container{
+    position:relative; width:100%; height:72vh;
+    border-radius:10px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,.4); margin-bottom:14px;
+  }
+  #map{ position:absolute; inset:0; }
+
+  /* North arrow */
+  #northArrow{
+    position:absolute; bottom:18px; right:18px; width:50px; height:50px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
+    box-shadow:0 2px 10px rgba(0,0,0,.3); text-align:center; font-weight:600; color:#fff; pointer-events:none; z-index:400;
+  }
+  #northArrow::before{ content:"▲"; display:block; font-size:20px; color:#ff4c4c; transform-origin:center; transition:transform .1s linear; margin-top:8px; }
+  #northArrow span{ display:block; font-size:13px; margin-top:-2px; color:#fff; }
+
+  /* Level panel (dipindah ke dalam map, pojok kanan atas) */
+  #levelPanel{
+    position:absolute; top:10px; right:10px; width:260px; z-index:500; display:none;
+    background:rgba(255,255,255,.7); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,.3);
+    color:#111; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.25); padding:12px 12px 10px;
+    max-height:65%; overflow-y:auto;
+  }
+  #levelPanel h3{ margin:0 0 6px 0; font-size:14px; color:#004aad; text-align:left; }
+  #levelContent{ font-size:13px; }
+  #levelContent .row{ display:flex; justify-content:space-between; margin:4px 0; border-bottom:1px solid rgba(0,0,0,.08); padding-bottom:2px; }
+  #levelContent .label{ color:#333; }
+  #levelContent .val{ color:#0d6efd; font-weight:700; }
+
+  /* Info ringkas (ikon play, speed, progress) – tampil inline di filter status */
+  #info-panel{ display:none; }
+
+  /* Footer (sama) */
+  .footer{
+    position:fixed; bottom:0; left:230px; width:calc(100% - 230px);
+    height:38px; background:#ffffff; padding:4px 0;
+    display:flex; justify-content:center; align-items:center;
+    border-top:1px solid #d1d5db; z-index:5; transition:all .3s ease;
+  }
+  .footer span{ color:#333; font-weight:500; margin-right:6px; font-size:12px; opacity:.8; }
+  .footer img{ height:28px; opacity:.85; margin:0 6px; filter:saturate(90%); }
+  .main.expanded ~ .footer{ left:0; width:100%; }
+
+/* === 👤 User icon di pojok kiri atas sidebar === */
+.user-icon {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-size: 26px;
+  color: #e0f2fe;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  z-index: 20;
+}
+.user-icon:hover { color: #38bdf8; }
+
+/* === 💬 Popup user info === */
+.user-popup {
+  position: absolute;
+  top: 45px;
+  left: 10px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #fff;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  display: none;
+  z-index: 999;
+  width: 190px;
+}
+.user-popup.show { display: block; }
+.user-popup p { margin: 4px 0; color: #e0f2fe; }
+.user-popup b { color: #fff; }
+.user-popup button {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.2);
+  color: #fca5a5;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.user-popup button:hover {
+  background: rgba(255,255,255,0.35);
+  color: #fff;
+}
+/* === Playback Bar (di bawah map) === */
+.playback-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-top: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+.playback-bar button {
+  background: #0078d7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.playback-bar button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.playback-bar input[type="range"] {
+  accent-color: #0078d7;
+  height: 6px;
+  cursor: pointer;
+}
+.playback-bar span, .playback-bar label {
+  font-size: 13px;
+  color: #e0f2fe;
+  user-select: none;
+}
+/* === Map Layer Toggle Control === */
+#mapLayerControl {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 500;
+}
+
+#mapLayerControl button {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #004aad;
+  transition: all 0.2s ease;
+}
+
+#mapLayerControl button:hover {
+  background: rgba(255,255,255,1);
+  transform: scale(1.08);
+}
+
+#mapLayerControl button.active {
+  background: #0078d7;
+  color: white;
+  border-color: rgba(0,0,0,0.25);
+}
+#upload-status {
+  display: inline-block;
+  margin-left: 8px;
+  min-width: 180px;
+  color: #e0f2fe;
+  font-weight: 600;
+  font-size: 12px;
+}
+/* === Overlay Controls (inside map) === */
+#overlayControls {
+  position: absolute;
+  bottom: 90px;  /* di atas north arrow */
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 500;
+}
+
+#overlayControls label {
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 6px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#overlayControls label:hover {
+  background: rgba(255,255,255,1);
+  transform: scale(1.05);
+}
+
+#overlayControls input {
+  display: none;
+}
+
+/* Aktif = biru */
+#overlayControls input:checked + i {
+  color: white;
+  background: #0078d7;
+  border-radius: 5px;
+  padding: 6px;
+}
+
+#overlayControls i {
+  font-size: 20px;
+  color: #004aad;
+  transition: all 0.2s ease;
+}
+
+</style>
+</head>
+<body>
+  <!-- Sidebar toggle -->
+  <button class="toggle-btn compact-position" id="toggleBtn" onclick="toggleSidebar()">☰</button>
+
+  <!-- 👤 User Profile Icon -->
+  <div class="user-icon" onclick="toggleUserInfo()">
+    <i class="bi bi-person-circle"></i>
+  </div>
+  
+  <!-- 💬 Popup Info -->
+  <div class="user-popup" id="userPopup">
+    <p><b>Username:</b> <span id="userName">-</span></p>
+    <p><b>Expiry:</b> <span id="userExpiry">-</span></p>
+    <button id="logoutBtn" onclick="logoutUser()">Logout</button>
+  </div>
+  
+
+  <!-- Sidebar -->
+  <div class="sidebar compact" id="sidebar">
+    <h2>RASON PANEL</h2>
+  
+    <a href="{{ url_for('pages.main_page') }}" data-title="Main Page"><i class="bi bi-house-door"></i><span>Main Page</span></a>
+    <a href="{{ url_for('pages.dashboard') }}" data-title="Data Resume"><i class="bi bi-bar-chart-fill"></i><span>Data Resume</span></a>
+    <a href="{{ url_for('pages.map_view') }}"  data-title="Map"><i class="bi bi-map"></i><span>Map</span></a>
+    <a href="{{ url_for('pages.trajectory3d_page') }}" data-title="Trajectory 3D"><i class="bi bi-globe2"></i><span>Trajectory 3D</span></a>
+    <a href="{{ url_for('pages.time_accuracy') }}" data-title="Time Accuracy"><i class="bi bi-stopwatch"></i><span>Time Accuracy</span></a>
+    <a href="{{ url_for('pages.height_reach') }}" data-title="Height Reach"><i class="bi bi-graph-up"></i><span>Height Reach</span></a>
+    <a href="{{ url_for('pages.data_availability_page') }}" data-title="Data Availability"><i class="bi bi-calendar3"></i><span>Data Availability</span></a>
+    <a href="{{ url_for('pages.error_analysis_page') }}" data-title="Error Analysis"><i class="bi bi-exclamation-triangle"></i><span>Error Analysis</span></a>
+    <a href="{{ url_for('pages.settings_page') }}" data-title="Settings"><i class="bi bi-gear"></i><span>Settings</span></a>
+  </div>
+
+  <!-- Main -->
+  <div class="main" id="mainContent">
+    <!-- Header -->
+    <div class="header-box">
+      <div class="header-icon" style="filter:brightness(10) saturate(0.1);">🎈</div>
+      <div class="header-text">
+        <h1>Radiosonde 3D Trajectory</h1>
+        <p>Interactive 3D path • analysis overlays</p>
+      </div>
+      <div class="header-logos">
+        <div class="header-clock">
+          <div id="utcClock">--:--:-- UTC</div>
+          <div id="utcDate" style="font-size:12px; opacity:0.8;">-- --- ----</div>
+        </div>
+        <img src="{{ url_for('static', filename='images/bmkg.png') }}" alt="BMKG" style="height:55px;width:auto;">
+      </div>
+    </div>
+
+    <!-- Filter bar (adopt Map Viewer; ID tetap seperti fungsi kamu) -->
+    <div class="filter-bar">
+      <label>Site:</label>
+      <select id="siteSelect">
+        <option value="">Loading sites...</option>
+      </select>
+
+      <label>Date:</label><input type="date" id="dateSelect">
+      <label>Hour:</label><select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
+      <label>Type:</label>
+      <select id="typeSelect"><option value=".bfr">.bfr</option><option value=".bufr">.bufr</option><option value=".bfh">.bfh</option><option value=".bin">.bin</option></select>
+      <button id="applyFilter">Apply</button>
+
+      <!-- Uploader (ID & behavior dipertahankan) -->
+      <div class="uploader">
+        <input id="file-input" type="file" accept=".bufr,.bfr,.bfh,.bin" />
+        <button id="upload-btn">Upload & Decode</button>
+        <span id="upload-status" class="statusText"></span>
+      </div>
+    </div>
+
+    <!-- Map container -->
+    <div id="map-container">
+      <div id="map"></div>
+      <div id="northArrow"><span>N</span></div>
+<!-- ❄️🌀 Overlay Controls -->
+<div id="overlayControls">
+  <label title="Toggle Freezing Layer">
+    <input type="checkbox" id="chk-freeze">
+    <i class="bi bi-snow2"></i>
+  </label>
+  <label title="Toggle Wind Barb Profile">
+    <input type="checkbox" id="chk-shear">
+    <i class="bi bi-wind"></i>
+  </label>
+</div>
+
+<!-- 🔘 Basemap Toggle Buttons -->
+<div id="mapLayerControl">
+  <button data-layer="osm" title="OpenStreetMap"><i class="bi bi-map"></i></button>
+  <button data-layer="esri" title="Esri Satellite" class="active"><i class="bi bi-image"></i></button>
+  <button data-layer="google" title="Google Hybrid"><i class="bi bi-globe-americas"></i></button>
+</div>
+
+      <!-- Level Info dipindah ke pojok atas kanan map -->
+      <div id="levelPanel">
+        <h3>📊 Level Info</h3>
+        <div id="levelContent">No data</div>
+      </div>
+<!-- ✅ Dummy elements to prevent JS null errors -->
+<div id="info-panel" style="display:none;"></div>
+<div id="st-name" style="display:none;"></div>
+<div id="st-launch" style="display:none;"></div>
+<div id="st-maxz" style="display:none;"></div>
+
+    </div>
+<!-- 🎞️ Playback Controls -->
+<div class="playback-bar">
+  <button id="btn-play">▶️ Play</button>
+  <button id="btn-pause" disabled>⏸️ Pause</button>
+  <label>Speed:</label>
+  <input id="speed" type="range" min="0.5" max="1000" step="0.5" value="1">
+  <span id="sp-val">1×</span>
+  <input id="prog" type="range" min="0" max="100" step="0.5" value="0" style="flex:1;">
+  <span id="st-elap">0 s</span>
+</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
+  </div>
+
+<script>
+/* ===== Layout: sidebar & clock (tanpa ubah fungsi trajectory) ===== */
+window.addEventListener("DOMContentLoaded", () => {
+  const sidebar = document.getElementById("sidebar");
+  const main = document.getElementById("mainContent");
+  const btn = document.getElementById("toggleBtn");
+  const footer = document.querySelector(".footer");
+  const saved = localStorage.getItem("sidebarState");
+
+  if (saved === "compact") {
+    sidebar.classList.add("compact");
+    main.style.marginLeft = "70px";
+    btn.classList.add("compact-position");
+    btn.textContent = "☰";
+    if (footer) { footer.style.left = "70px"; footer.style.width = "calc(100% - 70px)"; }
+  } else {
+    sidebar.classList.remove("compact");
+    main.style.marginLeft = "230px";
+    btn.classList.remove("compact-position");
+    btn.textContent = "❮";
+    if (footer) { footer.style.left = "230px"; footer.style.width = "calc(100% - 230px)"; }
+  }
+
+  // Pastikan map full render setelah layout settle
+  setTimeout(() => {
+    if (window.map && window.map.resize) window.map.resize();
+  }, 600);
+});
+
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const main = document.getElementById("mainContent");
+  const btn = document.getElementById("toggleBtn");
+  const footer = document.querySelector(".footer");
+
+  const isCompact = sidebar.classList.toggle("compact");
+  main.style.marginLeft = isCompact ? "70px" : "230px";
+  btn.textContent = isCompact ? "☰" : "❮";
+  btn.classList.toggle("compact-position", isCompact);
+
+  if (footer) {
+    footer.style.left = isCompact ? "70px" : "230px";
+    footer.style.width = isCompact ? "calc(100% - 70px)" : "calc(100% - 230px)";
+  }
+  localStorage.setItem("sidebarState", isCompact ? "compact" : "expanded");
+
+  // Resize map after sidebar animation
+  setTimeout(() => {
+    if (window.map && window.map.resize) window.map.resize();
+  }, 350);
+}
+
+function updateUTCClock() {
+  const now = new Date();
+  const hh = String(now.getUTCHours()).padStart(2, "0");
+  const mm = String(now.getUTCMinutes()).padStart(2, "0");
+  const ss = String(now.getUTCSeconds()).padStart(2, "0");
+  const dateStr = now.toUTCString().split(" ").slice(0, 4).join(" ");
+  document.getElementById("utcClock").textContent = `${hh}:${mm}:${ss} UTC`;
+  document.getElementById("utcDate").textContent = dateStr;
+}
+updateUTCClock(); setInterval(updateUTCClock, 1000);
+
+// Tambahan jaga-jaga agar map tidak kepotong saat load
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    if (window.map && window.map.resize) window.map.resize();
+  }, 700);
+});
+</script>
+
+<script>
+// === 🗺️ Default Map Indonesia (tampil saat pertama buka page) ===
+window.addEventListener("DOMContentLoaded", () => {
+  const map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      sources: {
+        osm: { type: "raster", tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256 },
+        esri: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256 },
+        google: { type: "raster", tiles: ["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"], tileSize: 256 }
+      },
+      layers: [
+        { id: "esri", type: "raster", source: "esri", layout: { visibility: "visible" } },
+        { id: "osm", type: "raster", source: "osm", layout: { visibility: "none" } },
+        { id: "google", type: "raster", source: "google", layout: { visibility: "none" } }
+      ]
+    },
+    center: [118, -2],   // 🧭 Tengah Indonesia
+    zoom: 4.5,
+    pitch: 0,
+    bearing: 0,
+    antialias: true
+  });
+
+  // simpan ke global agar tidak null sebelum data dimuat
+  window.map = map;
+});
+</script>
+
+
+<script>
+let allLevels=[];
+document.getElementById("upload-btn").addEventListener("click",()=>{
+  const f=document.getElementById("file-input").files[0];
+  if(!f){alert("Pilih file radiosonde terlebih dahulu.");return;}
+  uploadFile(f);
+});
+
+async function uploadFile(f){
+  const fd=new FormData();fd.append("file",f);
+  const st=document.getElementById("upload-status");st.textContent="Uploading...";
+  try{
+    const r=await fetch("/upload_bufr",{method:"POST",body:fd});
+    const js=await r.json();
+    if(js.success){st.textContent="✅ Uploaded successfully!";await loadTrajectory();}
+    else st.textContent="❌ Decode error: "+(js.error||"unknown");
+  }catch(e){st.textContent="❌ Upload error: "+e.message;}
+}
+
+document.getElementById("applyFilter").addEventListener("click",async()=>{
+  const site=document.getElementById("siteSelect").value;
+  const date=document.getElementById("dateSelect").value;
+  const hour=document.getElementById("hourSelect").value;
+  const ftype=document.getElementById("typeSelect").value;
+  const st=document.getElementById("upload-status");
+  if(!site||!date||!hour||!ftype){alert("⚠️ Mohon isi semua filter.");return;}
+  st.textContent="🔎 Mencari file di server...";
+  try{
+    const body=new URLSearchParams({site,date,hour,ftype});
+    const res=await fetch("/api/filter",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+    const data=await res.json();
+    if(!data.files||!data.files.length){st.textContent="⚠️ Tidak ditemukan file cocok.";return;}
+    const chosen=data.files.sort().slice(-1)[0];
+    st.textContent="📦 Mengambil dan decode "+chosen+"...";
+    const fd=new FormData();fd.append("remote_site",site);fd.append("remote_file",chosen);
+    const res2=await fetch("/upload_bufr",{method:"POST",body:fd});
+    const js=await res2.json();
+    if(js.success){st.textContent="✅ File berhasil diambil dan didecode: "+chosen;await loadTrajectory();}
+    else{st.textContent="❌ Decode error: "+(js.error||"unknown");}
+  }catch(e){st.textContent="❌ Gagal ambil data: "+e.message;}
+});
+
+async function loadTrajectory(){
+  const st=document.getElementById("upload-status");
+  try{
+    const [trajRes, levelRes] = await Promise.all([fetch("/api/trajectory3d"), fetch("/all_levels")]);
+    const d=await trajRes.json();
+    allLevels=await levelRes.json();
+    console.log("🔍 Contoh level[0]:", allLevels[0]);
+    if(!d||d.error){st.textContent="⚠️ Tidak ada data trajectory.";return;}
+    st.textContent="✅ Data trajectory berhasil dimuat.";
+    document.getElementById("info-panel").style.display="block";
+    document.getElementById("levelPanel").style.display="block";
+    document.getElementById("st-name").textContent=d.station.name||"Unknown";
+    document.getElementById("st-launch").textContent=d.meta.launch_time||"-";
+    document.getElementById("st-maxz").textContent=d.meta.max_height_m?Math.round(d.meta.max_height_m)+" m":"-";
+    start3DMap(d);
+  }catch(e){st.textContent="❌ Gagal load trajectory: "+e.message;}
+}
+
+function start3DMap(d) {
+  const { TripsLayer, IconLayer, LineLayer, PolygonLayer, ColumnLayer, MapboxOverlay } = deck;
+
+  const t0 = Math.min(...d.trip.timestamps);
+  const ts = d.trip.timestamps.map(t => t - t0);
+  let path = d.trip.path;
+  const dur = Math.max(...ts);
+  const stn = d.station;
+
+  // ✅ Selalu skip titik & level terakhir (biasanya error saat burst)
+  if (path.length > 1) {
+    path = path.slice(0, -1);
+    ts.pop();
+  }
+  if (Array.isArray(allLevels) && allLevels.length > 1) {
+    allLevels = allLevels.slice(0, -1);
+  }
+  console.warn("⏩ Skipped last point and level (burst cleanup)");
+
+  const map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      sources: {
+        osm: { type: "raster", tiles: ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256 },
+        esri: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256 },
+        google: { type: "raster", tiles: ["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"], tileSize: 256 }
+      },
+      layers: [
+        { id: "esri", type: "raster", source: "esri", layout: { visibility: "visible" } },
+        { id: "osm", type: "raster", source: "osm", layout: { visibility: "none" } },
+        { id: "google", type: "raster", source: "google", layout: { visibility: "none" } }
+      ]
+    },
+    center: [stn.lon, stn.lat],
+    zoom: 8,
+    pitch: 60,
+    bearing: 20,
+    antialias: true
+  });
+
+// === Basemap toggle buttons ===
+document.querySelectorAll("#mapLayerControl button").forEach(btn => {
+  btn.onclick = () => {
+    const layer = btn.dataset.layer;
+    ["osm", "esri", "google"].forEach(id => {
+      const vis = id === layer ? "visible" : "none";
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+    });
+    // Update button highlight
+    document.querySelectorAll("#mapLayerControl button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  };
+});
+
+  const minZ = Math.min(...path.map(p => p[2]));
+  const maxZ = Math.max(...path.map(p => p[2]));
+  const color = h => [Math.min(255, 255 * (h - minZ) / (maxZ - minZ)), 50, 255 * (1 - (h - minZ) / (maxZ - minZ))];
+
+  const allLines = [];
+  let mark = 0;
+  for (let i = 1; i < path.length; i++) {
+    const z = path[i][2];
+    if (z - mark >= 200) {
+      mark = z;
+      allLines.push({
+        source: [path[i][0], path[i][1], 0],
+        target: [path[i][0], path[i][1], z]
+      });
+    }
+  }
+
+  let cur = 0, play = false, spd = 1;
+  let pos = { lon: path[0][0], lat: path[0][1], alt: path[0][2] };
+
+  // === Freezing layer state ===
+  let freezeZ = getFreezingZ(allLevels);
+  let showFreeze = false;
+  let shearData = computeShearLevels(allLevels);
+  let showShear = false;
+
+  const getPos = t => {
+    if (t <= 0) return { lon: path[0][0], lat: path[0][1], alt: path[0][2] };
+    if (t >= dur) return { lon: path.at(-1)[0], lat: path.at(-1)[1], alt: path.at(-1)[2] };
+    for (let i = 1; i < ts.length; i++) if (ts[i] >= t) {
+      const r = (t - ts[i - 1]) / (ts[i] - ts[i - 1]);
+      return {
+        lon: path[i - 1][0] + r * (path[i][0] - path[i - 1][0]),
+        lat: path[i - 1][1] + r * (path[i][1] - path[i - 1][1]),
+        alt: path[i - 1][2] + r * (path[i][2] - path[i - 1][2])
+      };
+    }
+  };
+
+  function updateLevelInfo(t) {
+    if (!allLevels.length) return;
+    const idx = Math.min(Math.floor((t / dur) * allLevels.length), allLevels.length - 1);
+    const lv = allLevels[idx];
+    let html = "";
+    for (const [k, v] of Object.entries(lv)) {
+      if (v == null) continue;
+      html += `<div class="row"><div class="label">${k}</div><div class="val">${typeof v === "number" ? v.toFixed(2) : v}</div></div>`;
+    }
+    document.getElementById("levelContent").innerHTML = html || "No data";
+  }
+
+  function makeFreezingLayer(zMeters) {
+    if (!Number.isFinite(zMeters)) return [];
+    const lon0 = d.station.lon, lat0 = d.station.lat;
+    const span = 0.25;
+    const corners = [
+      [lon0 - span, lat0 - span, zMeters],
+      [lon0 + span, lat0 - span, zMeters],
+      [lon0 + span, lat0 + span, zMeters],
+      [lon0 - span, lat0 + span, zMeters]
+    ];
+    return [
+      new PolygonLayer({
+        id: "freeze-layer",
+        data: [{ polygon: corners }],
+        getPolygon: f => f.polygon,
+        filled: true,
+        extruded: false,
+        getFillColor: [0, 180, 255, 80],
+        getLineColor: [0, 120, 255, 180],
+        lineWidthMinPixels: 2,
+        pickable: false
+      })
+    ];
+  }
+
+  function makeLayers() {
+    const visLines = allLines.filter(l => l.target[2] <= pos.alt);
+    const base = [
+      new TripsLayer({
+        id: "trip",
+        data: [{ path, timestamps: ts }],
+        getPath: d => d.path,
+        getTimestamps: d => d.timestamps,
+        getColor: d => d.path.map(p => color(p[2])),
+        widthMinPixels: 5,
+        trailLength: dur,
+        currentTime: cur
+      }),
+      new LineLayer({
+        id: "lines",
+        data: visLines,
+        getSourcePosition: d => d.source,
+        getTargetPosition: d => d.target,
+        getColor: [0, 122, 255],
+        getWidth: 1.5
+      }),
+      new LineLayer({
+        id: "dyn",
+        data: [{ source: [pos.lon, pos.lat, 0], target: [pos.lon, pos.lat, pos.alt] }],
+        getSourcePosition: d => d.source,
+        getTargetPosition: d => d.target,
+        getColor: [0, 122, 255],
+        getWidth: 2
+      }),
+      new IconLayer({
+        id: "icon",
+        data: [pos],
+        getIcon: () => ({
+          url: "/static/images/balloon.png",
+          width: 64,
+          height: 64,
+          anchorY: 64
+        }),
+        getPosition: d => [d.lon, d.lat, d.alt],
+        sizeScale: 15,
+        billboard: true,
+        getSize: 4
+      })
+    ];
+
+    return base
+      .concat(showShear ? makeWindBarbLayer(allLevels) : [])
+      .concat(showFreeze && Number.isFinite(freezeZ) ? makeFreezingLayer(freezeZ) : []);
+  }
+
+  map.on("load", () => {
+    const overlay = new MapboxOverlay({ layers: makeLayers(), interleaved: true });
+    map.addControl(overlay);
+    const deckgl = overlay._deck;
+
+    // === Toggle UI: Freezing Layer ===
+    const chkFreeze = document.getElementById("chk-freeze");
+    if (chkFreeze) {
+      chkFreeze.onchange = () => {
+        showFreeze = chkFreeze.checked;
+        if (showFreeze && !Number.isFinite(freezeZ)) {
+          freezeZ = getFreezingZ(allLevels);
+          const st = document.getElementById("upload-status");
+          if (!Number.isFinite(freezeZ)) {
+            if (st) st.textContent = "⚠️ Freezing layer tidak ditemukan pada profil ini.";
+            showFreeze = false;
+            chkFreeze.checked = false;
+          } else {
+            if (st) st.textContent = "❄️ Freezing level ≈ " + Math.round(freezeZ) + " m";
+          }
+        }
+        deckgl.setProps({ layers: makeLayers() });
+      };
+      if (Number.isFinite(freezeZ)) {
+        const st = document.getElementById("upload-status");
+        if (st) st.textContent = "ℹ️ Freezing level terdeteksi ≈ " + Math.round(freezeZ) + " m";
+      }
+    }
+
+    // === Toggle UI: Wind Shear Layer ===
+    const chkShear = document.getElementById("chk-shear");
+    if (chkShear) {
+      chkShear.onchange = () => {
+        showShear = chkShear.checked;
+        const st = document.getElementById("upload-status");
+        if (showShear) {
+          if (!shearData.length) shearData = computeShearLevels(allLevels);
+          const maxShear = Math.max(...shearData.map(d => d.shear));
+          if (st) st.textContent = `💨 Max shear: ${maxShear.toFixed(1)} m/s/km`;
+        }
+        deckgl.setProps({ layers: makeLayers() });
+      };
+    }
+
+    // === Control UI (play/pause/progress) ===
+    const el = document.getElementById("st-elap"),
+          pl = document.getElementById("btn-play"),
+          pa = document.getElementById("btn-pause"),
+          spdR = document.getElementById("speed"),
+          spv = document.getElementById("sp-val"),
+          prog = document.getElementById("prog");
+    spdR.oninput = e => { spd = parseFloat(e.target.value); spv.textContent = (spd >= 10 ? Math.round(spd) : spd.toFixed(1)) + "×"; };
+    pl.onclick = () => { play = true; pl.disabled = true; pa.disabled = false; };
+    pa.onclick = () => { play = false; pl.disabled = false; pa.disabled = true; };
+    prog.oninput = e => {
+      cur = parseFloat(e.target.value) / 100 * dur;
+      pos = getPos(cur);
+      el.textContent = Math.round(cur) + " s";
+      updateLevelInfo(cur);
+      deckgl.setProps({ layers: makeLayers() });
+    };
+
+    let last = performance.now();
+    (function tick(now) {
+      const dt = (now - last) / 1000; last = now;
+      if (play) {
+        cur += dt * spd;
+        if (cur >= dur) { cur = dur; play = false; pl.disabled = false; pa.disabled = true; }
+        pos = getPos(cur);
+        el.textContent = Math.round(cur) + " s";
+        prog.value = (cur / dur) * 100;
+        updateLevelInfo(cur);
+        deckgl.setProps({ layers: makeLayers() });
+      }
+      requestAnimationFrame(tick);
+    })(last);
+    updateLevelInfo(0);
+  });
+
+  // === Kompas Utara (North Indicator) ===
+  const northArrow = document.getElementById("northArrow");
+  map.on("rotate", () => {
+    const bearing = map.getBearing();
+    northArrow.style.transform = `rotate(${-bearing}deg)`;
+  });
+}
+
+  // === Hitung ketinggian 0 °C (freezing level) dari profil allLevels ===
+  function getFreezingZ(levels){
+    if(!Array.isArray(levels)||levels.length<2) return null;
+    // cari crossing pertama dari bawah: T > 0 ke T <= 0
+    for(let i=1;i<levels.length;i++){
+      const a=levels[i-1], b=levels[i];
+      const t1=a?.temp_C, t2=b?.temp_C;
+      const z1=a?.height_m, z2=b?.height_m;
+      if([t1,t2,z1,z2].some(v=>v==null)) continue;
+      if(t1>0 && t2<=0){
+        // interpolasi linear
+        const frac = t1 / (t1 - t2);
+        return z1 + frac*(z2 - z1);
+      }
+    }
+    return null; // tidak ketemu
+  }
+
+
+  // === Hitung Wind Shear antar level (m/s per km) ===
+  function computeShearLevels(levels){
+    if(!Array.isArray(levels)||levels.length<2) return [];
+    const result=[];
+    
+    // Pastikan urutan naik
+    levels = [...levels].sort((a,b)=>a.height_m - b.height_m);
+  
+    for(let i=1;i<levels.length;i++){
+      const a=levels[i-1], b=levels[i];
+      
+      // Ambil komponen angin
+      const spd1 = a.wind_speed_mps ?? a.wind_speed ?? a.spd_ms ?? null;
+      const spd2 = b.wind_speed_mps ?? b.wind_speed ?? b.spd_ms ?? null;
+      const dir1 = a.wind_dir_deg ?? a.wind_dir ?? a.dir_deg ?? null;
+      const dir2 = b.wind_dir_deg ?? b.wind_dir ?? b.dir_deg ?? null;
+      const z1 = a.height_m, z2 = b.height_m;
+      if([spd1,spd2,dir1,dir2,z1,z2].some(v=>v==null)) continue;
+  
+      // Konversi ke komponen u/v
+      const u1 = -spd1 * Math.sin(dir1 * Math.PI/180);
+      const v1 = -spd1 * Math.cos(dir1 * Math.PI/180);
+      const u2 = -spd2 * Math.sin(dir2 * Math.PI/180);
+      const v2 = -spd2 * Math.cos(dir2 * Math.PI/180);
+  
+      const du = u2 - u1;
+      const dv = v2 - v1;
+      const dz = (z2 - z1)/1000; // km
+      if(dz <= 0) continue;
+  
+      const shear = Math.sqrt(du*du + dv*dv)/dz; // m/s per km
+  
+      result.push({
+        lon: a.longitude || levels[0].longitude,
+        lat: a.latitude || levels[0].latitude,
+        z_mid: (z1 + z2) / 2,
+        shear
+      });
+    }
+    return result;
+  }
+
+  // === Layer Wind Barb (Arah dan Kecepatan Angin) ===
+  function makeWindBarbLayer(levels){
+    if(!Array.isArray(levels)||!levels.length) return [];
+  
+    // Filter level yang punya data arah dan kecepatan
+    const data = levels.filter(l => l.wind_dir_deg != null && l.wind_speed_mps != null);
+  
+    return [
+      new deck.IconLayer({
+        id: 'windbarb-layer',
+        data: data,
+        getIcon: d => ({
+          // pakai ikon barb PNG transparan (bisa kamu ganti di /static/images)
+          url: '/static/images/windbarb.png',
+          width: 64,
+          height: 64,
+          anchorY: 32
+        }),
+        getPosition: d => [d.longitude, d.latitude, d.height_m],
+        getSize: d => 2.5 + d.wind_speed_mps * 0.1, // makin besar makin cepat
+        sizeScale: 6,
+        billboard: true,
+        getAngle: d => d.wind_dir_deg,              // orientasi panah
+        opacity: 0.9,
+        pickable: false
+      })
+    ];
+  }
+
+// === Load user info from backend ===
+async function loadUserInfo() {
+  try {
+    const res = await fetch("/api/my_info");
+    const data = await res.json();
+    document.getElementById("userName").textContent = data.user || "-";
+    document.getElementById("userExpiry").textContent = data.expiry || "-";
+  } catch (err) {
+    console.error("❌ Failed to load user info:", err);
+  }
+}
+
+function toggleUserInfo() {
+  document.getElementById("userPopup").classList.toggle("show");
+}
+
+// Close popup if clicked outside
+document.addEventListener("click", (e) => {
+  const popup = document.getElementById("userPopup");
+  const icon = document.querySelector(".user-icon");
+  if (!popup.contains(e.target) && !icon.contains(e.target)) {
+    popup.classList.remove("show");
+  }
+});
+
+function logoutUser() {
+  window.location.href = "{{ url_for('pages.logout') }}";
+}
+
+// === 🔹 Populate site dropdown dynamically from backend ===
+async function populateSites() {
+  const select = document.getElementById("siteSelect");
+  if (!select) return;
+  select.innerHTML = `<option value="">Loading sites...</option>`;
+
+  try {
+    const res = await fetch("/api/sites_config");
+    if (!res.ok) throw new Error("Failed to load sites list");
+    const data = await res.json();
+    const sites = data.sites || [];
+
+    if (!sites.length) {
+      select.innerHTML = `<option value="">(No sites configured)</option>`;
+      return;
+    }
+
+    select.innerHTML = "";
+
+    // ✅ Loop menyesuaikan struktur baru: { name, lat, lon }
+    for (const s of sites) {
+      const siteName = s.name || s; // fallback kalau backend masih string
+      const nameDisplay = siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const opt = document.createElement("option");
+      opt.value = siteName;
+      opt.textContent = nameDisplay;
+      select.appendChild(opt);
+    }
+
+    // 🔄 Restore pilihan terakhir
+    const saved = localStorage.getItem("siteSelect");
+    if (saved && sites.some(x => (x.name || x) === saved)) {
+      select.value = saved;
+    }
+
+  } catch (err) {
+    console.error("❌ Failed to populate sites:", err);
+    select.innerHTML = `<option value="">(Error loading sites)</option>`;
+  }
+}
+
+window.addEventListener("DOMContentLoaded", populateSites);
+
+
+loadUserInfo();
+</script>
+</body>
+</html>

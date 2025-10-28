@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Settings - Radiosonde Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      padding: 40px;
+      min-height: 100vh;
+    }
+
+    h1 { text-align: center; margin-bottom: 30px; }
+
+    .tab-container { text-align: center; margin-bottom: 30px; }
+    .tab-btn {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      padding: 10px 20px;
+      margin: 0 5px;
+      color: white;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .tab-btn.active { background: #38bdf8; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    table {
+      width: 85%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 15px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      text-align: center;
+    }
+    th { background: rgba(255,255,255,0.2); color: #fff; }
+
+    input, button, select {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      font-family: "Inter", sans-serif;
+    }
+    select { background: rgba(255,255,255,0.1); color: white; }
+    button {
+      background: #38bdf8;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0284c7; }
+
+    .btn-edit { background: #0d6efd; }
+    .btn-edit:hover { background: #0b5ed7; }
+    .btn-del { background: #dc3545; }
+    .btn-del:hover { background: #b02a37; }
+
+    .add-section { text-align: center; margin-top: 20px; }
+    h2 { text-align: center; margin-top: 40px; margin-bottom: 10px; }
+
+    footer {
+      text-align: center;
+      font-size: 0.9em;
+      opacity: 0.8;
+      margin-top: 40px;
+    }
+
+    .site-select {
+      text-align: center;
+      margin: 15px 0 30px;
+    }
+    .action-buttons {
+      text-align: center;
+      margin-top: 15px;
+    }
+    .action-buttons button {
+      margin: 5px;
+
+    }
+    #ftpTable, #dbTable {
+      width: 95%;
+      margin: 10px auto;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #ftpTable th, #dbTable th, #ftpTable td, #dbTable td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      text-align: left;
+    }
+    #ftpTable th, #dbTable th {
+      background: rgba(255,255,255,0.2);
+    }
+    /* === Highlight Sync State === */
+    tr.synced { background: rgba(34,197,94,0.25); }   /* green 500 */
+    tr.only-ftp { background: rgba(234,179,8,0.25); } /* yellow 500 */
+    tr.only-db { background: rgba(239,68,68,0.25); }  /* red 500 */
+
+    #ftpLoading, #dbLoading {
+      font-style: italic;
+      color: #e0f2fe;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 0.6; }
+      50%     { opacity: 1; }
+    }
+    /* ✨ Biarkan teks panjang membungkus di kolom tertentu */
+    #userTable td:nth-child(3),
+    #userTable td:nth-child(4) {
+      white-space: normal;        /* boleh turun ke baris berikut */
+      word-wrap: break-word;      /* potong kata jika terlalu panjang */
+      max-width: 220px;           /* batas lebar kolom agar rapi */
+    }
+    
+  </style>
+</head>
+<body>
+  <h1>⚙️ Settings Panel</h1>
+
+  <div class="tab-container">
+    <button class="tab-btn active" onclick="switchTab('users')">👥 User Management</button>
+    <button class="tab-btn" onclick="switchTab('sites')">🌐 Site Configuration</button>
+    <button class="tab-btn" onclick="switchTab('bufr')">🧩 BUFR Mapping Configuration</button>
+    <button class="tab-btn" onclick="switchTab('serial')">🔍 Serial Lookup</button>
+    <button class="tab-btn" onclick="switchTab('compare')">🗂️ FTP vs Database</button>
+  </div>
+  <!-- ===== TAB 1: USERS ===== -->
+  <div id="tab-users" class="tab-content active">
+    <div style="overflow-x:auto; max-width:95%; margin:0 auto;">
+      <table id="userTable">
+        <thead>
+          <th>Username</th><th>Password</th><th>Expiry</th><th>Pages</th><th>Status</th><th>Last Active</th><th>Action</th>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div> <!-- ✅ penutup div table-wrapper di sini -->
+  
+    <div class="add-section">
+      <input type="text" id="newUser" placeholder="New username">
+      <input type="password" id="newPass" placeholder="Password">
+      <button onclick="addUser()">Add User</button>
+    </div>
+  
+    <!-- 🔒 Force Logout All Users (hanya untuk admin) -->
+    <div class="add-section" id="adminLogoutSection" style="margin-top:25px; display:none;">
+      <button id="btnLogoutAll" style="background:#ef4444; color:white; font-weight:600;">
+        🚪 Force Logout All Users
+      </button>
+    </div>
+  </div> <!-- ✅ baru tutup tab-users di sini -->
+
+
+  <!-- ===== TAB 2: BUFR MAPPING ===== -->
+  <div id="tab-bufr" class="tab-content">
+    <div class="site-select">
+      <label for="siteSelect"><b>📍 Select Site:</b></label>
+      <select id="siteSelect" onchange="changeSite()">
+        <option value="default">Default (All Sites)</option>
+        <option value="aceh">Aceh</option>
+        <option value="tarakan">Tarakan</option>
+        <option value="sorong">Sorong</option>
+        <option value="cilacap">Cilacap</option>
+        <option value="pangkalanbun">Pangkalanbun</option>
+        <option value="ranai">Ranai</option>
+      </select>
+    </div>
+
+    <div class="action-buttons">
+      <button onclick="applyGenerate()">💾 Apply & Generate JSON</button>
+      <input type="file" id="jsonFileInput" accept=".json" style="display:none" onchange="importJSONFile(this)">
+      <button onclick="document.getElementById('jsonFileInput').click()">📂 Load JSON</button>
+    </div>
+
+    <h2>📘 Metadata Mapping</h2>
+    <table id="metaTable">
+      <thead>
+        <tr><th>Original Field (Keyword / Descriptor)</th><th>Variable Name</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="add-section">
+      <input type="text" id="newMetaField" placeholder="e.g. RADIOSONDE SERIAL NUMBER">
+      <input type="text" id="newMetaVar" placeholder="e.g. radiosonde_serial_number">
+      <button onclick="addMapping('meta')">Add Metadata</button>
+    </div>
+
+    <h2>📊 Per-Level Data Mapping</h2>
+    <table id="levelTable">
+      <thead>
+        <tr><th>Original Field (Keyword / Descriptor)</th><th>Variable Name</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="add-section">
+      <input type="text" id="newLevelField" placeholder="e.g. PRESSURE">
+      <input type="text" id="newLevelVar" placeholder="e.g. pressure_hPa">
+      <button onclick="addMapping('level')">Add Level Field</button>
+    </div>
+  </div>
+
+<!-- ===== TAB 3: SITE CONFIGURATION ===== -->
+<div id="tab-sites" class="tab-content">
+  <table id="siteTable">
+    <thead>
+      <tr><th>Site Name</th><th>Latitude</th><th>Longitude</th><th>UTC Offset</th><th>Action</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="add-section">
+    <input type="text" id="newSiteName" placeholder="e.g. pontianak">
+    <input type="number" step="0.0001" id="newSiteLat" placeholder="Lat">
+    <input type="number" step="0.0001" id="newSiteLon" placeholder="Lon">
+    <input type="number" id="newSiteOffset" placeholder="UTC" value="7">
+    <button onclick="addSite()">Add Site</button>
+  </div>
+</div>
+
+  <!-- ===== TAB 4: SERIAL LOOKUP ===== -->
+  <div id="tab-serial" class="tab-content">
+    <div style="text-align:center; margin-top:20px;">
+      <input type="text" id="serialInput" placeholder="Enter Serial Number (e.g. 230451)" style="padding:8px 12px; border-radius:6px; width:220px;">
+      <button onclick="lookupSerial()">Search</button>
+    </div>
+  
+    <div id="serialResult" style="margin-top:30px; text-align:center;">
+      <p style="opacity:0.8;">Enter a serial number above to search...</p>
+    </div>
+  </div>
+
+  <!-- ===== TAB 5: FTP vs DATABASE COMPARISON ===== -->
+  <div id="tab-compare" class="tab-content">
+  
+    <!-- 🔹 Filter bar (shared) -->
+    <div class="filter-bar" style="text-align:center; margin:20px 0;">
+      <label>📍 Site:</label>
+      <select id="ftpSiteSelect" style="margin:0 8px;"></select>
+  
+      <label>Type:</label>
+      <select id="ftpTypeSelect" style="margin:0 8px;">
+        <option value=".bfr">.bfr</option>
+        <option value=".bufr">.bufr</option>
+        <option value=".bfh">.bfh</option>
+        <option value=".bin">.bin</option>
+      </select>
+  
+      <label>Start:</label>
+      <input type="date" id="ftpStartDate" style="margin:0 8px;">
+  
+      <label>End:</label>
+      <input type="date" id="ftpEndDate" style="margin:0 8px;">
+  
+      <button onclick="loadFTPFiles()">🔍 Search</button>
+      <button onclick="reloadFTP()">🔄 Refresh</button>
+    </div>
+  
+    <!-- 🔹 Two-column layout -->
+    <div style="display:flex; justify-content:space-between; gap:20px; align-items:flex-start;">
+  
+      <!-- FTP PANEL -->
+      <div style="flex:1;">
+        <h2 style="text-align:center;">🌐 FTP Files</h2>
+        <div id="ftpLoading" style="display:none; text-align:center; padding:10px;">⏳ Loading FTP files...</div>
+        <table id="ftpTable">
+          <thead>
+            <tr><th>Status</th><th>Select</th><th>Filename</th><th>Date</th><th>Action</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+  
+      <!-- DB PANEL -->
+      <div style="flex:1;">
+        <h2 style="text-align:center;">🗃️ Database Cache</h2>
+        <div id="dbLoading" style="display:none; text-align:center; padding:10px;">⏳ Loading database cache...</div>
+        <table id="dbTable">
+          <thead>
+            <tr><th>Status</th><th>Select</th><th>Filename</th><th>Date</th><th>Action</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div> <!-- ✅ properly close flex container -->
+  
+    <!-- 🔹 Action buttons -->
+    <div class="add-section" style="margin-top:25px;">
+      <button onclick="syncSelected()">⬆️ Insert FTP → DB</button>
+      <button onclick="redoDownload()">🔁 Re-Download Selected</button>
+    </div>
+  
+    <!-- 🔹 Legend -->
+    <div style="text-align:center; margin-top:10px; opacity:0.8;">
+      <span>🟢 Synced</span> &nbsp;
+      <span>🟡 Only FTP</span> &nbsp;
+      <span>🔴 Only DB</span>
+    </div>
+  
+  </div>
+
+  <!-- 🔹 Modal Popup untuk memilih halaman -->
+  <div id="pagesModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:white; color:black; padding:25px; border-radius:10px; width:400px; text-align:left; box-shadow:0 4px 15px rgba(0,0,0,0.4);">
+      <h3 style="margin-top:0;">🧩 Edit Allowed Pages</h3>
+      <div id="pageCheckboxes" style="margin-top:10px; display:flex; flex-direction:column; gap:5px;"></div>
+      <div style="text-align:right; margin-top:15px;">
+        <button onclick="savePages()" style="background:#0d6efd; color:white; padding:6px 15px; border:none; border-radius:6px;">Save</button>
+        <button onclick="closePagesModal()" style="background:#dc3545; color:white; padding:6px 15px; border:none; border-radius:6px;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>© 2025 Radiosonde Monitoring · Powered by Terrindo · BMKG · Meteomodem</p>
+  </footer>
+
+
+  <script>
+    let currentSite = "default";
+
+    // ===== TAB SWITCH =====
+    function switchTab(tab) {
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(div => div.classList.remove("active"));
+      document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add("active");
+      document.getElementById(`tab-${tab}`).classList.add("active");
+    }
+    
+    // ===== USERS =====
+    async function loadUsers() {
+      try {
+        // Ambil semua user + user yang sedang aktif
+        const [resUsers, resActive, resWho] = await Promise.all([
+          fetch('/api/users'),
+          fetch('/admin/active_users'),
+          fetch('/api/whoami')
+        ]);
+    
+        const users = await resUsers.json();
+        const activeData = await resActive.json();
+        const me = await resWho.json();
+        const activeUsers = activeData.active || [];
+    
+        const tbody = document.querySelector("#userTable tbody");
+        tbody.innerHTML = "";
+
+        const resLastActive = await fetch('/api/last_active');
+        const lastActiveData = await resLastActive.json();        
+        
+        Object.entries(users).forEach(([u, info]) => {
+          const lastActive = lastActiveData[u] || "-";
+          const expiry = info.expiry || "-";
+          const pages = (info.pages || []).join(", ") || "-";
+          const isActive = activeUsers.includes(u);
+          const isCurrent = me.user === u;
+        
+          // Hitung status expiry (versi multiline)
+          let expiryDisplay = expiry;
+          if (expiry && expiry !== "-") {
+            try {
+              const now = new Date();
+              const expDate = new Date(expiry);
+              const diffDays = Math.floor((expDate - now) / (1000 * 60 * 60 * 24));
+          
+              if (diffDays < 0) {
+                // 🔴 Sudah lewat
+                expiryDisplay = `
+                  <div style="color:#f87171; font-weight:600; line-height:1.3;">
+                    ${expiry}<br>
+                    🔥 Expired
+                  </div>`;
+              } else if (diffDays <= 7) {
+                // 🟡 Hampir habis
+                expiryDisplay = `
+                  <div style="color:#facc15; font-weight:600; line-height:1.3;">
+                    ${expiry}<br>
+                    ⚠️ Expiring Soon (${diffDays} day${diffDays!==1?"s":""})
+                  </div>`;
+              } else {
+                // ✅ Masih aman
+                expiryDisplay = `
+                  <div style="color:#e2e8f0; line-height:1.3;">
+                    ${expiry}<br>
+                    ✅ Active
+                  </div>`;
+              }
+            } catch (e) {
+              console.warn("Invalid expiry format:", expiry);
+            }
+          }
+        
+          const statusBadge = isCurrent
+            ? `<span style="color:#60a5fa; font-weight:600;">🔵 Current Session</span>`
+            : (isActive
+                ? `<span style="color:#4ade80; font-weight:600;">🟢 Active</span>`
+                : `<span style="color:#9ca3af;">⚪ Offline</span>`);
+        
+          tbody.innerHTML += `
+            <tr>
+              <td>${u}</td>
+              <td>****</td>
+              <td>${expiryDisplay}</td>
+              <td>${pages}</td> 
+              <td>${statusBadge}</td>
+              <td>${lastActive}</td>
+              <td>
+                <button class="btn-edit" onclick="editUser('${u}')">Edit Password</button>
+                ${u === "admin" ? "" : `
+                  <button class="btn-edit" style="background:#22c55e;" onclick="editExpiry('${u}', '${expiry}')">Edit Expiry</button>
+                  <button class="btn-edit" style="background:#16a34a;" onclick="editPages('${u}', '${pages}')">Edit Pages</button>
+                  <button class="btn-del" onclick="deleteUser('${u}')">Delete</button>
+                  <button class="btn-logout" style="background:#f97316;" onclick="logoutUser('${u}')">Logout</button>
+                `}
+              </td>
+            </tr>`;
+        });
+      } catch (err) {
+        console.error("❌ Error loading users:", err);
+      }
+    }
+
+
+    async function addUser() {
+      const username = newUser.value.trim();
+      const password = newPass.value.trim();
+      if (!username || !password) return alert("Please fill username and password");
+      const res = await fetch('/api/users', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+      });
+      const json = await res.json();
+      alert(json.success ? "✅ User added successfully" : json.error);
+      loadUsers();
+    }
+
+    async function editUser(username) {
+      const newPass = prompt(`Enter new password for user "${username}":`);
+      if (!newPass) return;
+      const res = await fetch('/api/users', {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password: newPass})
+      });
+      const json = await res.json();
+      alert(json.success ? "🔐 Password updated" : json.error);
+      loadUsers();
+    }
+
+    async function editExpiry(username, current) {
+      const newExpiry = prompt(`Set expiry date for "${username}" (YYYY-MM-DD):`, current || "");
+      if (!newExpiry) return;
+    
+      const res = await fetch('/api/user_expiry', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, expiry: newExpiry})
+      });
+    
+      const json = await res.json();
+      if (json.success) {
+        alert(`✅ Expiry updated for ${username}: ${newExpiry}`);
+        loadUsers();
+      } else {
+        alert(`❌ ${json.error || 'Failed to update expiry date.'}`);
+      }
+    }
+    
+
+    async function deleteUser(username) {
+      if (!confirm(`Delete user "${username}"?`)) return;
+      const res = await fetch('/api/users', {
+        method: 'DELETE', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username})
+      });
+      const json = await res.json();
+      alert(json.success ? "🗑️ User deleted" : json.error);
+      loadUsers();
+    }
+
+    // ===== BUFR MAPPING =====
+    async function changeSite() {
+      currentSite = document.getElementById("siteSelect").value;
+      loadMappings();
+    }
+
+    async function loadMappings() {
+      const res = await fetch(`/api/bufrmap/${currentSite}`);
+      const data = await res.json();
+      renderTables(data);
+    }
+
+    function renderTables(data) {
+      const metaBody = document.querySelector("#metaTable tbody");
+      const levelBody = document.querySelector("#levelTable tbody");
+      metaBody.innerHTML = ""; levelBody.innerHTML = "";
+
+      data.meta.forEach(m => {
+        metaBody.innerHTML += `
+          <tr>
+            <td>${m.original}</td>
+            <td>${m.variable}</td>
+            <td>
+              <button class="btn-edit" onclick="editMapping('meta','${m.original}','${m.variable}')">Edit</button>
+              <button class="btn-del" onclick="deleteMapping('meta','${m.original}')">Delete</button>
+            </td>
+          </tr>`;
+      });
+      data.level.forEach(l => {
+        levelBody.innerHTML += `
+          <tr>
+            <td>${l.original}</td>
+            <td>${l.variable}</td>
+            <td>
+              <button class="btn-edit" onclick="editMapping('level','${l.original}','${l.variable}')">Edit</button>
+              <button class="btn-del" onclick="deleteMapping('level','${l.original}')">Delete</button>
+            </td>
+          </tr>`;
+      });
+    }
+
+    async function addMapping(type) {
+      const field = document.getElementById(`new${type==='meta'?'Meta':'Level'}Field`).value.trim();
+      const variable = document.getElementById(`new${type==='meta'?'Meta':'Level'}Var`).value.trim();
+      if (!field || !variable) return alert("Please fill both fields.");
+      const res = await fetch(`/api/bufrmap/${currentSite}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, original: field, variable})
+      });
+      const json = await res.json();
+      alert(json.success ? "✅ Mapping added" : json.error);
+      loadMappings();
+    }
+
+    async function editMapping(type, original, variable) {
+      const newVar = prompt(`New variable name for "${original}":`, variable);
+      if (!newVar) return;
+      const res = await fetch(`/api/bufrmap/${currentSite}`, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, original, variable: newVar})
+      });
+      const json = await res.json();
+      alert(json.success ? "✏️ Mapping updated" : json.error);
+      loadMappings();
+    }
+
+    async function deleteMapping(type, original) {
+      if (!confirm(`Delete mapping for "${original}"?`)) return;
+      const res = await fetch(`/api/bufrmap/${currentSite}`, {
+        method: 'DELETE', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, original})
+      });
+      const json = await res.json();
+      alert(json.success ? "🗑️ Mapping deleted" : json.error);
+      loadMappings();
+    }
+
+    // ===== APPLY & LOAD JSON =====
+    async function applyGenerate() {
+      const res = await fetch(`/api/bufrmap/${currentSite}`);
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bufr_mapping_${currentSite}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert(`✅ Mapping for ${currentSite} exported successfully!`);
+    }
+
+    function importJSONFile(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          const res = await fetch(`/api/bufrmap/${currentSite}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({type: 'full', data})
+          });
+          const json = await res.json();
+          alert(json.success ? "✅ JSON imported & applied" : json.error);
+          loadMappings();
+        } catch (err) {
+          alert("❌ Invalid JSON format");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    loadUsers();
+    loadMappings();
+
+async function loadSites() {
+  const res = await fetch('/api/sites_config');
+  const data = await res.json();
+  const tbody = document.querySelector("#siteTable tbody");
+  tbody.innerHTML = "";
+
+  (data.sites || []).forEach(s => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${s.name}</td>
+        <td>${s.lat ?? "-"}</td>
+        <td>${s.lon ?? "-"}</td>
+        <td>${s.utc_offset ?? 7}</td>
+        <td>
+          <button class="btn-edit" onclick="editSite('${s.name}', ${s.lat}, ${s.lon}, ${s.utc_offset})">Edit</button>
+          <button class="btn-del" onclick="deleteSite('${s.name}')">Delete</button>
+        </td>
+      </tr>`;
+  });
+
+  // refresh dropdown BUFR mapping
+  const sel = document.getElementById("siteSelect");
+  if (sel) {
+    sel.innerHTML = `<option value="default">Default (All Sites)</option>` +
+      data.sites.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+  }
+
+  // refresh dropdown FTP compare
+  const ftpSel = document.getElementById("ftpSiteSelect");
+  if (ftpSel) {
+    ftpSel.innerHTML = data.sites.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+  }
+}
+
+async function addSite() {
+  const name = document.getElementById("newSiteName").value.trim();
+  const lat = parseFloat(document.getElementById("newSiteLat").value || 0);
+  const lon = parseFloat(document.getElementById("newSiteLon").value || 0);
+  const utc_offset = parseInt(document.getElementById("newSiteOffset").value || 7);
+  if (!name) return alert("Please enter site name");
+  const res = await fetch('/api/sites_config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, lat, lon, utc_offset})
+  });
+  const json = await res.json();
+  alert(json.success ? "✅ Site added" : json.error);
+  loadSites();
+}
+
+async function editSite(name, lat, lon, utc_offset) {
+  const newLat = prompt(`Latitude for ${name}:`, lat);
+  const newLon = prompt(`Longitude for ${name}:`, lon);
+  const newUTC = prompt(`UTC offset for ${name}:`, utc_offset);
+  if (newLat === null || newLon === null || newUTC === null) return;
+
+  const res = await fetch('/api/sites_config', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, lat: parseFloat(newLat), lon: parseFloat(newLon), utc_offset: parseInt(newUTC)})
+  });
+  const json = await res.json();
+  alert(json.success ? "✅ Site updated" : json.error);
+  loadSites();
+}
+
+async function deleteSite(name) {
+  if (!confirm(`Delete site "${name}"?`)) return;
+  const res = await fetch('/api/sites_config', {
+    method: 'DELETE',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name})
+  });
+  const json = await res.json();
+  alert(json.success ? "🗑️ Site removed" : json.error);
+  loadSites();
+}
+
+    // ===== SERIAL LOOKUP =====
+    async function lookupSerial() {
+      let serial = document.getElementById("serialInput").value.trim();
+      const resultDiv = document.getElementById("serialResult");
+    
+      if (!serial) {
+        resultDiv.innerHTML = "<p style='color:#fca5a5;'>⚠️ Please enter a serial number.</p>";
+        return;
+      }
+    
+      // 🔹 Normalisasi input agar sesuai backend: hapus semua non-digit
+      serial = serial.replace(/\D/g, ""); // "412 2 00795" -> "412200795"
+    
+      if (!serial) {
+        resultDiv.innerHTML = "<p style='color:#fca5a5;'>⚠️ Invalid serial number format.</p>";
+        return;
+      }
+    
+      try {
+        const res = await fetch(`/api/serial_lookup/${serial}`);
+        if (!res.ok) throw new Error("Server error");
+    
+        const data = await res.json();
+    
+        if (data && Object.keys(data).length > 0) {
+          resultDiv.innerHTML = `
+            <table style="width:60%; margin:20px auto; border-collapse:collapse; background:rgba(255,255,255,0.1); border-radius:10px;">
+              <tr><th>Nomor Kardus</th><td>${data.nomor_kardus || "-"}</td></tr>
+              <tr><th>Nomor Seri</th><td>${data.nomor_seri || serial}</td></tr>
+              <tr><th>Lokasi</th><td>${data.lokasi || "-"}</td></tr>
+              <tr><th>Manufactured</th><td>${data.manufactured || "-"}</td></tr>
+              <tr><th>Out</th><td>${data.out || "-"}</td></tr>
+              <tr><th>Source File</th><td>${data.source_file || "-"}</td></tr>
+            </table>`;
+        } else {
+          resultDiv.innerHTML = `<p style='color:#fca5a5;'>❌ Serial ${serial} not found in JSON database.</p>`;
+        }
+      } catch (err) {
+        console.error(err);
+        resultDiv.innerHTML = `<p style='color:#fca5a5;'>❌ Error fetching serial data.</p>`;
+      }
+    }
+
+    // ===== 🧩 ADMIN: Force Logout All Users =====
+    async function showLogoutAllButton() {
+      try {
+        const res = await fetch('/api/users');
+        if (!res.ok) return;
+        const users = await res.json();
+    
+        // Cek apakah sesi saat ini adalah admin
+        if (users && Object.keys(users).includes("admin")) {
+          // aktifkan tombol hanya jika session user adalah admin
+          const resWho = await fetch('/api/whoami');
+          if (!resWho.ok) return;
+          const me = await resWho.json();
+          if (me.user === "admin") {
+            document.getElementById('adminLogoutSection').style.display = "block";
+          }
+        }
+      } catch (e) {
+        console.warn("Cannot determine user role", e);
+      }
+    }
+    
+    // Jalankan saat halaman load
+    showLogoutAllButton();
+    
+    // Event handler tombol logout all
+    const btnLogoutAll = document.getElementById('btnLogoutAll');
+    if (btnLogoutAll) {
+      btnLogoutAll.addEventListener('click', async () => {
+        const ok = confirm("⚠️ Are you sure? This will force all users (including you) to be logged out on their next request.");
+        if (!ok) return;
+        btnLogoutAll.disabled = true;
+        btnLogoutAll.textContent = "Processing...";
+    
+        try {
+          const res = await fetch('/admin/logout_all', { method: 'POST', credentials: 'same-origin' });
+          const json = await res.json();
+          if (json.success) {
+            alert("✅ Success — all users will be logged out on their next request!");
+            location.reload();
+          } else {
+            alert("❌ Failed to logout all users.");
+          }
+        } catch (err) {
+          console.error(err);
+          alert("❌ Network or server error.");
+        } finally {
+          btnLogoutAll.disabled = false;
+          btnLogoutAll.textContent = "🚪 Force Logout All Users";
+        }
+      });
+    }
+    
+    async function logoutUser(username) {
+      if (!confirm(`Force logout user "${username}"?`)) return;
+      try {
+        const res = await fetch(`/admin/logout_user/${username}`, {
+          method: 'POST',
+          credentials: 'same-origin'
+        });
+        const json = await res.json();
+        if (json.success) {
+          alert(`✅ User "${username}" has been logged out successfully.`);
+        } else {
+          alert(`❌ Failed to logout ${username}: ${json.error || 'unknown error'}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert(`❌ Network error when logging out ${username}.`);
+      }
+    }
+
+    let currentEditUser = null; // simpan user yang sedang diedit
+    
+    // Daftar halaman yang tersedia di sistem
+    const allAvailablePages = [
+      "main",
+      "dashboard",
+      "map",
+      "trajectory3d",
+      "time_accuracy",
+      "height_reach",
+      "data_availability",
+      "analysis",
+      "error_analysis",
+      "settings",
+      "raob",
+      "raob_doc",
+      "release",
+    ];
+    
+    function editPages(username, currentPagesStr) {
+      currentEditUser = username;
+    
+      // Ambil daftar halaman user saat ini
+      const currentPages = currentPagesStr.split(",").map(p => p.trim()).filter(Boolean);
+      const container = document.getElementById("pageCheckboxes");
+      container.innerHTML = "";
+    
+      // Tambahkan opsi "All Pages (*)"
+      const allChecked = currentPages.includes("*");
+      container.innerHTML += `
+        <label>
+          <input type="checkbox" id="page_all" ${allChecked ? "checked" : ""} onchange="toggleAllPages(this)">
+          <b>All Pages (*)</b>
+        </label>
+      `;
+    
+      // Tambahkan semua halaman sistem
+      allAvailablePages.forEach(page => {
+        const checked = allChecked || currentPages.includes(page);
+        container.innerHTML += `
+          <label>
+            <input type="checkbox" name="pageOption" value="${page}" ${checked ? "checked" : ""} ${allChecked ? "disabled" : ""}>
+            ${page}
+          </label>
+        `;
+      });
+    
+      document.getElementById("pagesModal").style.display = "flex";
+    }
+    
+    function toggleAllPages(checkbox) {
+      document.querySelectorAll("input[name='pageOption']").forEach(cb => {
+        cb.disabled = checkbox.checked;
+      });
+    }
+    
+    function closePagesModal() {
+      document.getElementById("pagesModal").style.display = "none";
+      currentEditUser = null;
+    }
+    
+    async function savePages() {
+      if (!currentEditUser) return;
+      const allSelected = document.getElementById("page_all").checked;
+      let selectedPages = [];
+    
+      if (allSelected) {
+        selectedPages = ["*"];
+      } else {
+        document.querySelectorAll("input[name='pageOption']:checked").forEach(cb => {
+          selectedPages.push(cb.value);
+        });
+      }
+    
+      try {
+        const res = await fetch("/api/user_pages", {
+          method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({username: currentEditUser, pages: selectedPages})
+        });
+    
+        const json = await res.json();
+        if (json.success) {
+          alert(`✅ Updated allowed pages for ${currentEditUser}`);
+          closePagesModal();
+          loadUsers();
+        } else {
+          alert(`❌ ${json.error || "Failed to update pages"}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Network error while saving pages");
+      }
+    }
+
+    let currentFTP = [];
+    let currentDB = [];
+    
+    // ===== LOAD FTP FILES =====
+    async function loadFTPFiles() {
+      const site  = document.getElementById("ftpSiteSelect").value;
+      const ftype = document.getElementById("ftpTypeSelect").value;
+      const start = document.getElementById("ftpStartDate").value;
+      const end   = document.getElementById("ftpEndDate").value;
+    
+      document.getElementById("ftpLoading").style.display = "block";
+      document.getElementById("dbLoading").style.display  = "block";
+    
+      try {
+        let url = `/api/sites?ext=${encodeURIComponent(ftype)}&limit=200`;
+        if (start) url += `&start_date=${start}`;
+        if (end)   url += `&end_date=${end}`;
+    
+        const res  = await fetch(url);
+        const data = await res.json();
+        currentFTP = (data[site] || []).map(f => f.name);
+    
+        // lanjut load DB setelah FTP selesai
+        await loadDBFiles();
+      } catch (err) {
+        alert("❌ Failed to load FTP data");
+        console.error(err);
+      } finally {
+        document.getElementById("ftpLoading").style.display = "none";
+        document.getElementById("dbLoading").style.display  = "none";
+      }
+    }
+    
+    // ===== LOAD DB FILES =====
+    async function loadDBFiles() {
+      const site = document.getElementById("ftpSiteSelect").value;
+      try {
+        const res  = await fetch(`/api/db_files/${site}`);
+        const data = await res.json();
+        currentDB  = (data.files || []).map(f => f.filename);
+        renderCompareTables();
+      } catch (err) {
+        console.error("❌ Failed to load DB files:", err);
+      }
+    }
+
+
+    
+    // ===== RENDER COMPARISON TABLES =====
+    async function renderCompareTables() {
+      const site = document.getElementById("ftpSiteSelect").value;
+      const ftype = document.getElementById("ftpTypeSelect").value;
+      const start = document.getElementById("ftpStartDate").value;
+      const end = document.getElementById("ftpEndDate").value;
+    
+      if (!site) return;
+    
+      const tbodyFTP = document.querySelector("#ftpTable tbody");
+      const tbodyDB = document.querySelector("#dbTable tbody");
+      tbodyFTP.innerHTML = "";
+      tbodyDB.innerHTML = "";
+    
+      // Build URL FTP
+      let url = `/api/sites?ext=${encodeURIComponent(ftype)}&limit=200`;
+      if (start) url += `&start_date=${start}`;
+      if (end) url += `&end_date=${end}`;
+    
+      // --- FTP SIDE ---
+      const ftpRes = await fetch(url);
+      const ftpData = await ftpRes.json();
+      let ftpFiles = (ftpData[site] || []);
+    
+      // 🧩 Sort descending by file_date (newest first)
+      ftpFiles.sort((a, b) => {
+        const da = new Date(a.file_date || 0);
+        const db = new Date(b.file_date || 0);
+        return db - da;
+      });
+    
+      ftpFiles.forEach(f => {
+        const inDB = currentDB.includes(f.name);
+        const indicator = inDB ? "🟢" : "🟡";
+        tbodyFTP.innerHTML += `
+          <tr>
+            <td>${indicator}</td>
+            <td><input type="checkbox" name="ftpSel" value="${f.name}"></td>
+            <td>${f.name}</td>
+            <td>${f.file_date || "-"}</td>
+            <td><button onclick="insertToDB('${site}','${f.name}')">📥 Insert</button></td>
+          </tr>`;
+      });
+    
+      // --- DB SIDE ---
+      const dbRes = await fetch(`/api/db_files/${site}`);
+      const dbData = await dbRes.json();
+      let dbFiles = (dbData.files || []);
+      
+      // === 🔹 Filter DB files berdasarkan file type (ekstensi) ===
+      if (ftype) {
+        const ext = ftype.replace(".", "").toLowerCase();
+        dbFiles = dbFiles.filter(f => f.filename && f.filename.toLowerCase().endsWith(ext));
+      }
+      
+      // === 🔹 Filter DB files berdasarkan start dan end date ===
+      if (start || end) {
+        const startDate = start ? new Date(start) : null;
+        const endDate = end ? new Date(end) : null;
+        dbFiles = dbFiles.filter(f => {
+          if (!f.file_date) return false;
+          const fileDate = new Date(f.file_date);
+          if (startDate && fileDate < startDate) return false;
+          if (endDate && fileDate > endDate) return false;
+          return true;
+        });
+      }
+   
+      // 🧩 Sort descending by file_date
+      dbFiles.sort((a, b) => {
+        const da = new Date(a.file_date || 0);
+        const db = new Date(b.file_date || 0);
+        return db - da;
+      });
+    
+      dbFiles.forEach(f => {
+        const inFTP = currentFTP.includes(f.filename);
+        const indicator = inFTP ? "🟢" : "🔴";
+        tbodyDB.innerHTML += `
+          <tr>
+            <td>${indicator}</td>
+            <td><input type="checkbox" name="dbSel" value="${f.filename}"></td>
+            <td>${f.filename}</td>
+            <td>${f.file_date || "-"}</td>
+            <td><button onclick="redoFile('${site}','${f.filename}')">🔁 Redownload</button></td>
+          </tr>`;
+      });
+    }
+
+
+    async function insertToDB(site, filename) {
+      const ok = confirm(`Insert ${filename} from FTP into database?`);
+      if (!ok) return;
+      const res = await fetch(`/api/insert_from_ftp/${site}/${filename}`);
+      const j = await res.json();
+      alert(j.success ? "✅ Inserted successfully!" : j.error);
+    }
+    
+    async function redoFile(site, filename) {
+      const ok = confirm(`Re-download and re-decode ${filename}?`);
+      if (!ok) return;
+      const res = await fetch(`/api/redownload/${site}/${filename}`);
+      const j = await res.json();
+      alert(j.success ? "✅ File updated!" : j.error);
+    }
+    
+    function syncSelected() {
+      const site = document.getElementById("ftpSiteSelect").value;
+      document.querySelectorAll("input[name='ftpSel']:checked").forEach(async cb => {
+        await insertToDB(site, cb.value);
+      });
+    }
+    
+    function redoDownload() {
+      const site = document.getElementById("dbSiteSelect").value;
+      document.querySelectorAll("input[name='dbSel']:checked").forEach(async cb => {
+        await redoFile(site, cb.value);
+      });
+    }
+    
+
+    function reloadFTP() { loadFTPFiles(); loadDBFiles(); }
+    function reloadDB() { loadFTPFiles(); loadDBFiles(); }
+
+    
+    async function populateCompareDropdowns() {
+      const res = await fetch("/api/sites_config");
+      const js = await res.json();
+      const options = js.sites.map(s => `<option value="${s}">${s}</option>`).join("");
+      document.getElementById("ftpSiteSelect").innerHTML = options;
+    }
+
+// ===== ROLE-BASED TAB VISIBILITY =====
+$(document).ready(async function() {
+  try {
+    const res = await fetch('/api/whoami');
+    const data = await res.json();
+    const user = data.user || "";
+
+    // Kalau admin → tampilkan semua tab
+    if (user === "admin") return;
+
+    // Kalau user biasa → sembunyikan semua tab kecuali "Serial Lookup"
+    const allowedTabs = ["serial"]; // ID tab yg boleh diakses
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      const match = btn.getAttribute("onclick").match(/'([^']+)'/);
+      if (match && !allowedTabs.includes(match[1])) {
+        btn.style.display = "none";
+      }
+    });
+    document.querySelectorAll(".tab-content").forEach(tab => {
+      const id = tab.id.replace("tab-", "");
+      if (!allowedTabs.includes(id)) tab.style.display = "none";
+    });
+
+    // Auto-switch ke tab serial
+    switchTab("serial");
+
+    // Tambahkan indikator mode user
+    const hdr = document.querySelector("h1");
+    if (hdr) hdr.textContent = "Settings (User Mode)";
+  } catch (e) {
+    console.warn("Failed to adjust tabs:", e);
+  }
+});
+
+
+    populateCompareDropdowns();
+
+    loadSites();
+
+  </script>
+</body>
+</html>
