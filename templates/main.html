@@ -587,9 +587,9 @@
 
     // Leaflet Map
     var map = L.map('indoMap').setView([-2, 118], 5);
-setTimeout(() => {
-  map.invalidateSize();
-}, 500)
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 500)
     // --- Panes & z-index (marker di atas provinsi) ---
     map.createPane('provincePane');
     map.createPane('markerPane');

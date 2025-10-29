@@ -622,7 +622,9 @@ canvas {
     // --- Map ---
     // Fokus ke tengah Indonesia (sekitar Kalimantan)
     const map = L.map('map', { zoomControl: false }).setView([-2.5, 118], 5);
-
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 500)
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
     // --- Base maps ---
@@ -1305,8 +1307,6 @@ canvas {
       }
     });
   }
-
-
 
     // === Update waktu Himawari ===
     function setHimawariTime(dateUTC) {
