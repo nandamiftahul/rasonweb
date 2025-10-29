@@ -191,6 +191,12 @@
       transition: color 0.2s;
     }
     .toc-popup a:hover { color: #00b4ff; }
+
+    .global-nav-controls {
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
   </style>
 </head>
 
@@ -1087,6 +1093,30 @@
         toggleTOC();
       };
     });
+    // === 🕒 Auto-hide Global Navigation Controls ===
+    const navControls = document.querySelector('.global-nav-controls');
+    let navTimeout;
+  
+    function showNav() {
+      navControls.style.opacity = '1';
+      navControls.style.pointerEvents = 'auto';
+      clearTimeout(navTimeout);
+      navTimeout = setTimeout(() => {
+        navControls.style.opacity = '0';
+        navControls.style.pointerEvents = 'none';
+      }, 2500); // ⏳ sembunyikan setelah 2.5 detik tanpa gerakan mouse
+    }
+  
+    // Tampilkan saat mouse bergerak di mana pun
+    document.addEventListener('mousemove', showNav);
+  
+    // Inisialisasi: sembunyikan setelah halaman dimuat
+    window.addEventListener('DOMContentLoaded', () => {
+      navControls.style.transition = 'opacity 0.5s ease';
+      navControls.style.opacity = '0';
+      navControls.style.pointerEvents = 'none';
+    });
+  
   </script>
 </body>
 </html>
