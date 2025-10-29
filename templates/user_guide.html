@@ -2,297 +2,1009 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>RASON Monitoring — User Guide v1.1.0</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Guide | Rason Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
   <style>
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:"Inter",sans-serif;
-      background:linear-gradient(to bottom right,#0a2a6b,#004aad,#0078d7);
-      color:#0b1d3a;
-      display:flex;
-      justify-content:center;
-      align-items:flex-start;
-      padding:32px 16px;
-      line-height:1.6
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      overflow-x: hidden;
     }
-    .doc{
-      width:100%;
-      max-width:1100px;
-      background:#fff;
-      border-radius:16px;
-      box-shadow:0 20px 40px rgba(0,0,0,0.25);
-      overflow:hidden
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #0a2a6b 0%, #004aad 60%, #0078d7 100%);
+      padding: 35px 0 25px;
+      color: #fff;
+      text-align: left;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
     }
-    .doc__header{
-      background:linear-gradient(135deg,#0a2a6b 0%,#004aad 55%,#0078d7 100%);
-      color:#fff;
-      padding:28px 32px
+    .header-inner {
+      width: 90%;
+      max-width: 1100px;
+      margin: 0 auto;
     }
-    .doc__title{margin:0;font-size:28px;font-weight:800}
-    .doc__subtitle{margin-top:6px;font-size:15px;opacity:.9}
-    .doc__meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
-    .badge{
-      background:rgba(255,255,255,.15);
-      border:1px solid rgba(255,255,255,.25);
-      padding:6px 10px;
-      border-radius:999px;
-      font-weight:600;
-      font-size:13px
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
-    .doc__body{padding:32px}
-    .section{margin-bottom:32px;border-left:4px solid #0078d7;padding-left:16px}
-    h2{color:#0a2a6b;margin-bottom:10px}
-    ul{margin:8px 0 8px 22px}
-    li{margin-bottom:4px}
-    code,pre{
-      font-family:ui-monospace,Consolas,"Liberation Mono","Courier New",monospace;
-      background:#f6f9ff;
-      border-radius:6px
+    header p {
+      margin: 6px 0 18px;
+      font-size: 15px;
+      opacity: 0.9;
     }
-    pre{padding:10px 12px;overflow-x:auto}
-    .doc__footer{
-      background:#f8fbff;
-      border-top:1px solid #e7ecf3;
-      padding:18px 24px;
-      font-size:13px;
-      display:flex;
-      justify-content:space-between;
-      flex-wrap:wrap;
-      color:#406189
+    .header-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
     }
-    .brand{display:flex;align-items:center;gap:10px}
-    .brand img{height:24px}
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #eaf6ff;
+      font-weight: 500;
+      backdrop-filter: blur(4px);
+    }
+
+    /* MAIN CONTENT */
+    main {
+      flex: 1;
+      width: 90%;
+      max-width: 1100px;
+      margin: 25px auto;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.3);
+      overflow: hidden;
+      position: relative;
+    }
+
+    section.page {
+      display: none;
+      opacity: 0;
+      padding: 40px 50px 70px;
+      transition: opacity 0.6s ease;
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+    }
+    section.page.active {
+      display: block;
+      opacity: 1;
+      animation: fadeIn 0.6s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      color: #eaf6ff;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      padding-bottom: 6px;
+      margin-bottom: 18px;
+    }
+
+    ul { line-height: 1.7; margin-left: 20px; }
+    li { margin-bottom: 8px; }
+
+    code {
+      background: rgba(255,255,255,0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #ffe;
+    }
+
+    img.icon {
+      height: 55px;
+      width: auto;
+      margin: 10px 0;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    /* NAVIGATION */
+    .global-nav-controls {
+      position: fixed;
+      bottom: 70px;  /* di atas footer */
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      z-index: 100;
+    }
+    .global-nav-controls button {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      font-weight: 500;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+      backdrop-filter: blur(6px);
+    }
+    .global-nav-controls button:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-2px);
+    }
+
+
+    /* FOOTER */
+    footer {
+      background: rgba(255,255,255,0.08);
+      text-align: center;
+      padding: 8px;
+      font-size: 11.5px;
+      color: rgba(255,255,255,0.9);
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+    footer img {
+      height: 18px;
+      vertical-align: middle;
+      margin: 0 4px;
+      opacity: 0.9;
+    }
+
+    /* TOC POPUP */
+    .toc-popup {
+      display: none;
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      max-width: 600px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.4);
+      animation: fadeIn 0.4s ease;
+      z-index: 10;
+    }
+    .toc-popup h3 { margin-top: 0; color: #cfe8ff; }
+    .toc-popup a {
+      display: block;
+      color: #fff;
+      text-decoration: none;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      transition: color 0.2s;
+    }
+    .toc-popup a:hover { color: #00b4ff; }
   </style>
 </head>
+
 <body>
-<main class="doc">
-<header class="doc__header">
-  <h1 class="doc__title">RASON Monitoring — User Guide v1.1.0</h1>
-  <p class="doc__subtitle">Refactor Release — User Manual &amp; Feature Overview</p>
-  <div class="doc__meta">
-    <span class="badge">Version: v1.1.0</span>
-    <span class="badge">Date: 28 Oct 2025</span>
-    <span class="badge">Developed by: Terrindo</span>
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <h1>RASON Monitoring — User Guide v1.1.0</h1>
+      <p>Refactor Release — User Manual & Feature Overview</p>
+      <div class="header-badges">
+        <div class="badge">Version: v1.1.0</div>
+        <div class="badge">Date: 28 Oct 2025</div>
+        <div class="badge">Developed by: Terrindo</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main id="guide-container">
+
+    <!-- 🔑 LOGIN PAGE -->
+    <section class="page active" id="page-login" data-title="Login Page">
+      <h2>🔑 LOGIN PAGE — DETAILED GUIDE</h2>
+      <p>Halaman login merupakan pintu masuk utama sistem <strong>Radiosonde Monitoring</strong>. 
+      Pengguna harus memasukkan kredensial yang valid untuk mendapatkan akses ke seluruh fitur web.</p>
+
+      <div style="display:flex;align-items:center;gap:16px;margin:18px 0;">
+        <img src="{{ url_for('static', filename='images/bmkg2.png') }}" alt="BMKG Logo" class="icon">
+        <p><strong>Logo BMKG</strong><br>Menandakan sistem ini merupakan bagian dari jaringan data radiosonde nasional yang dikelola oleh BMKG.</p>
+      </div>
+
+      <p><strong>Judul:</strong> <em>“Radiosonde Monitoring”</em><br>
+      Ditampilkan tepat di bawah logo. Ini adalah nama sistem yang menandai identitas platform.</p>
+
+      <ul>
+        <li><strong>Kolom <em>Username</em> dan <em>Password</em>:</strong> Tempat pengguna memasukkan nama akun dan kata sandi yang diberikan oleh admin.</li>
+        <li><strong>Tombol <em>Login</em>:</strong> <i class="bi bi-box-arrow-in-right"></i> Mengirim data ke server untuk divalidasi. Jika benar, sistem menampilkan halaman utama (<code>/main</code>).</li>
+        <li><strong>Pesan Error:</strong> <i class="bi bi-exclamation-triangle"></i> Muncul bila login gagal atau akun sudah kedaluwarsa.</li>
+        <li><strong>Latar Animasi:</strong> Gradasi biru dinamis untuk tampilan modern dan elegan.</li>
+      </ul>
+
+      <div style="display:flex;align-items:center;gap:16px;margin-top:18px;">
+        <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Terrindo Logo" class="icon">
+        <p><strong>Footer “Powered by Terrindo Media Raya”</strong><br>Identitas pengembang sistem yang selalu tampil di bawah kotak login.</p>
+      </div>
+
+      <p style="margin-top:20px;">Setelah login berhasil, pengguna akan diarahkan ke <strong>Main Page</strong>.</p>
+    </section>
+
+    <!-- 🏠 MAIN PAGE -->
+    <section class="page" id="page-main" data-title="Main Page">
+      <h2>🏠 MAIN PAGE — DETAILED GUIDE</h2>
+    
+      <p><strong>Main Page</strong> adalah pusat utama sistem <em>Radiosonde Monitoring</em>, menampilkan peta interaktif Indonesia beserta status real-time dari setiap site pengamatan radiosonde BMKG. Dari sini, pengguna dapat memantau aktivitas site, melihat status “online/offline/inflight/preparing”, dan mengakses seluruh fitur analisis melalui sidebar kiri.</p>
+    
+      <h3>🧭 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> Berisi daftar fitur utama seperti:
+          <ul>
+            <li><i class="bi bi-bar-chart-fill"></i> <strong>Data Resume</strong> — Daftar file & metadata radiosonde.</li>
+            <li><i class="bi bi-map"></i> <strong>Map View</strong> — Peta lintasan radiosonde.</li>
+            <li><i class="bi bi-globe2"></i> <strong>Trajectory 3D</strong> — Visualisasi 3D jalur balon.</li>
+            <li><i class="bi bi-stopwatch"></i> <strong>Time Accuracy</strong> — Analisis waktu peluncuran AA–DD.</li>
+            <li><i class="bi bi-graph-up"></i> <strong>Height Reach</strong> — Ketinggian maksimum tiap peluncuran.</li>
+            <li><i class="bi bi-calendar3"></i> <strong>Data Availability</strong> — Kalender ketersediaan data.</li>
+            <li><i class="bi bi-exclamation-triangle"></i> <strong>Error Analysis</strong> — QC otomatis berbasis fisika.</li>
+            <li><i class="bi bi-gear"></i> <strong>Settings</strong> — Manajemen user & mapping BUFR.</li>
+          </ul>
+        </li>
+    
+        <li><strong>Header Box:</strong> Berisi ikon 🎈, judul <em>“Radiosonde Monitoring”</em>, deskripsi singkat, jam UTC digital yang diperbarui setiap detik, dan logo BMKG di sisi kanan.</li>
+    
+        <li><strong>User Icon (👤):</strong> Terletak di pojok kiri atas sidebar — menampilkan info akun dan tombol logout cepat.</li>
+      </ul>
+    
+      <h3>🗺️ Peta Utama (Indonesia Map)</h3>
+      <ul>
+        <li>Dibangun menggunakan <code>Leaflet.js</code> dan data GeoJSON provinsi Indonesia.</li>
+        <li>Menampilkan semua site radiosonde BMKG dengan posisi geografis akurat.</li>
+        <li><strong>Warna Marker:</strong>
+          <ul>
+            <li>🟢 Hijau — Online</li>
+            <li>🟠 Oranye — Preparing</li>
+            <li>🔵 Biru — Inflight</li>
+            <li>🔴 Merah — Offline</li>
+          </ul>
+        </li>
+        <li>Tooltip setiap marker menampilkan:
+          <ul>
+            <li>Nama site</li>
+            <li>Status saat ini</li>
+            <li>Waktu update terakhir</li>
+          </ul>
+        </li>
+        <li>Legend status ditampilkan di pojok kanan bawah.</li>
+      </ul>
+    
+      <h3>📦 Status Grid</h3>
+      <ul>
+        <li>Menampilkan status terbaru 6 site teratas secara ringkas.</li>
+        <li>Data berasal dari endpoint <code>/api/latest_status</code> dan diperbarui otomatis setiap 10 menit.</li>
+        <li>Kolom meliputi:
+          <ul>
+            <li><b>Launch</b> dan <b>End</b> — waktu mulai & berakhirnya pengamatan.</li>
+            <li><b>Status</b> — kondisi penerbangan atau data.</li>
+            <li><b>Termination</b> — penyebab berakhirnya peluncuran.</li>
+            <li><b>End Pressure</b> & <b>Max Height</b> — performa balon.</li>
+            <li><b>Ascent Rate</b> — kecepatan rata-rata naik.</li>
+          </ul>
+        </li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Sidebar Toggle (☰ / ❮):</strong> Menyembunyikan/menampilkan sidebar; sistem mengingat preferensi posisi terakhir.</li>
+        <li><strong>User Info Popup:</strong> Klik ikon 👤 untuk menampilkan nama user & masa aktif (expiry).</li>
+        <li><strong>Auto Refresh:</strong> Status peta dan grid diperbarui otomatis setiap 5–10 menit.</li>
+        <li><strong>Footer:</strong> Menampilkan logo <em>Powered by Terrindo Media Raya</em>.</li>
+      </ul>
+    
+      <p>Halaman ini memberikan gambaran umum seluruh jaringan radiosonde secara nasional, berfungsi sebagai pusat pemantauan dan titik awal navigasi ke semua modul analisis.</p>
+    </section>
+
+    <!-- 📊 DASHBOARD PAGE -->
+    <section class="page" id="page-dashboard" data-title="Dashboard Page">
+      <h2>📊 DASHBOARD PAGE — DETAILED GUIDE</h2>
+      <p>Halaman <strong>Dashboard / Data Resume</strong> menampilkan daftar file hasil pengamatan radiosonde dari setiap site, lengkap dengan metadata, status kualitas, dan fitur ekspor data.</p>
+    
+      <h3>🔹 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> di sisi kiri layar, berisi menu akses cepat ke halaman lain.</li>
+        <li><strong>Header Box:</strong> ikon <code>📊</code>, judul <em>Radiosonde Data Resume</em>, jam digital UTC, dan logo BMKG di sisi kanan.</li>
+        <li><strong>User Icon (👤):</strong> pojok kiri atas sidebar — menampilkan info user dan tombol logout.</li>
+      </ul>
+    
+      <h3>🎛️ Filter Panel</h3>
+      <ul>
+        <li><strong>File Type:</strong> memilih ekstensi file (<code>.bfr</code>, <code>.bufr</code>, <code>.bfh</code>, <code>.bin</code>).</li>
+        <li><strong>Start / End Date:</strong> menentukan rentang waktu data.</li>
+        <li><strong>Apply:</strong> menjalankan filter (API <code>/api/sites</code>).</li>
+        <li><strong>Show Metadata:</strong> ambil metadata lengkap (<code>/api/sites_with_meta</code>).</li>
+        <li><strong>Generate CSV:</strong> ekspor hasil ke CSV.</li>
+      </ul>
+    
+      <h3>📂 Tabel Data</h3>
+      <ul>
+        <li>Menampilkan daftar file per site dengan waktu peluncuran, tekanan akhir, tinggi maksimum, kecepatan naik, jarak, serial number, dan status.</li>
+        <li><strong>Warna Status:</strong> Hijau = OK, Oranye = Warning, Merah = Issues.</li>
+        <li><strong>Ikon Aksi:</strong> 📄 buka file, ⬇ unduh, 📊 analisis RAOB.</li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Loading Overlay:</strong> muncul saat data dimuat.</li>
+        <li><strong>Sidebar State:</strong> tersimpan di <code>localStorage</code>.</li>
+        <li><strong>UTC Clock:</strong> update otomatis.</li>
+      </ul>
+    </section>
+
+    <!-- 🗺️ MAP VIEWER PAGE -->
+    <section class="page" id="page-map" data-title="Map Viewer">
+      <h2>🗺️ MAP VIEWER — DETAILED GUIDE</h2>
+    
+      <p><strong>Map Viewer</strong> adalah modul interaktif yang memungkinkan pengguna memutar ulang perjalanan balon radiosonde secara spasial dan temporal. Halaman ini menampilkan peta dunia nyata, data Himawari-8, profil vertikal (angin, suhu, kelembapan), serta metadata stasiun yang diperoleh dari file BUFR/BFR/BFH/BIN.</p>
+    
+      <h3>🎯 Tujuan Utama</h3>
+      <ul>
+        <li>Menampilkan lintasan radiosonde secara real-time atau hasil decoding file.</li>
+        <li>Memutar (playback) posisi balon dari ground hingga titik burst.</li>
+        <li>Menampilkan grafik profil vertikal angin, termodinamika, dan kecepatan naik.</li>
+      </ul>
+    
+      <h3>🧭 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> Sama seperti halaman utama, berisi semua tautan fitur Rason Monitoring.</li>
+        <li><strong>User Icon (👤):</strong> Pojok kiri atas — menampilkan informasi akun dan tombol logout.</li>
+        <li><strong>Header Box:</strong> Ikon 🎈, judul <em>“Radiosonde Map Viewer”</em>, jam UTC real-time, dan logo BMKG di kanan atas.</li>
+      </ul>
+    
+      <h3>🎛️ Filter Bar</h3>
+      <ul>
+        <li><strong>Site:</strong> Menampilkan daftar lokasi radiosonde yang tersedia (otomatis dari <code>/api/sites_config</code>).</li>
+        <li><strong>Date, Hour, Type:</strong> Menentukan waktu dan tipe file (BUFR/BFR/BFH/BIN) yang ingin dimuat.</li>
+        <li><strong>Apply:</strong> Menjalankan filter dan mengambil file yang sesuai melalui endpoint <code>/api/filter</code>.</li>
+        <li><strong>Uploader:</strong> Memungkinkan pengguna mengunggah file radiosonde lokal ke server dan menampilkannya langsung di peta.</li>
+      </ul>
+    
+      <h3>🗺️ Map Container</h3>
+      <ul>
+        <li>Peta dibangun menggunakan <code>Leaflet.js</code> dengan dukungan <em>base maps</em>:
+          <ul>
+            <li>🛰️ Esri Satellite</li>
+            <li>🗺️ OpenStreetMap</li>
+            <li>🧭 Google Hybrid</li>
+          </ul>
+        </li>
+        <li><strong>Overlay:</strong> Citra satelit <em>Himawari-8 IR Band-13</em> (melalui WMS NASA GIBS) untuk observasi awan.</li>
+        <li><strong>Marker 🎈:</strong> Menunjukkan posisi balon saat frame tertentu.</li>
+        <li><strong>Path Line (Merah):</strong> Lintasan total balon selama penerbangan.</li>
+        <li><strong>Panel Kiri:</strong> <em>Station Metadata</em> — menampilkan informasi radiosonde (sensor, frekuensi, gas, dll.).</li>
+        <li><strong>Panel Kanan:</strong> <em>Level Info</em> — menampilkan data per lapisan (tinggi, suhu, angin, dsb.).</li>
+        <li>Kedua panel dapat disembunyikan/ditampilkan dengan tombol <code>+</code> / <code>−</code>.</li>
+      </ul>
+    
+      <h3>🎞️ Playback Controls</h3>
+      <ul>
+        <li><strong>⏮ / ▶ / ⏭:</strong> Kontrol untuk mundur, mainkan/jeda, dan maju antar frame.</li>
+        <li><strong>Slider:</strong> Menggeser frame manual berdasarkan ketinggian/waktu.</li>
+        <li><strong>Frame Counter:</strong> Menunjukkan indeks frame saat ini dan total level.</li>
+        <li><strong>📊 Show Charts:</strong> Menampilkan atau menyembunyikan panel grafik.</li>
+      </ul>
+    
+      <h3>📊 Charts Panel</h3>
+      <ul>
+        <li>Menampilkan tiga grafik utama (menggunakan <code>Chart.js</code>):</li>
+          <ul>
+            <li><b>Wind Direction Profile</b> — arah angin terhadap ketinggian.</li>
+            <li><b>Wind Speed & Ascent Rate</b> — kecepatan angin dan laju kenaikan.</li>
+            <li><b>Temperature & Dewpoint Profile</b> — struktur termodinamika udara.</li>
+          </ul>
+        <li>Semua grafik dilengkapi fitur <em>zoom</em> dan <em>pan</em>.</li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Auto Resize:</strong> Peta otomatis menyesuaikan ukuran saat sidebar diubah.</li>
+        <li><strong>Filter Persistence:</strong> Pilihan terakhir disimpan di <code>localStorage</code> (site, tanggal, jam, tipe).</li>
+        <li><strong>Upload Feedback:</strong> Status <code>Uploading / Decoding / Success</code> ditampilkan secara real-time.</li>
+        <li><strong>Footer:</strong> Logo <em>Powered by Terrindo</em> ditampilkan tetap di bawah layar.</li>
+      </ul>
+    
+      <p>Modul ini merupakan pusat analisis visual radiosonde, memungkinkan operator untuk memverifikasi kualitas penerbangan, validitas data, dan kondisi atmosfer secara intuitif serta cepat.</p>
+    </section>
+
+    <!-- 🌐 TRAJECTORY 3D PAGE -->
+    <section class="page" id="page-trajectory" data-title="Trajectory 3D">
+      <h2>🌐 TRAJECTORY 3D — DETAILED GUIDE</h2>
+    
+      <p><strong>Trajectory 3D</strong> menampilkan visualisasi tiga dimensi lintasan balon radiosonde menggunakan <em>MapLibre GL</em> dan <em>Deck.gl</em>. Halaman ini memungkinkan pengguna melihat dinamika vertikal dan horizontal penerbangan balon secara realistis, sekaligus menampilkan layer analisis seperti <b>wind shear</b> dan <b>freezing level</b>.</p>
+    
+      <h3>🧭 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> sama dengan halaman lain, berisi tautan ke seluruh modul Rason Monitoring.</li>
+        <li><strong>User Icon (👤):</strong> menampilkan info akun dan tombol logout.</li>
+        <li><strong>Header Box:</strong> ikon 🎈, judul <em>“Radiosonde 3D Trajectory”</em>, jam UTC real-time, dan logo BMKG.</li>
+      </ul>
+    
+      <h3>🎛️ Filter Bar</h3>
+      <ul>
+        <li><strong>Site / Date / Hour / Type:</strong> filter utama untuk memilih lokasi, tanggal, jam, dan jenis file (.bufr / .bfr / .bfh / .bin).</li>
+        <li><strong>Apply:</strong> memanggil API <code>/api/filter</code> untuk mengambil file dari server FTP dan men-decode-nya.</li>
+        <li><strong>Upload & Decode:</strong> mengunggah file lokal ke server melalui endpoint <code>/upload_bufr</code> dan langsung menampilkan hasilnya di map 3D.</li>
+        <li><strong>Status Text:</strong> menampilkan proses <em>Uploading → Decoding → Success</em>.</li>
+      </ul>
+    
+      <h3>🗺️ Map 3D Viewer</h3>
+      <ul>
+        <li>Dibangun di atas <code>MapLibre GL</code> dengan base-maps:
+          <ul>
+            <li>🛰️ Esri Satellite (default)</li>
+            <li>🗺️ OpenStreetMap</li>
+            <li>🧭 Google Hybrid</li>
+          </ul>
+        </li>
+        <li><strong>Map Layer Control:</strong> tombol <i class="bi bi-map"></i>, <i class="bi bi-image"></i>, <i class="bi bi-globe-americas"></i> untuk beralih antar base map.</li>
+        <li><strong>North Arrow (▲ N):</strong> penunjuk utara yang berputar sesuai arah kamera (pitch/bearing).</li>
+        <li><strong>Overlay Controls (❄️ & 💨):</strong>
+          <ul>
+            <li><i class="bi bi-snow2"></i> menampilkan lapisan <em>Freezing Level (0 °C)</em>.</li>
+            <li><i class="bi bi-wind"></i> menampilkan profil <em>Wind Shear</em> (arah & kecepatan angin antar lapisan).</li>
+          </ul>
+        </li>
+        <li><strong>Level Panel:</strong> di pojok kanan atas peta, menampilkan data numerik tiap lapisan (tinggi, angin, suhu, kelembapan, dll.).</li>
+      </ul>
+    
+      <h3>🎞️ Playback Bar</h3>
+      <ul>
+        <li><strong>▶️ Play / ⏸️ Pause:</strong> memutar atau menghentikan animasi lintasan balon.</li>
+        <li><strong>Speed Slider:</strong> mengatur kecepatan pemutaran (0.5× – 1000×).</li>
+        <li><strong>Progress Slider:</strong> menggeser frame secara manual berdasarkan waktu atau ketinggian.</li>
+        <li><strong>Elapsed Time:</strong> menampilkan waktu sejak peluncuran (t = 0 s → burst).</li>
+      </ul>
+    
+      <h3>🌡️ Analisis Tambahan</h3>
+      <ul>
+        <li><strong>Freezing Level:</strong> sistem secara otomatis mendeteksi ketinggian suhu 0 °C berdasarkan profil termal dan menampilkan lapisan biru transparan pada map.</li>
+        <li><strong>Wind Shear Layer:</strong> menampilkan ikon panah angin (Wind Barb) pada setiap lapisan dengan arah dan kecepatan sebenarnya.</li>
+        <li><strong>Shear Value (m/s/km):</strong> dihitung otomatis dari komponen u/v antar lapisan untuk menilai potensi turbulensi.</li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Compact Sidebar:</strong> dapat disembunyikan (☰ / ❮) dan posisinya disimpan di <code>localStorage</code>.</li>
+        <li><strong>Auto-resize Map:</strong> peta 3D otomatis menyesuaikan ukuran saat sidebar ditoggle.</li>
+        <li><strong>UTC Clock:</strong> jam dan tanggal diperbarui setiap detik.</li>
+        <li><strong>Footer:</strong> logo <em>Powered by Terrindo</em> selalu muncul di bagian bawah.</li>
+      </ul>
+    
+      <p>Modul ini merupakan visualisasi tingkat lanjut untuk menganalisis penerbangan radiosonde secara spasial dan vertikal, memberikan gambaran fisik lengkap tentang kondisi atmosfer dan dinamika angin pada saat pengamatan.</p>
+    </section>
+ 
+    <!-- ⏱️ TIME ACCURACY PAGE -->
+    <section class="page" id="page-time" data-title="Time Accuracy">
+      <h2>⏱️ TIME ACCURACY — DETAILED GUIDE</h2>
+    
+      <p><strong>Time Accuracy</strong> adalah modul untuk memantau ketepatan waktu peluncuran dan durasi penerbangan radiosonde berdasarkan data hasil decoding BUFR/BFR. Halaman ini menampilkan <b>grafik akurasi waktu</b> dan <b>tabel kronologi</b> setiap peluncuran di tiap site.</p>
+    
+      <h3>🎯 Tujuan Utama</h3>
+      <ul>
+        <li>Mengukur deviasi waktu antara jadwal peluncuran dan aktual peluncuran balon.</li>
+        <li>Menganalisis durasi penerbangan (Launch → 100 hPa → Burst).</li>
+        <li>Memantau kepatuhan operasional site terhadap standar waktu internasional (00Z / 12Z).</li>
+      </ul>
+    
+      <h3>🧭 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> konsisten dengan halaman lain (Data Resume, Map, Trajectory, dll.).</li>
+        <li><strong>Header Box:</strong> ikon ⏱️, judul <em>“Time Accuracy Monitoring”</em>, jam UTC real-time, dan logo BMKG.</li>
+        <li><strong>User Icon:</strong> menampilkan info user dan expiry subscription.</li>
+      </ul>
+    
+      <h3>🗂️ Filter & Selector</h3>
+      <ul>
+        <li><strong>Site:</strong> memilih lokasi peluncuran dari daftar konfigurasi API <code>/api/sites_config</code>.</li>
+        <li><strong>Month / Year:</strong> menentukan periode analisis.</li>
+        <li><strong>Launch Time:</strong> memilih waktu 00Z, 12Z, atau <em>All</em> untuk menampilkan kedua jadwal.</li>
+      </ul>
+    
+      <h3>📊 Chart Visualization</h3>
+      <ul>
+        <li>Grafik batang (stacked bar) menggunakan <code>Chart.js</code> untuk menggambarkan fase waktu setiap peluncuran:</li>
+        <ul>
+          <li><span style="color:white;background:rgba(255,255,255,0.9);padding:2px 6px;border-radius:4px;">Putih</span> — Preparation → Launch</li>
+          <li><span style="color:white;background:rgba(59,130,246,0.85);padding:2px 6px;border-radius:4px;">Biru</span> — Launch → 100 hPa (AB)</li>
+          <li><span style="color:white;background:rgba(239,68,68,0.85);padding:2px 6px;border-radius:4px;">Merah</span> — 100 hPa → Burst (End)</li>
+        </ul>
+        <li>Setiap hari ditampilkan dua bar (00Z & 12Z) untuk mempermudah perbandingan.</li>
+        <li><strong>Axis:</strong> Y menunjukkan durasi dalam menit (0–240 min).</li>
+        <li><strong>Title:</strong> otomatis menampilkan site, bulan, tahun, dan sesi waktu yang dipilih.</li>
+      </ul>
+    
+      <h3>📋 Data Table</h3>
+      <ul>
+        <li>Menampilkan daftar harian dengan kolom:</li>
+        <ul>
+          <li><strong>Date</strong> — tanggal dan waktu peluncuran (00Z/12Z).</li>
+          <li><strong>Launch</strong> — jam aktual peluncuran (UTC).</li>
+          <li><strong>AB</strong> — waktu mencapai 100 hPa.</li>
+          <li><strong>Burst</strong> — waktu pecah balon.</li>
+        </ul>
+        <li>Header tabel bersifat <em>sticky</em> agar tetap terlihat saat di-scroll.</li>
+        <li>Data otomatis disinkronkan dengan grafik berdasarkan filter bulan dan site.</li>
+      </ul>
+    
+      <h3>📈 Summary Statistik</h3>
+      <ul>
+        <li>Menampilkan rata-rata waktu (dalam menit) dari:
+          <ul>
+            <li>Preparation–Launch</li>
+            <li>Launch–AB (100 hPa)</li>
+            <li>Launch–End (Burst)</li>
+          </ul>
+        </li>
+        <li>Nilai rata-rata muncul otomatis di bawah grafik setelah pemuatan selesai.</li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Compact Sidebar:</strong> dapat disembunyikan (☰ / ❮) dan posisinya disimpan di <code>localStorage</code>.</li>
+        <li><strong>Auto Update:</strong> Dropdown bulan & tahun langsung memuat ulang data secara dinamis.</li>
+        <li><strong>UTC Clock:</strong> diperbarui tiap detik di header.</li>
+        <li><strong>Footer:</strong> tetap di bawah dengan logo <em>Powered by Terrindo</em>.</li>
+      </ul>
+    
+      <p>Modul ini membantu operator dan supervisor memastikan jadwal peluncuran radiosonde berjalan tepat waktu dan konsisten antar site, serta menyediakan indikasi awal terhadap keterlambatan atau anomali waktu peluncuran.</p>
+    </section>
+
+    <!-- 🎈 HEIGHT REACH PAGE -->
+    <section class="page" id="page-height" data-title="Height Reach">
+      <h2>🎈 HEIGHT REACH — DETAILED GUIDE</h2>
+    
+      <p><strong>Height Reach Graph</strong> menampilkan ketinggian maksimum yang dicapai oleh balon radiosonde selama penerbangan. Modul ini membantu operator menilai performa balon, gas, dan sensor pada setiap peluncuran, serta mengidentifikasi anomali seperti burst dini atau tekanan akhir yang tidak wajar.</p>
+    
+      <h3>🎯 Tujuan Utama</h3>
+      <ul>
+        <li>Mengamati tinggi maksimum yang dicapai setiap peluncuran (m).</li>
+        <li>Membandingkan performa antara sesi 00Z dan 12Z.</li>
+        <li>Menilai kestabilan tekanan akhir (hPa) antar periode.</li>
+      </ul>
+    
+      <h3>🧭 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> berisi menu utama (Map, 3D, Time Accuracy, Error Analysis, dll.) yang konsisten di seluruh halaman.</li>
+        <li><strong>Header Box:</strong> ikon 🎈, judul <em>Height Reach Graph</em>, jam UTC real-time, dan logo BMKG di kanan atas.</li>
+        <li><strong>User Icon:</strong> menampilkan info akun dan expiry date.</li>
+      </ul>
+    
+      <h3>🗂️ Filter & Selector</h3>
+      <ul>
+        <li><strong>Site:</strong> daftar lokasi radiosonde (Aceh, Tarakan, Ranai, dsb.) yang dimuat dari API <code>/api/sites_config</code>.</li>
+        <li><strong>Month / Year:</strong> memilih periode data.</li>
+        <li><strong>Launch Time:</strong> memilih jadwal 00Z, 12Z, atau <em>All</em> untuk membandingkan kedua sesi.</li>
+      </ul>
+    
+      <h3>📈 Chart Visualization</h3>
+      <ul>
+        <li>Grafik garis (line chart) dengan dua kurva:</li>
+        <ul>
+          <li><span style="color:white;background:rgba(59,130,246,0.8);padding:2px 6px;border-radius:4px;">Biru</span> — sesi 00Z</li>
+          <li><span style="color:white;background:rgba(239,68,68,0.8);padding:2px 6px;border-radius:4px;">Merah</span> — sesi 12Z</li>
+        </ul>
+        <li>Sumbu X menampilkan tanggal peluncuran (hari UTC), dan sumbu Y menunjukkan ketinggian maksimum (meter).</li>
+        <li>Grafik bersifat interaktif dan dapat menampilkan tooltip nilai saat kursor diarahkan ke titik data.</li>
+        <li><strong>Judul Otomatis:</strong> menyesuaikan dengan site, bulan, tahun, dan sesi (00Z/12Z/All).</li>
+        <li><strong>Rata-rata:</strong> nilai rata-rata ketinggian maksimum seluruh data ditampilkan di bawah grafik.</li>
+      </ul>
+    
+      <h3>📋 Data Table</h3>
+      <ul>
+        <li>Menampilkan hasil numerik setiap peluncuran dengan kolom:</li>
+        <ul>
+          <li><strong>Date</strong> — tanggal dan waktu peluncuran (UTC).</li>
+          <li><strong>Height (m)</strong> — ketinggian maksimum tercapai.</li>
+          <li><strong>Pressure (hPa)</strong> — tekanan pada titik akhir penerbangan (burst pressure).</li>
+        </ul>
+        <li>Header tabel bersifat <em>sticky</em> agar tetap terlihat saat di-scroll.</li>
+        <li><strong>Alternating rows:</strong> baris ganjil dan genap dibedakan dengan intensitas warna latar berbeda untuk visibilitas.</li>
+      </ul>
+    
+      <h3>📊 Summary Bawah Tabel</h3>
+      <ul>
+        <li>Menampilkan statistik ringkasan:</li>
+        <ul>
+          <li><b>Max Height</b> dan <b>Min Height</b> — ketinggian maksimum dan minimum (m).</li>
+          <li><b>Max Pressure</b> dan <b>Min Pressure</b> — tekanan tertinggi dan terendah (hPa).</li>
+        </ul>
+        <li>Bagian ini diperbarui otomatis setiap kali site, bulan, atau tahun diubah.</li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Compact Sidebar:</strong> sidebar dapat disembunyikan (☰ / ❮) dan posisinya disimpan di <code>localStorage</code>.</li>
+        <li><strong>Auto Refresh:</strong> pemilihan bulan atau tahun otomatis memuat ulang data dari server.</li>
+        <li><strong>UTC Clock:</strong> diperbarui tiap detik di header.</li>
+        <li><strong>Footer:</strong> tetap di bawah dengan logo <em>Powered by Terrindo</em>.</li>
+      </ul>
+    
+      <p>Modul ini berperan penting dalam mengevaluasi performa sistem peluncuran radiosonde — baik dari sisi gas pengisi, volume balon, maupun keandalan sensor tekanan. Grafik ini sering digunakan untuk memverifikasi efisiensi peluncuran dan mendeteksi potensi masalah pada sistem pengisian atau pelepasan.</p>
+    </section>
+
+    <!-- 📅 DATA AVAILABILITY PAGE -->
+    <section class="page" id="page-availability" data-title="Data Availability">
+      <h2>📅 DATA AVAILABILITY — DETAILED GUIDE</h2>
+    
+      <p><strong>Data Availability</strong> menampilkan ketersediaan data radiosonde per site dan per hari dalam format tabel kalender.  
+      Setiap sel menunjukkan status ketersediaan data untuk sesi <em>00Z</em> dan <em>12Z</em> dengan kode warna dan tooltip informasi.</p>
+    
+      <h3>🎯 Tujuan Utama</h3>
+      <ul>
+        <li>Menilai kelengkapan data peluncuran tiap site dalam satu bulan.</li>
+        <li>Mendeteksi hari/tanggal yang mengalami kehilangan data.</li>
+        <li>Mengukur konsistensi pengiriman file BUFR/BFR ke server pusat.</li>
+      </ul>
+    
+      <h3>🧭 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> tetap sama seperti halaman lain (Main, Map, 3D, Time Accuracy, dll.).</li>
+        <li><strong>Header Box:</strong> ikon 🎈, judul <em>Data Availability per Month</em>, jam UTC real-time, dan logo BMKG di kanan atas.</li>
+        <li><strong>User Icon:</strong> menampilkan profil user aktif dan tombol logout.</li>
+      </ul>
+    
+      <h3>🔎 Filter Bar</h3>
+      <ul>
+        <li><strong>Bulan:</strong> memilih bulan data yang ingin ditampilkan.</li>
+        <li><strong>Tahun:</strong> memilih tahun pengamatan.</li>
+        <li><strong>Jam:</strong> menentukan sesi peluncuran (00Z / 12Z).</li>
+        <li><strong>Load Data:</strong> memanggil API <code>/api/data_availability?month=&lt;m&gt;&year=&lt;y&gt;</code> untuk memuat data ketersediaan.</li>
+      </ul>
+    
+      <h3>📊 Struktur Tabel Kalender</h3>
+      <ul>
+        <li>Setiap baris = 1 site (misal: <em>Tarakan, Ranai, Cilacap, Sorong</em>).</li>
+        <li>Setiap kolom = tanggal dalam bulan (1–31).</li>
+        <li>Isi tabel berupa simbol lingkaran berwarna dengan arti sebagai berikut:</li>
+      </ul>
+    
+      <div style="margin-left:20px;">
+        <p><span class="circle red"></span> <b>Merah</b> — Tidak ada data (offline / gagal upload)</p>
+        <p><span class="circle yellow"></span> <b>Kuning</b> — Data tidak lengkap / sebagian</p>
+        <p><span class="circle green"></span> <b>Hijau</b> — Data lengkap & valid</p>
+      </div>
+    
+      <h3>💬 Tooltip Informasi</h3>
+      <ul>
+        <li>Setiap lingkaran memiliki tooltip detail, contoh:
+          <br><code>00Z - uploaded 06:14 UTC (complete)</code> atau <code>12Z - no file received</code></li>
+        <li>Tooltip muncul saat pengguna mengarahkan kursor ke simbol.</li>
+      </ul>
+    
+      <h3>⚙️ Fitur & Mekanisme</h3>
+      <ul>
+        <li><strong>Filter Dinamis:</strong> pemilihan bulan/tahun langsung memperbarui isi tabel tanpa reload halaman.</li>
+        <li><strong>Responsif:</strong> tabel bisa di-scroll horizontal agar semua tanggal terlihat.</li>
+        <li><strong>Auto Adjust:</strong> kolom site dibuat tetap rata kiri dan lebar seragam.</li>
+        <li><strong>Compact Sidebar:</strong> tombol ☰ / ❮ untuk memperluas atau menyembunyikan sidebar, dengan status tersimpan di <code>localStorage</code>.</li>
+        <li><strong>UTC Clock:</strong> jam dan tanggal UTC diperbarui setiap detik di pojok kanan atas header.</li>
+        <li><strong>Footer:</strong> tetap di bagian bawah dengan tulisan <em>Powered by Terrindo</em>.</li>
+      </ul>
+    
+      <h3>🧮 Contoh Representasi Warna</h3>
+      <table style="margin-top:10px; border-collapse:collapse; border:1px solid rgba(255,255,255,0.3);">
+        <tr>
+          <th style="background:rgba(255,255,255,0.2);padding:4px 10px;">Tanggal</th>
+          <th style="background:rgba(255,255,255,0.2);padding:4px 10px;">00Z</th>
+          <th style="background:rgba(255,255,255,0.2);padding:4px 10px;">12Z</th>
+        </tr>
+        <tr>
+          <td style="padding:4px 10px;">05 Oct</td>
+          <td style="text-align:center;"><span class="circle green"></span></td>
+          <td style="text-align:center;"><span class="circle red"></span></td>
+        </tr>
+        <tr>
+          <td style="padding:4px 10px;">06 Oct</td>
+          <td style="text-align:center;"><span class="circle yellow"></span></td>
+          <td style="text-align:center;"><span class="circle green"></span></td>
+        </tr>
+      </table>
+    
+      <h3>📤 Backend Integration</h3>
+      <p>Data diambil dari endpoint API <code>/api/data_availability</code> yang menggabungkan hasil pembacaan file BUFR dari FTP server dan SQLite cache.  
+      API menghasilkan struktur JSON seperti berikut:</p>
+    
+      <pre style="background:rgba(255,255,255,0.1);padding:12px;border-radius:8px;overflow-x:auto;">
+    {
+      "month": 10,
+      "year": 2025,
+      "sites": [
+        {
+          "name": "Tarakan",
+          "days": {
+            "5": { "00": {"color": "green", "tooltip": "complete"}, "12": {"color": "red", "tooltip": "no data"} },
+            "6": { "00": {"color": "yellow", "tooltip": "partial"}, "12": {"color": "green", "tooltip": "complete"} }
+          }
+        }
+      ]
+    }
+      </pre>
+    
+      <p>Halaman ini memungkinkan pengawasan operasional radiosonde dalam skala bulanan untuk mendeteksi pola <em>data loss</em> dan mengoptimalkan jadwal pengiriman data dari stasiun ke pusat.</p>
+    </section>
+   
+      <!-- ⚠️ ERROR ANALYSIS PAGE -->
+    <section class="page" id="page-error" data-title="Error Analysis">
+      <h2>⚠️ ERROR ANALYSIS — DETAILED GUIDE</h2>
+    
+      <p><strong>Error Analysis</strong> adalah modul paling komprehensif dalam sistem Radiosonde Monitoring.  
+      Halaman ini menganalisis performa sensor, kondisi atmosfer, dan mendeteksi anomali fisis menggunakan lebih dari 10 pemeriksaan otomatis (QC Checks) berbasis algoritma <em>Deep Physics</em>.</p>
+    
+      <h3>🎯 Tujuan Utama</h3>
+      <ul>
+        <li>Mengevaluasi kualitas pengukuran suhu, kelembapan, tekanan, dan angin.</li>
+        <li>Mendeteksi kesalahan sensor atau masalah peluncuran (burst rendah, freeze-out, dll.).</li>
+        <li>Mengenali fenomena atmosfer signifikan (tropopause, jet layer, awan Cb dll.).</li>
+      </ul>
+    
+      <h3>🧭 Komponen Utama</h3>
+      <ul>
+        <li><strong>Sidebar Navigasi:</strong> akses cepat ke halaman lain.</li>
+        <li><strong>Header Box:</strong> ikon ❗, judul <em>Error Analysis</em>, jam UTC real-time, dan logo BMKG.</li>
+        <li><strong>User Popup:</strong> profil user dan tombol logout.</li>
+      </ul>
+    
+      <h3>🔍 Filter dan Pemilihan File</h3>
+      <ul>
+        <li><b>Site :</b> lokasi stasiun radiosonde.</li>
+        <li><b>Date :</b> tanggal peluncuran yang ingin dianalisis.</li>
+        <li><b>Hour :</b> sesi 00Z / 12Z.</li>
+        <li><b>File Type :</b> memilih format (BUFR / BFR / BFH / BIN).</li>
+        <li><b>📁 List Files :</b> memanggil API <code>/api/filter</code> untuk menampilkan daftar file yang tersedia.</li>
+      </ul>
+    
+      <h3>📈 Visualisasi Grafik Sensor</h3>
+      <p>Empat grafik <code>Chart.js</code> ditampilkan berdampingan dalam grid 2×2 :</p>
+      <ul>
+        <li><b>Temperature (°C)</b> — profil vertikal suhu udara.</li>
+        <li><b>Relative Humidity (%)</b> — kelembapan relatif terhadap tinggi.</li>
+        <li><b>Wind Speed (m/s)</b> — kecepatan angin.</li>
+        <li><b>Wind Direction (°)</b> — arah angin dalam derajat.</li>
+      </ul>
+      <p>Setiap grafik memiliki sumbu X = ketinggian (m) dan sumbu Y = nilai fisis, dengan grid transparan dan tooltip interaktif.</p>
+    
+      <h3>📊 Tabel Level Data</h3>
+      <ul>
+        <li>Menampilkan setiap lapisan observasi (Pressure, Height, Temp, Dewpoint, RH, Wind Speed, Wind Direction).</li>
+        <li>Header tabel <em>sticky</em> agar tetap terlihat saat scroll.</li>
+        <li><span style="background:rgba(255,90,90,0.6);color:#fff;padding:2px 6px;border-radius:4px;">Merah (Red)</span> → anomali serius (suhu terlalu rendah atau burst rendah).</li>
+        <li><span style="background:rgba(255,210,80,0.6);color:#222;padding:2px 6px;border-radius:4px;">Kuning (Yellow)</span> → peringatan (lonjakan angin atau RH sangat rendah).</li>
+      </ul>
+    
+      <h3>🧠 Deep Physics Automatic Analysis</h3>
+      <p>Algoritma ini menjalankan > 10 pemeriksaan berbasis fisika atmosfer.  
+      Hasilnya ditampilkan dalam dua kategori utama :</p>
+      <ul>
+        <li><b>⚠️ Potential Operational Issues</b> — indikasi kesalahan alat atau peluncuran.</li>
+        <li><b>🌍 Atmospheric Features</b> — indikasi fenomena alam (tropopause, awan, jet stream dll.).</li>
+      </ul>
+    
+      <h4>📋 Daftar Pemeriksaan Utama (Checks)</h4>
+      <ol>
+        <li><b>Cold-Point Tropopause Detection:</b> T &lt; −75 °C → indikasi lapisan tropopause.</li>
+        <li><b>RH Freeze-out:</b> RH &lt; 5 % pada T &lt; −40 °C → sensor kelembapan beku.</li>
+        <li><b>Pressure Reversal:</b> kenaikan P di altitude tinggi → glitch sensor barometrik.</li>
+        <li><b>Strong Vertical Wind Shear:</b> ΔV &gt; 10 m/s per km → lapisan jet/turbulensi.</li>
+        <li><b>Directional Shear:</b> perubahan arah angin &gt; 60°/km → frontal zone atau jet transition.</li>
+        <li><b>Burst Low:</b> tekanan akhir &gt; 100 hPa → balon pecah lebih awal.</li>
+        <li><b>RH Sensor Saturation:</b> RH &gt; 90 % dengan T &lt; −40 °C → indikasi sensor kelembapan macet.</li>
+        <li><b>Cloud Layer Crossing:</b> RH &gt; 99 % pada T &gt; 0 °C & z &lt; 3 km → lewat lapisan awan.</li>
+        <li><b>Ascent Rate Deceleration:</b> perlambatan naik &gt; 50 % → melewati awan tebal / Cb.</li>
+      </ol>
+    
+      <h3>🧾 Summary Metadata</h3>
+      <p>Ringkasan peluncuran otomatis ditampilkan di atas grafik :</p>
+      <ul>
+        <li><b>Launch Time</b> dan <b>End Time</b> (UTC).</li>
+        <li><b>Max Height</b> & <b>End Pressure</b> dengan satuan km/hPa.</li>
+        <li><b>Termination Code</b> (0–6, 11, 18 dst.) dengan penjelasan (Burst, Battery, Ascent Stop, dll.).</li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Compact Sidebar:</strong> ☰ / ❮ untuk menyembunyikan navigasi (tersimpan di <code>localStorage</code>).</li>
+        <li><strong>UTC Clock:</strong> pembaruan real-time setiap detik.</li>
+        <li><strong>Auto-Scroll Table:</strong> data tingkat ketinggian hingga 400 baris dapat di-scroll vertikal.</li>
+        <li><strong>Footer:</strong> posisi tetap dengan label <em>Powered by Terrindo</em>.</li>
+      </ul>
+    
+      <p>Dengan menggabungkan data BUFR/BFR/BFH/BIN ke dalam visualisasi 4 grafik dan analisis fisika, modul ini memberikan diagnostik menyeluruh untuk menjamin integritas pengamatan radiosonde.</p>
+    </section>
+ 
+    <!-- ⚙️ SETTINGS PAGE -->
+    <section class="page" id="page-settings" data-title="Settings">
+      <h2>⚙️ SETTINGS — DETAILED GUIDE</h2>
+    
+      <p><strong>Settings Panel</strong> merupakan pusat konfigurasi administratif sistem Radiosonde Monitoring.  
+      Halaman ini hanya dapat diakses oleh akun <b>admin</b> dan berisi lima tab utama untuk manajemen user, konfigurasi site, pemetaan BUFR, pencarian serial radiosonde, serta sinkronisasi antara FTP dan database.</p>
+    
+      <h3>🧭 Struktur Utama</h3>
+      <ul>
+        <li><b>👥 User Management</b> — mengatur akun, masa berlaku, halaman akses, dan status aktif user.</li>
+        <li><b>🌐 Site Configuration</b> — menambah atau mengedit koordinat stasiun radiosonde.</li>
+        <li><b>🧩 BUFR Mapping Configuration</b> — mengonfigurasi struktur field metadata dan level data untuk decoding.</li>
+        <li><b>🔍 Serial Lookup</b> — mencari informasi radiosonde berdasarkan nomor seri.</li>
+        <li><b>🗂️ FTP vs Database</b> — membandingkan data file antara server FTP dan cache database.</li>
+      </ul>
+    
+      <h3>👥 1. User Management</h3>
+      <ul>
+        <li>Menampilkan semua akun pengguna, masa aktif, halaman yang diizinkan, dan status online/offline.</li>
+        <li><b>Expired:</b> ditandai warna <span style="color:#f87171;">merah</span>, <b>Expiring Soon:</b> warna <span style="color:#facc15;">kuning</span>, dan <b>Active:</b> putih.</li>
+        <li>Admin dapat:
+          <ul>
+            <li>✏️ Mengubah password</li>
+            <li>🗓️ Mengatur tanggal expiry (YYYY-MM-DD)</li>
+            <li>🧩 Mengedit halaman akses user melalui modal checkbox</li>
+            <li>🗑️ Menghapus user</li>
+            <li>🚪 Memaksa logout user (individu atau semua user sekaligus)</li>
+          </ul>
+        </li>
+        <li>Data user diambil dari <code>/api/users</code> dan status aktif dari <code>/admin/active_users</code>.</li>
+      </ul>
+    
+      <h3>🌐 2. Site Configuration</h3>
+      <ul>
+        <li>Menampilkan daftar seluruh lokasi stasiun radiosonde lengkap dengan koordinat dan UTC offset.</li>
+        <li>Admin dapat menambah site baru, mengedit posisi (lat/lon), atau menghapus site.</li>
+        <li>Semua perubahan disimpan ke konfigurasi <code>sites.json</code> melalui endpoint <code>/api/sites_config</code>.</li>
+        <li>Setiap site terhubung langsung ke dropdown filter pada halaman lain seperti <em>Height Reach</em> dan <em>Data Availability</em>.</li>
+      </ul>
+    
+      <h3>🧩 3. BUFR Mapping Configuration</h3>
+      <ul>
+        <li>Menentukan pemetaan antara <b>descriptor BUFR</b> dengan <b>variable name Python</b>.</li>
+        <li>Terdiri dari dua kategori:
+          <ul>
+            <li>📘 <b>Metadata Mapping</b> — informasi seperti serial number, launch time, dll.</li>
+            <li>📊 <b>Per-Level Mapping</b> — variabel vertikal seperti pressure, temperature, humidity, wind.</li>
+          </ul>
+        </li>
+        <li><b>Actions:</b>
+          <ul>
+            <li>✏️ Edit / Hapus field</li>
+            <li>➕ Tambah field baru</li>
+            <li>💾 Export mapping ke JSON</li>
+            <li>📂 Import mapping JSON untuk overwrite</li>
+          </ul>
+        </li>
+        <li>Konfigurasi disimpan di <code>/api/bufrmap/&lt;site&gt;</code> (default global atau per site).</li>
+      </ul>
+    
+      <h3>🔍 4. Serial Lookup</h3>
+      <ul>
+        <li>Memungkinkan pencarian nomor seri radiosonde (contoh: 230451).</li>
+        <li>Menampilkan data lengkap dari JSON database, termasuk:
+          <ul>
+            <li>Nomor Kardus</li>
+            <li>Nomor Seri</li>
+            <li>Lokasi</li>
+            <li>Tanggal Keluar / Masuk</li>
+            <li>Source File</li>
+          </ul>
+        </li>
+        <li>Backend: <code>/api/serial_lookup/&lt;serial&gt;</code>.</li>
+      </ul>
+    
+      <h3>🗂️ 5. FTP vs Database Comparison</h3>
+      <ul>
+        <li>Membandingkan file yang tersedia di server FTP dan di cache database lokal.</li>
+        <li><b>Filter:</b> site, file type (.bfr/.bufr/.bfh/.bin), tanggal mulai dan akhir.</li>
+        <li><b>Tampilan dua kolom:</b>
+          <ul>
+            <li><b>🌐 FTP Files:</b> daftar file di FTP server.</li>
+            <li><b>🗃️ Database Cache:</b> daftar file di database lokal.</li>
+          </ul>
+        </li>
+        <li>Indikator warna:
+          <ul>
+            <li>🟢 — File tersedia di kedua sisi (synced)</li>
+            <li>🟡 — Hanya di FTP</li>
+            <li>🔴 — Hanya di DB</li>
+          </ul>
+        </li>
+        <li>Fungsi tambahan:
+          <ul>
+            <li>📥 Insert FTP → DB (sinkronisasi manual)</li>
+            <li>🔁 Re-download file dari FTP untuk refresh data</li>
+            <li>🔄 Refresh tabel FTP & DB</li>
+          </ul>
+        </li>
+      </ul>
+    
+      <h3>🛡️ Role-based Access Control</h3>
+      <ul>
+        <li>Admin memiliki akses penuh ke seluruh tab.</li>
+        <li>User biasa hanya dapat mengakses tab “🔍 Serial Lookup”.</li>
+        <li>Hal ini dikontrol otomatis oleh API <code>/api/whoami</code> pada saat halaman dimuat.</li>
+      </ul>
+    
+      <h3>⚙️ Fitur Tambahan</h3>
+      <ul>
+        <li><strong>Responsive Layout:</strong> semua tabel dan input menyesuaikan layar.</li>
+        <li><strong>Auto Refresh:</strong> site dan user list memuat ulang setelah setiap perubahan.</li>
+        <li><strong>JSON Compatibility:</strong> mapping BUFR dapat diimpor/ekspor antar environment.</li>
+      </ul>
+    
+      <p>Panel ini menjadi pusat kontrol utama untuk pengelolaan user, site, dan data.  
+      Seluruh konfigurasi di sini secara langsung memengaruhi modul analisis dan visualisasi pada sistem Radiosonde Monitoring.</p>
+    </section>
+    
+
+  </main>
+  <div class="global-nav-controls">
+    <button onclick="navigatePage(-1)"><i class="bi bi-arrow-left"></i> Previous</button>
+    <button onclick="toggleTOC()"><i class="bi bi-house-door"></i> Home</button>
+    <button onclick="navigatePage(1)">Next <i class="bi bi-arrow-right"></i></button>
   </div>
-</header>
+  <!-- FOOTER -->
+  <footer>
+    Powered by 
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Terrindo"> 
+    <span>PT. Terrindo Media Raya</span>
+  </footer>
 
-<div class="doc__body">
-
-<section class="section">
-<h2>📘 OVERVIEW</h2>
-<p>Rason Monitoring adalah sistem web untuk menganalisis data radiosonde BMKG. Platform ini menampilkan hasil decoding BUFR/BFR/BFH/BIN secara otomatis dalam bentuk grafik, tabel, dan peta interaktif.</p>
-<p>Akses sistem dibedakan menjadi <strong>Admin</strong> dan <strong>User biasa</strong>, dengan batas masa aktif (expiry) dan halaman yang diizinkan (allowed pages).</p>
-</section>
-
-<section class="section">
-<h2>🔑 LOGIN PAGE</h2>
-<p><strong>URL:</strong> <code>/login</code></p>
-<ul>
-<li>Masukkan <strong>username</strong> dan <strong>password</strong> yang diberikan admin.</li>
-<li>Sistem melakukan validasi password hash dan memeriksa masa aktif akun.</li>
-<li>Jika masa aktif telah lewat, akan muncul pesan: <code>❌ Subscription expired on &lt;tanggal&gt;</code></li>
-</ul>
-<p><strong>✅ Setelah login berhasil:</strong></p>
-<ul>
-<li>Sistem membuat session token unik.</li>
-<li>User diarahkan ke halaman <strong>Main Page</strong>.</li>
-<li>Status login disimpan di daftar aktif (Active Users).</li>
-</ul>
-<p><strong>⚠️ Keamanan:</strong></p>
-<ul>
-<li>Satu user hanya bisa login di satu sesi aktif.</li>
-<li>Login baru otomatis mengeluarkan sesi sebelumnya.</li>
-</ul>
-</section>
-
-<section class="section">
-<h2>🏠 MAIN PAGE</h2>
-<p><strong>URL:</strong> <code>/main</code> (atau <code>/</code>)</p>
-<p>Halaman utama menampilkan tampilan dashboard umum dan navigasi sidebar. Dari sini user dapat menuju ke seluruh fitur utama.</p>
-<p><strong>Elemen utama:</strong></p>
-<ul>
-<li><strong>Sidebar kiri</strong> → daftar halaman (Data Availability, Time Accuracy, Error Analysis, dsb.)</li>
-<li><strong>Header box</strong> → judul, deskripsi singkat, dan jam digital real-time.</li>
-<li><strong>Footer</strong> → “Powered by Terrindo”</li>
-<li><strong>Background</strong> → gradasi biru (#0a2a6b → #0078d7) dengan font Inter.</li>
-</ul>
-<p>Sidebar dapat disembunyikan/diperluas (collapse) dan sistem menyimpan status terakhirnya menggunakan <em>localStorage</em> (tetap sama meski pindah halaman).</p>
-</section>
-
-<section class="section">
-<h2>📊 DASHBOARD PAGE</h2>
-<p><strong>URL:</strong> <code>/dashboard</code></p>
-<p><strong>Fungsi:</strong> Melihat daftar file radiosonde dari FTP berdasarkan ekstensi dan batas jumlah.</p>
-<ul>
-<li>Dropdown filter ekstensi (<code>.bfr</code>, <code>.bufr</code>, <code>.bfh</code>, <code>.bin</code>)</li>
-<li>Input limit untuk membatasi jumlah file per site.</li>
-<li>Tabel menampilkan site dan file terbaru.</li>
-<li>Semua data diambil dari fungsi <code>fetch_all_sites()</code>.</li>
-</ul>
-<p>Halaman ini berguna bagi operator untuk memantau data terbaru per site.</p>
-</section>
-
-<section class="section">
-<h2>🕒 TIME ACCURACY PAGE</h2>
-<p><strong>URL:</strong> <code>/time_accuracy</code></p>
-<p>Menampilkan grafik <strong>akurasi waktu peluncuran</strong> terhadap pesan AA–DD.</p>
-<ul>
-<li>Mengambil data dari <code>/api/time_accuracy/&lt;site&gt;</code></li>
-<li>Grafik menunjukkan waktu mencapai 100 hPa (AB) dan 30 hPa (CD)</li>
-<li>Perbandingan dilakukan per tanggal (00Z dan 12Z)</li>
-<li>Dapat memilih site dan bulan tertentu melalui dropdown/filter</li>
-</ul>
-<p>Gunanya untuk mengevaluasi keakuratan waktu peluncuran radiosonde.</p>
-</section>
-
-<section class="section">
-<h2>📈 HEIGHT REACH PAGE</h2>
-<p><strong>URL:</strong> <code>/height_reach</code></p>
-<p>Menampilkan grafik capaian maksimum ketinggian setiap peluncuran.</p>
-<ul>
-<li>Sumber data dari <code>/api/height_reach/&lt;site&gt;</code></li>
-<li>Sumbu X = tanggal, Sumbu Y = tinggi maksimum (m)</li>
-<li>Warna atau tooltip menunjukkan tekanan minimum yang tercapai</li>
-<li>Bermanfaat untuk memastikan performa balon dan sensor</li>
-</ul>
-<p>Halaman ini menunjukkan seberapa tinggi radiosonde berhasil naik sebelum burst.</p>
-</section>
-
-<section class="section">
-<h2>📆 DATA AVAILABILITY PAGE</h2>
-<p><strong>URL:</strong> <code>/data_availability</code></p>
-<p>Menampilkan kalender ketersediaan data radiosonde dalam 1 bulan.</p>
-<ul>
-<li>Data diambil dari <code>/api/data_availability</code></li>
-<li>Grid kalender menunjukkan status setiap hari (00Z dan 12Z)</li>
-<li>Warna indikator:<br>🟥 Merah – tidak ada data   🟨 Kuning – sebagian file hilang   🟩 Hijau – semua file tersedia</li>
-<li>Tooltip menampilkan detail file yang hilang</li>
-</ul>
-<p>Halaman ini digunakan untuk audit ketersediaan data per site dan per hari.</p>
-</section>
-
-<section class="section">
-<h2>🌡️ ERROR ANALYSIS PAGE</h2>
-<p><strong>URL:</strong> <code>/error_analysis</code></p>
-<p>Menganalisis kualitas data berdasarkan parameter fisika atmosfer.</p>
-<ul>
-<li>File diambil dari <code>/upload_bufr</code></li>
-<li>Menampilkan empat grafik utama terhadap ketinggian: Temperature, Relative Humidity, Wind Speed, Wind Direction</li>
-<li>Hasil QC ditampilkan otomatis oleh fungsi <code>deepPhysics()</code> (mendeteksi cold-point, inversion, freeze-out RH, wind shear, burst, dll.)</li>
-<li>Setiap hasil analisis ditampilkan di panel deskripsi bawah grafik.</li>
-</ul>
-<p>Halaman ini penting untuk verifikasi otomatis kualitas sounding.</p>
-</section>
-
-<section class="section">
-<h2>🧭 TRAJECTORY 3D PAGE</h2>
-<p><strong>URL:</strong> <code>/trajectory3d</code></p>
-<p>Visualisasi lintasan radiosonde dalam ruang 3D menggunakan Deck.gl + MapLibre.</p>
-<ul>
-<li>Data diambil dari <code>/api/trajectory3d</code></li>
-<li>Menampilkan jalur (lon, lat, height) sebagai trip animation</li>
-<li>Informasi tambahan: durasi, maksimum tinggi, dan posisi stasiun</li>
-<li>Mendukung animasi interaktif (berjalan sesuai timestamp)</li>
-</ul>
-<p>Fitur ini memberikan pandangan spasial perjalanan radiosonde.</p>
-</section>
-
-<section class="section">
-<h2>📉 ANALYSIS / RAOB PAGE</h2>
-<p><strong>URL:</strong> <code>/analysis</code> atau <code>/raob/&lt;site&gt;/&lt;filename&gt;</code></p>
-<p>Analisis meteorologi mendalam menggunakan diagram Skew-T dan Hodograph.</p>
-<ul>
-<li>Decode data dari FTP atau DB via <code>/api/raob</code></li>
-<li>Menampilkan Skew-T (Temperature, Dewpoint, Parcel Path) dan Hodograph (Profil angin warna = ketinggian)</li>
-<li>Menampilkan indeks CAPE, CIN, LCL, Lifted Index, K Index, Wind Shear, SRH serta tropopause</li>
-<li>Gambar hasil disimpan sementara di server.</li>
-</ul>
-<p>Digunakan untuk mengevaluasi kestabilan atmosfer dan potensi konvektif.</p>
-</section>
-
-<section class="section">
-<h2>🗺️ MAP VIEW PAGE</h2>
-<p><strong>URL:</strong> <code>/map</code></p>
-<p>Peta interaktif (Leaflet) untuk menampilkan posisi lintasan radiosonde.</p>
-<ul>
-<li>Menampilkan marker site dan path radiosonde (lon/lat)</li>
-<li>Mendukung zoom dan pan</li>
-<li>Terkoneksi langsung dengan data terakhir yang di-upload</li>
-</ul>
-</section>
-
-<section class="section">
-<h2>⚙️ SETTINGS PAGE</h2>
-<p><strong>URL:</strong> <code>/settings</code></p>
-<p>Panel administrasi untuk konfigurasi user dan BUFR mapping.</p>
-<h3>Tab 1 – User Management</h3>
-<ul>
-<li>Menampilkan daftar user dari <code>users.json</code></li>
-<li>Admin dapat mengubah expiry date, mengatur halaman akses, menambah/menghapus user</li>
-</ul>
-<h3>Tab 2 – BUFR Mapping Config</h3>
-<ul>
-<li>Menampilkan struktur mapping field BUFR (meta &amp; level)</li>
-<li>Dapat mengubah/menambah variabel per site dan otomatis tersimpan ke file JSON</li>
-</ul>
-<p>Halaman ini hanya dapat diakses oleh admin.</p>
-</section>
-
-<section class="section">
-<h2>📦 RELEASE PAGE</h2>
-<p><strong>URL:</strong> <code>/release</code></p>
-<p>Menampilkan catatan rilis (release notes) sistem Rason Monitoring.</p>
-<blockquote><strong>v1.0.2 – 25 Oktober 2025</strong><br>Database FTP &amp; SQLite comparison update – Sinkronisasi lebih cepat dan sederhana.</blockquote>
-</section>
-
-<section class="section">
-<h2>🧩 UNDER DEVELOPMENT PAGE</h2>
-<p><strong>URL:</strong> <code>/underdev</code></p>
-<p>Halaman placeholder untuk fitur yang sedang dalam tahap pengembangan. Tampilannya mengikuti tema utama sistem (sidebar, header, footer).</p>
-</section>
-
-<section class="section">
-<h2>🚪 LOGOUT</h2>
-<p><strong>URL:</strong> <code>/logout</code></p>
-<ul>
-<li>Menghapus session aktif dan cookie browser.</li>
-<li>User langsung diarahkan ke halaman login.</li>
-<li>Status user dihapus dari daftar <code>ACTIVE_USERS</code>.</li>
-</ul>
-</section>
-
-<section class="section">
-<h2>👑 ADMIN FEATURES</h2>
-<p>Admin memiliki akses penuh terhadap semua halaman dan API:</p>
-<ul>
-<li>Menambahkan / menghapus user</li>
-<li>Memaksa logout semua user (<code>/admin/logout_all</code>)</li>
-<li>Melihat daftar user aktif (<code>/admin/active_users</code>)</li>
-<li>Mengubah expiry date dan akses halaman setiap user</li>
-<li>Mengatur konfigurasi site dan mapping BUFR</li>
-</ul>
-</section>
-
-<section class="section">
-<h2>🧭 SUMMARY</h2>
-<p><strong>Rason Monitoring v1.1.0</strong> menyediakan sistem analisis radiosonde lengkap: login aman, tampilan modern, otomatis dari FTP, QC fisika, dan analisis RAOB profesional.</p>
-<blockquote>“Satu platform untuk memantau, menganalisis, dan memverifikasi data radiosonde nasional.”</blockquote>
-<p><strong>Developed by PT. Terrindo Media Raya</strong><br>Author: Nanda Miftahul Khoyri   •   Release Date: 28 October 2025</p>
-</section>
-
-</div>
-
-<footer class="doc__footer">
-  <div>© {{ current_year or "2025" }} • RASON Monitoring User Guide v1.1.0</div>
-  <div class="brand">
-    <img src="{{ url_for('static', filename='images/terrindo.png') }}" alt="Terrindo">
-    <span>Powered by Terrindo</span>
+  <!-- 📖 Table of Contents -->
+  <div class="toc-popup" id="tocPopup">
+    <h3>📖 Table of Contents</h3>
+  
+    <a href="#" data-goto="page-login">🔑 Login Page</a>
+    <a href="#" data-goto="page-main">🏠 Main Page</a>
+    <a href="#" data-goto="page-dashboard">📊 Dashboard</a>
+    <a href="#" data-goto="page-map">🗺️ Map Viewer</a>
+    <a href="#" data-goto="page-trajectory">🌐 3D Trajectory</a>
+    <a href="#" data-goto="page-time">🕒 Time Accuracy</a>
+    <a href="#" data-goto="page-height">🎈 Height Reach</a>
+    <a href="#" data-goto="page-availability">📅 Data Availability</a>
+    <a href="#" data-goto="page-error">⚠️ Error Analysis</a>
+    <a href="#" data-goto="page-settings">⚙️ Settings</a>
   </div>
-</footer>
 
-</main>
+
+  <script>
+    const pages = document.querySelectorAll('.page');
+    let currentPage = 0;
+    function navigatePage(direction) {
+      pages[currentPage].classList.remove('active');
+      currentPage = (currentPage + direction + pages.length) % pages.length;
+      pages[currentPage].classList.add('active');
+    }
+    function toggleTOC() {
+      const toc = document.getElementById('tocPopup');
+      toc.style.display = toc.style.display === 'block' ? 'none' : 'block';
+    }
+    document.querySelectorAll('#tocPopup a').forEach(link => {
+      link.onclick = e => {
+        e.preventDefault();
+        const targetId = link.getAttribute('data-goto');
+        const idx = [...pages].findIndex(p => p.id === targetId);
+        if (idx >= 0) {
+          pages[currentPage].classList.remove('active');
+          currentPage = idx;
+          pages[currentPage].classList.add('active');
+        }
+        toggleTOC();
+      };
+    });
+  </script>
 </body>
 </html>

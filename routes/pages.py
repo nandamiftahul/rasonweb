@@ -215,7 +215,5 @@ def roadmap_page():
     return render_template("roadmap.html")
 
 @pages.route("/user_guide")
-@login_required
-@page_access_required("user_guide")
 def user_guide_page():
     return render_template("user_guide.html")
