@@ -21,7 +21,7 @@ from metpy.units import units
 from metpy.plots import SkewT, Hodograph
 from scipy.signal import medfilt
 from geopy.distance import geodesic
-from core.auth import login_required, get_user_store, VALID_USERS, USER_SESSION_TOKENS, USER_STATE
+from core.auth import login_required, get_user_store, save_users, generate_password_hash, VALID_USERS, USER_SESSION_TOKENS, USER_STATE
 from core.db import db_get, db_insert, DB_PATH
 from core.ftp import fetch_all_sites, download_from_ftp, download_and_process
 from core.bufr_parser import decode_bufr, parse_bufr, generate_wmo_temp
@@ -38,7 +38,6 @@ from config.settings import (
     UPLOAD_FOLDER,
     CONFIG,
 )
-
 
 api = Blueprint("api", __name__, url_prefix="")
 
@@ -1084,15 +1083,72 @@ def api_bufrmap_full():
     if section not in ["meta", "level"]:
         return jsonify({"error": "Invalid mapping type"}), 400
 
-    if request.method == "POST":
-        mapping[section].append({"original": data["original"], "variable": data["variable"]})
-
+    # =========================================================
+    # POST — Add new mapping entry
+    # =========================================================
+    elif request.method == "POST":
+        js = request.get_json(force=True)
+        section = js.get("type")  # "meta" or "level"
+        original = js.get("original", "").strip()
+        variable = js.get("variable", "").strip()
+        code = js.get("code", "").strip()  # ✅ new
+    
+        if section not in ("meta", "level"):
+            return jsonify({"error": "Invalid mapping type"}), 400
+        if not original or not variable:
+            return jsonify({"error": "Missing field(s)"}), 400
+    
+        # prevent duplicates
+        if any(m["original"] == original for m in mapping[section]):
+            return jsonify({"error": f"Field '{original}' already exists"}), 400
+    
+        mapping[section].append({"code": code, "original": original, "variable": variable})
+        if save_mapping(mapping):
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to save mapping"}), 500
+    
+    # =========================================================
+    # PUT — Update mapping (now edits original or code)
+    # =========================================================
     elif request.method == "PUT":
+        js = request.get_json(force=True)
+        section = js.get("type")
+    
+        # ✅ Special case: full JSON import
+        if section == "full" and "data" in js:
+            data = js["data"]
+            if "meta" in data and "level" in data:
+                if save_mapping(data):
+                    return jsonify({"success": True})
+            return jsonify({"error": "Invalid JSON structure"}), 400
+    
+        original = js.get("original", "").strip()
+        new_original = js.get("new_original", "").strip()
+        variable = js.get("variable", "").strip()
+        code = js.get("code", "").strip()
+    
+        if section not in ("meta", "level"):
+            return jsonify({"error": "Invalid mapping type"}), 400
+    
+        updated = False
         for m in mapping[section]:
-            if m["original"] == data["original"]:
-                m["variable"] = data["variable"]
+            if m["original"] == original:
+                if new_original:
+                    m["original"] = new_original
+                if code:
+                    m["code"] = code
+                if variable:
+                    m["variable"] = variable
+                updated = True
                 break
-
+    
+        if not updated:
+            return jsonify({"error": f"Field '{original}' not found"}), 404
+    
+        if save_mapping(mapping):
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to save mapping"}), 500
+    
     elif request.method == "DELETE":
         mapping[section] = [m for m in mapping[section] if m["original"] != data["original"]]
 
@@ -1211,29 +1267,30 @@ def api_bufrmap_site(site):
         section = js.get("type")  # "meta" or "level"
         original = js.get("original", "").strip()
         variable = js.get("variable", "").strip()
-
+        code = js.get("code", "").strip()  # ✅ new
+    
         if section not in ("meta", "level"):
             return jsonify({"error": "Invalid mapping type"}), 400
         if not original or not variable:
             return jsonify({"error": "Missing field(s)"}), 400
-
+    
         # prevent duplicates
         if any(m["original"] == original for m in mapping[section]):
             return jsonify({"error": f"Field '{original}' already exists"}), 400
-
-        mapping[section].append({"original": original, "variable": variable})
+    
+        mapping[section].append({"code": code, "original": original, "variable": variable})
         if save_mapping(mapping):
             return jsonify({"success": True})
         return jsonify({"error": "Failed to save mapping"}), 500
-
+    
     # =========================================================
-    # PUT — Update mapping variable
+    # PUT — Update mapping (now edits original or code)
     # =========================================================
     elif request.method == "PUT":
         js = request.get_json(force=True)
         section = js.get("type")
     
-        # ✅ Special case: full JSON import (from Load JSON in settings.html)
+        # ✅ Special case: full JSON import
         if section == "full" and "data" in js:
             data = js["data"]
             if "meta" in data and "level" in data:
@@ -1241,16 +1298,23 @@ def api_bufrmap_site(site):
                     return jsonify({"success": True})
             return jsonify({"error": "Invalid JSON structure"}), 400
     
-        # --- Normal single-field update ---
         original = js.get("original", "").strip()
+        new_original = js.get("new_original", "").strip()
         variable = js.get("variable", "").strip()
+        code = js.get("code", "").strip()
+    
         if section not in ("meta", "level"):
             return jsonify({"error": "Invalid mapping type"}), 400
     
         updated = False
         for m in mapping[section]:
             if m["original"] == original:
-                m["variable"] = variable
+                if new_original:
+                    m["original"] = new_original
+                if code:
+                    m["code"] = code
+                if variable:
+                    m["variable"] = variable
                 updated = True
                 break
     
@@ -1260,7 +1324,6 @@ def api_bufrmap_site(site):
         if save_mapping(mapping):
             return jsonify({"success": True})
         return jsonify({"error": "Failed to save mapping"}), 500
-    
 
     # =========================================================
     # DELETE — Remove mapping entry

@@ -194,7 +194,12 @@
     <h2>📘 Metadata Mapping</h2>
     <table id="metaTable">
       <thead>
-        <tr><th>Original Field (Keyword / Descriptor)</th><th>Variable Name</th><th>Action</th></tr>
+        <tr>
+          <th>BUFR Code</th>
+          <th>Original Field</th>
+          <th>Variable Name</th>
+          <th>Action</th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -208,15 +213,21 @@
     <h2>📊 Per-Level Data Mapping</h2>
     <table id="levelTable">
       <thead>
-        <tr><th>Original Field (Keyword / Descriptor)</th><th>Variable Name</th><th>Action</th></tr>
+        <tr>
+          <th>BUFR Code</th>
+          <th>Original Field</th>
+          <th>Variable Name</th>
+          <th>Action</th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
 
     <div class="add-section">
-      <input type="text" id="newLevelField" placeholder="e.g. PRESSURE">
-      <input type="text" id="newLevelVar" placeholder="e.g. pressure_hPa">
-      <button onclick="addMapping('level')">Add Level Field</button>
+      <input type="text" id="newMetaCode" placeholder="e.g. 0-01-002">
+      <input type="text" id="newMetaField" placeholder="e.g. RADIOSONDE SERIAL NUMBER">
+      <input type="text" id="newMetaVar" placeholder="e.g. radiosonde_serial_number">
+      <button onclick="addMapping('meta')">Add Metadata</button>
     </div>
   </div>
 
@@ -513,55 +524,62 @@
       const metaBody = document.querySelector("#metaTable tbody");
       const levelBody = document.querySelector("#levelTable tbody");
       metaBody.innerHTML = ""; levelBody.innerHTML = "";
-
+    
       data.meta.forEach(m => {
         metaBody.innerHTML += `
           <tr>
+            <td>${m.code || "-"}</td>
             <td>${m.original}</td>
             <td>${m.variable}</td>
             <td>
-              <button class="btn-edit" onclick="editMapping('meta','${m.original}','${m.variable}')">Edit</button>
+              <button class="btn-edit" onclick="editMapping('meta','${m.original}','${m.variable}','${m.code || ''}')">Edit</button>
               <button class="btn-del" onclick="deleteMapping('meta','${m.original}')">Delete</button>
             </td>
           </tr>`;
       });
+    
       data.level.forEach(l => {
         levelBody.innerHTML += `
           <tr>
+            <td>${l.code || "-"}</td>
             <td>${l.original}</td>
             <td>${l.variable}</td>
             <td>
-              <button class="btn-edit" onclick="editMapping('level','${l.original}','${l.variable}')">Edit</button>
+              <button class="btn-edit" onclick="editMapping('level','${l.original}','${l.variable}','${l.code || ''}')">Edit</button>
               <button class="btn-del" onclick="deleteMapping('level','${l.original}')">Delete</button>
             </td>
           </tr>`;
       });
     }
-
+    
     async function addMapping(type) {
+      const code = document.getElementById(`new${type==='meta'?'Meta':'Level'}Code`).value.trim();
       const field = document.getElementById(`new${type==='meta'?'Meta':'Level'}Field`).value.trim();
       const variable = document.getElementById(`new${type==='meta'?'Meta':'Level'}Var`).value.trim();
       if (!field || !variable) return alert("Please fill both fields.");
+    
       const res = await fetch(`/api/bufrmap/${currentSite}`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({type, original: field, variable})
+        body: JSON.stringify({type, code, original: field, variable})
       });
       const json = await res.json();
       alert(json.success ? "✅ Mapping added" : json.error);
       loadMappings();
     }
-
-    async function editMapping(type, original, variable) {
-      const newVar = prompt(`New variable name for "${original}":`, variable);
-      if (!newVar) return;
+    
+    async function editMapping(type, original, variable, code) {
+      const newOrig = prompt(`Edit Original Field:`, original);
+      if (!newOrig) return;
+      const newCode = prompt(`Edit BUFR Code (e.g. 0-01-002):`, code || "");
       const res = await fetch(`/api/bufrmap/${currentSite}`, {
         method: 'PUT', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({type, original, variable: newVar})
+        body: JSON.stringify({type, original, new_original: newOrig, code: newCode, variable})
       });
       const json = await res.json();
-      alert(json.success ? "✏️ Mapping updated" : json.error);
+      alert(json.success ? "✏️ Field updated" : json.error);
       loadMappings();
     }
+
 
     async function deleteMapping(type, original) {
       if (!confirm(`Delete mapping for "${original}"?`)) return;
@@ -886,6 +904,7 @@ async function deleteSite(name) {
         const res = await fetch("/api/user_pages", {
           method: "PUT",
           headers: {"Content-Type": "application/json"},
+          credentials: "same-origin",
           body: JSON.stringify({username: currentEditUser, pages: selectedPages})
         });
     
