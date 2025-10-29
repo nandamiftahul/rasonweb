@@ -210,10 +210,13 @@
 
   <!-- MAIN -->
   <main id="guide-container">
-
     <!-- 🔑 LOGIN PAGE -->
     <section class="page active" id="page-login" data-title="Login Page">
       <h2>🔑 LOGIN PAGE — DETAILED GUIDE</h2>
+      <img src="{{ url_for('static', filename='images/guide/login_page.png') }}" 
+           alt="Login Page Preview" 
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+      
       <p>Halaman login merupakan pintu masuk utama sistem <strong>Radiosonde Monitoring</strong>. 
       Pengguna harus memasukkan kredensial yang valid untuk mendapatkan akses ke seluruh fitur web.</p>
 
@@ -246,7 +249,10 @@
       <img src="{{ url_for('static', filename='images/guide/main_page.png') }}" 
            alt="Main Page Preview" 
            style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-          
+      <img src="{{ url_for('static', filename='images/guide/card-main.png') }}" 
+           alt="Main Page Preview" 
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                    
       <p><strong>Main Page</strong> adalah pusat utama sistem <em>Radiosonde Monitoring</em>, menampilkan peta interaktif Indonesia beserta status real-time dari setiap site pengamatan radiosonde BMKG. Dari sini, pengguna dapat memantau aktivitas site, melihat status “online/offline/inflight/preparing”, dan mengakses seluruh fitur analisis melalui sidebar kiri.</p>
     
       <h3>🧭 Komponen Utama</h3>
