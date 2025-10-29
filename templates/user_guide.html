@@ -210,8 +210,62 @@
 
   <!-- MAIN -->
   <main id="guide-container">
+  
+    <!-- 🛰️ OVERVIEW PAGE -->
+    <section class="page active" id="page-overview" data-title="Overview">
+      <h2>🛰️ OVERVIEW — SYSTEM INTRODUCTION</h2>
+      <p><strong>RASON Monitoring</strong> (Radiosonde Monitoring System) merupakan platform terpadu yang dikembangkan oleh 
+         <b>PT. Terrindo Media Raya</b> bekerja sama dengan <b>BMKG</b>
+         untuk memantau, menganalisis, dan memverifikasi data radiosonde secara real-time dan historis.</p>
+    
+      <h3>🎯 Tujuan Sistem</h3>
+      <ul>
+        <li>Menyediakan pemantauan terpadu seluruh site radiosonde BMKG di Indonesia.</li>
+        <li>Mengintegrasikan data dari server FTP, SQLite cache, dan sistem decoding BUFR/BFR/BFH/BIN.</li>
+        <li>Menampilkan analisis grafis dan fisika atmosfer secara otomatis melalui antarmuka web interaktif.</li>
+        <li>Mendukung evaluasi performa sensor, keandalan peluncuran, serta ketepatan waktu operasional.</li>
+      </ul>
+    
+      <h3>🧩 Arsitektur Umum</h3>
+      <ul>
+        <li><b>Backend:</b> Flask API (Python 3.12) dengan modul decoding & QC otomatis.</li>
+        <li><b>Frontend:</b> HTML5 + Chart.js + Leaflet + Deck.gl + MapLibre GL.</li>
+        <li><b>Database:</b> SQLite lokal + sinkronisasi FTP radiosonde BMKG.</li>
+        <li><b>Deployment:</b> Gunicorn + Nginx (Unix Socket), mode multi-site.</li>
+      </ul>
+    
+      <h3>🗂️ Struktur Modul</h3>
+      <ul>
+        <li><b>🔑 Login Page</b> — autentikasi user dan validasi masa aktif akun.</li>
+        <li><b>🏠 Main Page</b> — peta nasional status radiosonde & navigasi utama.</li>
+        <li><b>📊 Dashboard</b> — daftar file & metadata hasil peluncuran.</li>
+        <li><b>🗺️ Map Viewer</b> — peta 2D lintasan radiosonde.</li>
+        <li><b>🌐 3D Trajectory</b> — visualisasi tiga dimensi jalur balon.</li>
+        <li><b>🕒 Time Accuracy</b> — analisis ketepatan waktu peluncuran.</li>
+        <li><b>🎈 Height Reach</b> — grafik ketinggian maksimum per site.</li>
+        <li><b>📅 Data Availability</b> — tabel kelengkapan data bulanan.</li>
+        <li><b>⚠️ Error Analysis</b> — QC otomatis berbasis fisika atmosfer.</li>
+        <li><b>⚙️ Settings</b> — panel konfigurasi admin & manajemen user.</li>
+      </ul>
+    
+      <h3>💡 Pengembangan dan Pemeliharaan</h3>
+      <p>Sistem ini dikembangkan secara modular agar mudah diperluas untuk integrasi data lain 
+         (misalnya Wind Profiler, Himawari IR Overlay, atau RAOB Skew-T Analysis).  
+         Semua modul dioptimalkan agar berjalan ringan di browser modern (Firefox, Chrome, Edge).</p>
+    
+      <div style="display:flex;justify-content:center;align-items:center;gap:20px;margin-top:30px;">
+        <img src="{{ url_for('static', filename='images/bmkg2.png') }}" alt="BMKG Logo" style="height:60px;">
+        <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo" style="height:60px;">
+      </div>
+    
+      <p style="text-align:center;margin-top:15px;font-style:italic;opacity:0.85;">
+        "A unified platform for radiosonde data visualization, validation, and analysis —  
+        developed by Terrindo"
+      </p>
+    </section>
+
     <!-- 🔑 LOGIN PAGE -->
-    <section class="page active" id="page-login" data-title="Login Page">
+    <section class="page" id="page-login" data-title="Login Page">
       <h2>🔑 LOGIN PAGE — DETAILED GUIDE</h2>
       <img src="{{ url_for('static', filename='images/guide/login_page.png') }}" 
            alt="Login Page Preview" 
@@ -993,7 +1047,8 @@
   <!-- 📖 Table of Contents -->
   <div class="toc-popup" id="tocPopup">
     <h3>📖 Table of Contents</h3>
-  
+    
+    <a href="#" data-goto="page-overview">🛰️ Overview</a>
     <a href="#" data-goto="page-login">🔑 Login Page</a>
     <a href="#" data-goto="page-main">🏠 Main Page</a>
     <a href="#" data-goto="page-dashboard">📊 Dashboard</a>
