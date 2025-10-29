@@ -205,6 +205,7 @@
     </table>
 
     <div class="add-section">
+      <input type="text" id="newMetaCode" placeholder="e.g. 0-01-002">
       <input type="text" id="newMetaField" placeholder="e.g. RADIOSONDE SERIAL NUMBER">
       <input type="text" id="newMetaVar" placeholder="e.g. radiosonde_serial_number">
       <button onclick="addMapping('meta')">Add Metadata</button>
@@ -223,11 +224,12 @@
       <tbody></tbody>
     </table>
 
-    <div class="add-section">
-      <input type="text" id="newMetaCode" placeholder="e.g. 0-01-002">
-      <input type="text" id="newMetaField" placeholder="e.g. RADIOSONDE SERIAL NUMBER">
-      <input type="text" id="newMetaVar" placeholder="e.g. radiosonde_serial_number">
-      <button onclick="addMapping('meta')">Add Metadata</button>
+      <div class="add-section">
+        <input type="text" id="newLevelCode" placeholder="e.g. 0-01-002">
+        <input type="text" id="newLevelField" placeholder="e.g. PRESSURE">
+        <input type="text" id="newLevelVar" placeholder="e.g. pressure_hPa">
+        <button onclick="addMapping('level')">Add Level Data</button>
+      </div>
     </div>
   </div>
 
@@ -552,33 +554,41 @@
       });
     }
     
-    async function addMapping(type) {
-      const code = document.getElementById(`new${type==='meta'?'Meta':'Level'}Code`).value.trim();
-      const field = document.getElementById(`new${type==='meta'?'Meta':'Level'}Field`).value.trim();
-      const variable = document.getElementById(`new${type==='meta'?'Meta':'Level'}Var`).value.trim();
-      if (!field || !variable) return alert("Please fill both fields.");
-    
-      const res = await fetch(`/api/bufrmap/${currentSite}`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({type, code, original: field, variable})
-      });
-      const json = await res.json();
-      alert(json.success ? "✅ Mapping added" : json.error);
-      loadMappings();
-    }
-    
-    async function editMapping(type, original, variable, code) {
-      const newOrig = prompt(`Edit Original Field:`, original);
-      if (!newOrig) return;
-      const newCode = prompt(`Edit BUFR Code (e.g. 0-01-002):`, code || "");
-      const res = await fetch(`/api/bufrmap/${currentSite}`, {
-        method: 'PUT', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({type, original, new_original: newOrig, code: newCode, variable})
-      });
-      const json = await res.json();
-      alert(json.success ? "✏️ Field updated" : json.error);
-      loadMappings();
-    }
+async function addMapping(type) {
+  const code = document.getElementById(`new${type==='meta'?'Meta':'Level'}Code`).value.trim();
+  const field = document.getElementById(`new${type==='meta'?'Meta':'Level'}Field`).value.trim();
+  const variable = document.getElementById(`new${type==='meta'?'Meta':'Level'}Var`).value.trim();
+  if (!field || !variable) return alert("Please fill both fields.");
+
+  const res = await fetch(`/api/bufrmap/${currentSite}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({type, code, original: field, variable})
+  });
+  const json = await res.json();
+  alert(json.success ? "✅ Mapping added" : json.error);
+  loadMappings();
+}
+
+async function editMapping(type, original, variable, code) {
+  const newOrig = prompt(`Edit Original Field:`, original);
+  if (!newOrig) return;
+  const newCode = prompt(`Edit BUFR Code (e.g. 0-01-002):`, code || "");
+  const newVar = prompt(`Edit Variable Name:`, variable);
+
+  const res = await fetch(`/api/bufrmap/${currentSite}`, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      type,
+      original,
+      new_original: newOrig,
+      code: newCode,
+      variable: newVar
+    })
+  });
+  const json = await res.json();
+  alert(json.success ? "✏️ Field updated" : json.error);
+  loadMappings();
+}
 
 
     async function deleteMapping(type, original) {
