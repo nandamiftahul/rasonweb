@@ -192,11 +192,11 @@ def parse_bufr(decoded_text, site="default"):
                 current[key] = val
                 matched_level = True
                 break
-        #print(meta) 
-        #print(current) 
+   
         if matched_level:
             continue
-
+    print(meta) 
+    print(current)    
     if current:
         levels.append(current)
 
