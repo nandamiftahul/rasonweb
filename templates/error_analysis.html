@@ -468,7 +468,7 @@
       <label>Date:</label><input type="date" id="dateSelect">
       <label>Hour:</label><select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
       <label>File:</label><select id="typeSelect">
-        <option value="bfr">BFR</option><option value="bufr">BUFR</option><option value="bfh">BFH</option><option value="bin">BIN</option>
+        <option value="bin">bin</option><option value="bfr">bfr</option><option value="bfh">bfh</option><option value="bufr">bufr</option>
       </select>
       <button id="filterBtn">📁 List Files</button>
     </div>
@@ -571,6 +571,7 @@
   <!-- Footer -->
   <div class="footer">
     <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodemori.png') }}" alt="Meteomodem Logo" style="height: 20px; width: auto;">
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
   </div>
 
@@ -1191,7 +1192,9 @@ function renderTable(levels,RH,WS,WD){
     function logoutUser() {
       window.location.href = "{{ url_for('pages.logout') }}";
     }
-    
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateSelect').value = today;    
     loadUserInfo();
  </script>
 </body>

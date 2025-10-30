@@ -296,7 +296,7 @@
     border: 1px solid rgba(255,255,255,0.2);
     border-radius: 10px;
     padding: 15px;
-    max-height: 500px;
+    max-height: 550px;
     overflow-y: auto;
     flex: 0 0 320px;              /* agak lebar sedikit */
     color: #fff;
@@ -460,6 +460,51 @@
       background: rgba(255,255,255,0.35);
       color: #fff;
     }
+/* === Site Ranking Table (di bawah chart) === */
+.ranking-box {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  padding: 20px;
+  color: #fff;
+  margin-left: 0;
+  margin-right: auto;
+  width: 60%;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+}
+
+.ranking-box h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  color: #fff;
+  text-align: center;
+}
+
+.ranking-box table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #fff;
+}
+
+.ranking-box th, .ranking-box td {
+  padding: 6px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+
+.ranking-box thead {
+  background: rgba(255,255,255,0.25);
+  font-weight: 600;
+}
+
+.ranking-box tbody tr:nth-child(even) {
+  background: rgba(255,255,255,0.05);
+}
+.ranking-box tbody tr:first-child {
+  background: rgba(255,255,255,0.25);
+  font-weight: 600;
+}
     
   </style>
 </head>
@@ -547,13 +592,14 @@
         </table>
       </div>
     </div>
-
-
     <div id="summary" class="summary"></div>
+    <!-- 🔹 Ranking table di bawah chart -->
+    <div id="rankingSection" class="ranking-box" style="margin-top:25px;"></div>
   </div>
   <!-- Footer -->
   <div class="footer">
     <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodemori.png') }}" alt="Meteomodem Logo" style="height: 20px; width: auto;">
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
   </div>
 <script>
@@ -681,6 +727,7 @@
   
       siteSelect.value = sites[0];
       await loadTimeAccuracy(sites[0], year, month);
+      await showSiteRankingTable(year, month);
     } catch {
       loadingMsg.textContent = "Failed to load sites.";
     }
@@ -862,8 +909,14 @@
   }
 
   // ===== Event bindings =====
-  monthSelect.addEventListener("change", loadSites);
-  yearSelect.addEventListener("change", loadSites);
+monthSelect.addEventListener("change", ()=>{
+  loadSites();
+  showSiteRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
+});
+yearSelect.addEventListener("change", ()=>{
+  loadSites();
+  showSiteRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
+});
   siteSelect.addEventListener("change",()=>{
     loadTimeAccuracy(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value));
   });
@@ -913,7 +966,60 @@
     function logoutUser() {
       window.location.href = "{{ url_for('pages.logout') }}";
     }
-    
+// === Generate site ranking berdasarkan rata-rata preparation time ===
+async function showSiteRankingTable(year, month) {
+  const rankingBox = document.getElementById("rankingSection");
+  rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating ranking...</p>";
+
+  try {
+    const res = await fetch("/api/sites_config");
+    const data = await res.json();
+    const sites = (data.sites || []).map(s => s.name).sort();
+    const results = [];
+
+    for (const site of sites) {
+      const r = await fetch(`/api/time_accuracy/${site}?year=${year}&month=${month}`);
+      const j = await r.json();
+      const arr = (j.data || []).map(e => {
+        if (!e.launch_time) return null;
+        const launch = new Date(e.launch_time.replace(" ", "T") + "Z");
+        const base = new Date(launch);
+        if (e.hour === "00Z") base.setUTCHours(23, 30);
+        else if (e.hour === "12Z") base.setUTCHours(11, 30);
+        else base.setUTCHours(launch.getUTCHours() - 1, 30);
+        const diff = (launch - base) / 60000;
+        return diff >= 0 && diff < 360 ? diff : null;
+      });
+      const valid = arr.filter(x => x !== null);
+      const avg = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : NaN;
+      results.push({ site, avg });
+    }
+
+    results.sort((a, b) => a.avg - b.avg);
+
+    rankingBox.innerHTML = `
+      <h3>🏆 Site Ranking by Avg Preparation Time (${monthName(month)} ${year})</h3>
+      <table>
+        <thead>
+          <tr><th>Rank</th><th>Site</th><th>Avg (min)</th></tr>
+        </thead>
+        <tbody>
+          ${results.map((r, i) => `
+            <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
+              <td>${i + 1}</td>
+              <td>${r.site}</td>
+              <td>${isFinite(r.avg)?r.avg.toFixed(1):'-'}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    console.error(err);
+    rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate ranking.</p>";
+  }
+}
+
     loadUserInfo();
   updateUTCClock(); setInterval(updateUTCClock,1000);
 </script>

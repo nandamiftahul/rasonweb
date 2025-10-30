@@ -119,7 +119,7 @@ def parse_bufr(decoded_text, site="default"):
     # 🔹 3. Choose active mapping (same as before)
     # ==================================================================
     active_map = mapping if (mapping and "meta" in mapping and "level" in mapping) else default_mapping
-    print(active_map["meta"])
+    #print(active_map["meta"])
     # ==================================================================
     # 🔹 4. Original parsing logic (unchanged)
     # ==================================================================
@@ -194,8 +194,8 @@ def parse_bufr(decoded_text, site="default"):
    
         if matched_level:
             continue
-    print(meta) 
-    print(current)    
+    #print(meta) 
+    #print(current)    
     if current:
         levels.append(current)
 

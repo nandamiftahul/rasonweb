@@ -565,6 +565,7 @@
   </div>
   <div class="footer">
     <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodemori.png') }}" alt="Meteomodem Logo" style="height: 20px; width: auto;">
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}">
   </div>
   <!-- ✅ Loading overlay element -->
@@ -870,6 +871,17 @@ function generateCSV() {
     setInterval(updateUTCClock, 1000);
     // === Export CSV ===
     document.getElementById('btnCsv').addEventListener('click', generateCSV);
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').value = today; 
+    // Ambil tanggal hari ini
+    const tomorrow = new Date();
+    // Tambahkan 1 hari
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Format ke YYYY-MM-DD
+    const formatted = tomorrow.toISOString().split('T')[0];
+    // Set sebagai default value
+    document.getElementById('endDate').value = formatted;
   </script>
 </body>
 </html>

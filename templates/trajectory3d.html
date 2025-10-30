@@ -390,7 +390,7 @@
       <label>Date:</label><input type="date" id="dateSelect">
       <label>Hour:</label><select id="hourSelect"><option value="00">00Z</option><option value="12">12Z</option></select>
       <label>Type:</label>
-      <select id="typeSelect"><option value=".bfr">.bfr</option><option value=".bufr">.bufr</option><option value=".bfh">.bfh</option><option value=".bin">.bin</option></select>
+      <select id="typeSelect"><option value=".bin">.bin</option><option value=".bfr">.bfr</option><option value=".bfh">.bfh</option><option value=".bufr">.bufr</option></select>
       <button id="applyFilter">Apply</button>
 
       <!-- Uploader (ID & behavior dipertahankan) -->
@@ -451,6 +451,7 @@
   <!-- Footer -->
   <div class="footer">
     <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodemori.png') }}" alt="Meteomodem Logo" style="height: 20px; width: auto;">
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
   </div>
 
@@ -1046,7 +1047,9 @@ async function populateSites() {
 
 window.addEventListener("DOMContentLoaded", populateSites);
 
-
+// Get today's date in YYYY-MM-DD format
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('dateSelect').value = today; 
 loadUserInfo();
 </script>
 </body>

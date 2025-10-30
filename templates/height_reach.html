@@ -294,7 +294,7 @@
     border: 1px solid rgba(255,255,255,0.2);
     border-radius: 10px;
     padding: 15px;
-    max-height: 500px;
+    max-height: 630px;
     overflow-y: auto;
     flex: 0 0 320px;              /* agak lebar sedikit */
     color: #fff;
@@ -465,6 +465,52 @@
       background: rgba(255,255,255,0.35);
       color: #fff;
     }
+/* === Site Ranking Table (di bawah chart) === */
+.ranking-box {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  padding: 20px;
+  color: #fff;
+  margin-left: 0;
+  margin-right: auto;
+  width: 60%;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+}
+
+.ranking-box h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  color: #fff;
+  text-align: center;
+}
+
+.ranking-box table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #fff;
+}
+
+.ranking-box th, .ranking-box td {
+  padding: 6px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+
+.ranking-box thead {
+  background: rgba(255,255,255,0.25);
+  font-weight: 600;
+}
+
+.ranking-box tbody tr:nth-child(even) {
+  background: rgba(255,255,255,0.05);
+}
+
+.ranking-box tbody tr:first-child {
+  background: rgba(255,255,255,0.25);
+  font-weight: 600;
+}
         
   </style>
 </head>
@@ -561,12 +607,17 @@
           <p>Max Pressure: - hPa | Min Pressure: - hPa</p>
         </div>
       </div>
-      </div>
+
+    </div>
+      <!-- 🔹 Ranking table di bawah chart -->
+  <div id="rankingSection" class="ranking-box" style="margin-top:25px;"></div>
     </div>
   </div>
+
   <!-- Footer -->
   <div class="footer">
     <span>Powered by</span>
+    <img src="{{ url_for('static', filename='images/meteomodemori.png') }}" alt="Meteomodem Logo" style="height: 20px; width: auto;">
     <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo">
   </div>
 <script>
@@ -694,6 +745,7 @@
       const year = parseInt(yearSelect.value);
       const month = parseInt(monthSelect.value);
       await loadHeightReach(sites[0], year, month);
+      await showHeightRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
     } catch (err) {
       console.error("❌ Failed to load site list:", err);
       loadingMsg.textContent = "Failed to load sites.";
@@ -852,12 +904,14 @@
   }
 
   // ===== Event bindings =====
-  monthSelect.addEventListener("change", () =>
-    loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value))
-  );
-  yearSelect.addEventListener("change", () =>
-    loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value))
-  );
+  monthSelect.addEventListener("change", ()=>{
+    loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value));
+    showHeightRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
+  });
+  yearSelect.addEventListener("change", ()=>{
+    loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value));
+    showHeightRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
+  });
   siteSelect.addEventListener("change", () =>
     loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value))
   );
@@ -907,6 +961,50 @@
     function logoutUser() {
       window.location.href = "{{ url_for('pages.logout') }}";
     }
+// === Generate site ranking berdasarkan maksimum ketinggian ===
+async function showHeightRankingTable(year, month) {
+  const rankingBox = document.getElementById("rankingSection");
+  rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating ranking...</p>";
+
+  try {
+    const res = await fetch("/api/sites_config");
+    const data = await res.json();
+    const sites = (data.sites || []).map(s => s.name).sort();
+    const results = [];
+
+    for (const site of sites) {
+      const r = await fetch(`/api/height_reach/${site}?year=${year}&month=${month}`);
+      const j = await r.json();
+      const heights = (j.data || []).map(e => e.max_height).filter(v => v && isFinite(v));
+      const maxH = heights.length ? Math.max(...heights) : NaN;
+      results.push({ site, maxH });
+    }
+
+    // urut dari tertinggi ke terendah
+    results.sort((a, b) => b.maxH - a.maxH);
+
+    rankingBox.innerHTML = `
+      <h3>🏆 Site Ranking by Max Balloon Height (${monthName(month)} ${year})</h3>
+      <table>
+        <thead>
+          <tr><th>Rank</th><th>Site</th><th>Max Height (m)</th></tr>
+        </thead>
+        <tbody>
+          ${results.map((r, i) => `
+            <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
+              <td>${i + 1}</td>
+              <td>${r.site}</td>
+              <td>${isFinite(r.maxH)?r.maxH.toFixed(0):'-'}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    console.error(err);
+    rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate ranking.</p>";
+  }
+}
     
     loadUserInfo();
   updateUTCClock();
