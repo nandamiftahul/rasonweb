@@ -961,7 +961,7 @@
     function logoutUser() {
       window.location.href = "{{ url_for('pages.logout') }}";
     }
-// === Generate site ranking berdasarkan maksimum ketinggian ===
+// === Generate site ranking berdasarkan rata-rata maksimum ketinggian ===
 async function showHeightRankingTable(year, month) {
   const rankingBox = document.getElementById("rankingSection");
   rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating ranking...</p>";
@@ -976,25 +976,26 @@ async function showHeightRankingTable(year, month) {
       const r = await fetch(`/api/height_reach/${site}?year=${year}&month=${month}`);
       const j = await r.json();
       const heights = (j.data || []).map(e => e.max_height).filter(v => v && isFinite(v));
-      const maxH = heights.length ? Math.max(...heights) : NaN;
-      results.push({ site, maxH });
+
+      const avgH = heights.length ? heights.reduce((a, b) => a + b, 0) / heights.length : NaN;
+      results.push({ site, avgH });
     }
 
-    // urut dari tertinggi ke terendah
-    results.sort((a, b) => b.maxH - a.maxH);
+    // urut dari rata-rata tertinggi ke terendah
+    results.sort((a, b) => b.avgH - a.avgH);
 
     rankingBox.innerHTML = `
-      <h3>🏆 Site Ranking by Max Balloon Height (${monthName(month)} ${year})</h3>
+      <h3>🏆 Site Ranking by Average Max Balloon Height (${monthName(month)} ${year})</h3>
       <table>
         <thead>
-          <tr><th>Rank</th><th>Site</th><th>Max Height (m)</th></tr>
+          <tr><th>Rank</th><th>Site</th><th>Avg Max Height (m)</th></tr>
         </thead>
         <tbody>
           ${results.map((r, i) => `
             <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
               <td>${i + 1}</td>
               <td>${r.site}</td>
-              <td>${isFinite(r.maxH)?r.maxH.toFixed(0):'-'}</td>
+              <td>${isFinite(r.avgH)?r.avgH.toFixed(0):'-'}</td>
             </tr>
           `).join("")}
         </tbody>
