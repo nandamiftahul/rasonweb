@@ -10,7 +10,7 @@ DB_PATH = os.getenv("DB_PATH", os.path.join(BASE_DIR, "rason_data.db"))
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-SESSION_TIMEOUT_MINUTES = int(os.getenv("SESSION_TIMEOUT_MINUTES", "30"))
+SESSION_TIMEOUT_MINUTES = int(os.getenv("SESSION_TIMEOUT_MINUTES", "60"))
 SECRET_KEY = os.getenv("SECRETKEY", "Unknown")  # asalnya dipakai untuk Fernet & Flask secret
 
 # === Files ===

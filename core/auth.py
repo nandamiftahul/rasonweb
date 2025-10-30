@@ -108,11 +108,19 @@ def login_required(f):
         if last_active:
             last_active_dt = datetime.strptime(last_active, "%Y-%m-%d %H:%M:%S")
             inactive_minutes = (now - last_active_dt).total_seconds() / 60
-            if inactive_minutes > SESSION_TIMEOUT_MINUTES:
-                user = session.get("user")
-                print(f"⏰ Session expired for user '{user}' (inactive {inactive_minutes:.1f} min)")
+            user = session.get("user")
+            
+            # Tentukan timeout berbeda
+            if user == "display":
+                timeout_limit = 60 * 24 * 30   # 30 hari dalam menit
+            else:
+                timeout_limit = SESSION_TIMEOUT_MINUTES
+            
+            if inactive_minutes > timeout_limit:
+                print(f"⏰ Session expired for user '{user}' "
+                      f"(inactive {inactive_minutes:.1f} min / limit {timeout_limit} min)")
                 session.clear()
-                return redirect(url_for("pages.login"))
+                return redirect(url_for("pages.login"))     
         session["last_active"] = now.strftime("%Y-%m-%d %H:%M:%S")
 
         # 🧠 Simpan ke global USER_STATE
