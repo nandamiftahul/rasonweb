@@ -149,18 +149,21 @@
 
     /* FOOTER */
     footer {
-      background: rgba(255,255,255,0.08);
+      background: rgb(255, 255, 255);
       text-align: center;
       padding: 8px;
       font-size: 11.5px;
-      color: rgba(255,255,255,0.9);
+      color: #000000; /* ⬅️ warna putih solid */
       border-top: 1px solid rgba(255,255,255,0.2);
+      font-weight: 500; /* opsional biar lebih jelas */
     }
+    
     footer img {
       height: 18px;
       vertical-align: middle;
       margin: 0 4px;
-      opacity: 0.9;
+      opacity: 1; /* ⬅️ pastikan logo juga terlihat penuh */
+      filter: brightness(1.1); /* opsional untuk menonjolkan logo */
     }
 
     /* TOC POPUP */
@@ -261,7 +264,9 @@
     
       <div style="display:flex;justify-content:center;align-items:center;gap:20px;margin-top:30px;">
         <img src="{{ url_for('static', filename='images/bmkg2.png') }}" alt="BMKG Logo" style="height:60px;">
-        <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Meteomodem Logo" style="height:60px;">
+        <img src="{{ url_for('static', filename='images/meteomodem.png') }}" 
+             alt="Meteomodem Logo" 
+             style="height:60px;background:white;padding:6px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">        
       </div>
     
       <p style="text-align:center;margin-top:15px;font-style:italic;opacity:0.85;">
@@ -296,7 +301,9 @@
       </ul>
 
       <div style="display:flex;align-items:center;gap:16px;margin-top:18px;">
-        <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Terrindo Logo" class="icon">
+        <img src="{{ url_for('static', filename='images/meteomodem.png') }}" 
+             alt="Meteomodem Logo" 
+             style="height:60px;background:white;padding:6px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
         <p><strong>Footer “Powered by Terrindo Media Raya”</strong><br>Identitas pengembang sistem yang selalu tampil di bawah kotak login.</p>
       </div>
 

@@ -119,7 +119,7 @@ def parse_bufr(decoded_text, site="default"):
     # 🔹 3. Choose active mapping (same as before)
     # ==================================================================
     active_map = mapping if (mapping and "meta" in mapping and "level" in mapping) else default_mapping
-
+    print(active_map["meta"])
     # ==================================================================
     # 🔹 4. Original parsing logic (unchanged)
     # ==================================================================
@@ -129,7 +129,6 @@ def parse_bufr(decoded_text, site="default"):
             continue
 
         # ========== METADATA ==========
-         
         matched_meta = False
         for item in active_map["meta"]:
             if item["original"] in line:
@@ -179,7 +178,7 @@ def parse_bufr(decoded_text, site="default"):
             if lv["original"] in line:
                 key = lv["variable"]
                 val = _safe_float_tail(line)
-
+                #print(key,val)
                 if "TEMPERATURE" in lv["original"]:
                     try: val = val - 273.15
                     except Exception: pass

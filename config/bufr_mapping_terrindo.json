@@ -1,146 +1,136 @@
 {
   "level": [
     {
-      "original": "PRESSURE",
-      "variable": "pressure_hPa"
-    },
-    {
-      "original": "GEOPOTENTIAL HEIGHT",
-      "variable": "height_m"
-    },
-    {
-      "original": "TEMPERATURE/AIR TEMPERATURE",
-      "variable": "temp_C"
-    },
-    {
-      "original": "DEW-POINT TEMPERATURE",
-      "variable": "dewpoint_C"
-    },
-    {
-      "original": "WIND DIRECTION",
-      "variable": "wind_dir_deg"
-    },
-    {
-      "original": "WIND SPEED",
-      "variable": "wind_speed_mps"
-    },
-    {
-      "original": "LATITUDE DISPLACEMENT",
-      "variable": "lat_disp"
-    },
-    {
-      "original": "LONGITUDE DISPLACEMENT",
-      "variable": "lon_disp"
-    },
-    {
+      "code": "004086",
       "original": "LONG TIME PERIOD OR DISPLACEMENT",
       "variable": "time_s"
     },
     {
+      "code": "008042",
       "original": "EXTENDED VERTICAL SOUNDING SIGNIFICANCE",
       "variable": "status_flag"
+    },
+    {
+      "code": "007004",
+      "original": "PRESSURE",
+      "variable": "pressure_hPa"
+    },
+    {
+      "code": "010009",
+      "original": "GEOPOTENTIAL HEIGHT",
+      "variable": "height_m"
+    },
+    {
+      "code": "005015",
+      "original": "LATITUDE DISPLACEMENT (HIGH ACCURACY)",
+      "variable": "lat_disp"
+    },
+    {
+      "code": "006015",
+      "original": "LONGITUDE DISPLACEMENT (HIGH ACCURACY)",
+      "variable": "lon_disp"
+    },
+    {
+      "code": "012101",
+      "original": "TEMPERATURE/DRY-BULB TEMPERATURE",
+      "variable": "temp_C"
+    },
+    {
+      "code": "012103",
+      "original": "DEW-POINT TEMPERATURE",
+      "variable": "dewpoint_C"
+    },
+    {
+      "code": "011001",
+      "original": "WIND DIRECTION",
+      "variable": "wind_dir_deg"
+    },
+    {
+      "code": "011002",
+      "original": "WIND SPEED",
+      "variable": "wind_speed_mps"
     }
   ],
   "meta": [
     {
+      "code": "001001",
       "original": "WMO BLOCK NUMBER",
       "variable": "wmo_block"
     },
     {
+      "code": "001002",
       "original": "WMO STATION NUMBER",
       "variable": "wmo_station"
     },
     {
-      "original": "004001 YEAR",
+      "code": "004001",
+      "original": "YEAR",
       "variable": "year"
     },
     {
-      "original": "004002 MONTH",
+      "code": "004002",
+      "original": "MONTH",
       "variable": "month"
     },
     {
-      "original": "004003 DAY",
+      "code": "004003",
+      "original": "DAY",
       "variable": "day"
     },
     {
-      "original": "004004 HOUR",
+      "code": "004004",
+      "original": "HOUR",
       "variable": "hour"
     },
     {
-      "original": "004005 MINUTE",
+      "code": "004005",
+      "original": "MINUTE",
       "variable": "minute"
     },
     {
-      "original": "004006 SECOND",
+      "code": "004006",
+      "original": "SECOND",
       "variable": "second"
     },
     {
+      "code": "005001",
       "original": "LATITUDE (HIGH ACCURACY)",
       "variable": "station_lat"
     },
     {
+      "code": "006001",
       "original": "LONGITUDE (HIGH ACCURACY)",
       "variable": "station_lon"
     },
     {
-      "original": "HEIGHT OF STATION GROUND",
+      "code": "007030",
+      "original": "HEIGHT OF STATION GROUND ABOVE MEAN SEA LEVEL (SEE NOTE 3)",
       "variable": "station_height_m"
     },
     {
-      "original": "RADIOSONDE SERIAL NUMBER",
-      "variable": "radiosonde_serial_number"
-    },
-    {
-      "original": "RADIOSONDE ASCENSION NUMBER",
-      "variable": "radiosonde_ascension_number"
-    },
-    {
-      "original": "RADIOSONDE RELEASE NUMBER",
-      "variable": "radiosonde_release_number"
-    },
-    {
-      "original": "RADIOSONDE GROUND RECEIVING SYSTEM",
-      "variable": "radiosonde_ground_rx_system"
-    },
-    {
-      "original": "RADIOSONDE OPERATING FREQUENCY",
-      "variable": "radiosonde_operating_frequency"
-    },
-    {
-      "original": "BALLOON MANUFACTURER",
-      "variable": "balloon_manufacturer"
-    },
-    {
-      "original": "WEIGHT OF BALLOON",
-      "variable": "balloon_weight_kg"
-    },
-    {
-      "original": "TYPE OF GAS USED IN BALLOON",
-      "variable": "balloon_gas_type"
-    },
-    {
-      "original": "TYPE OF PRESSURE SENSOR",
-      "variable": "pressure_sensor_type"
-    },
-    {
-      "original": "TYPE OF TEMPERATURE SENSOR",
-      "variable": "temperature_sensor_type"
-    },
-    {
-      "original": "TYPE OF HUMIDITY SENSOR",
-      "variable": "humidity_sensor_type"
-    },
-    {
+      "code": "025061",
       "original": "SOFTWARE IDENTIFICATION AND VERSION NUMBER",
       "variable": "software_version"
     },
     {
-      "original": "REASON FOR TERMINATION",
-      "variable": "reason_for_termination"
+      "code": "001081",
+      "original": "RADIOSONDE SERIAL NUMBER",
+      "variable": "radiosonde_serial_number"
     },
     {
-      "original": "TRACKING TECHNIQUE/STATUS OF SYSTEM USED",
-      "variable": "system_status"
+      "code": "002095",
+      "original": "TYPE OF PRESSURE SENSOR",
+      "variable": "pressure_sensor_type"
+    },
+    {
+      "code": "002097",
+      "original": "TYPE OF TEMPERATURE",
+      "variable": "temperature_sensor_type"
+    },
+    {
+      "code": "002097",
+      "original": "TYPE OF HUMIDITY SENSOR",
+      "variable": "humidity_sensor_type"
     }
   ]
 }

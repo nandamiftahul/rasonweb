@@ -1,0 +1,231 @@
+{
+  "level": [
+    {
+      "code": "004086",
+      "original": "LONG TIME PERIOD OR DISPLACEMENT",
+      "variable": "time_s"
+    },
+    {
+      "code": "008042",
+      "original": "EXTENDED VERTICAL SOUNDING SIGNIFICANCE",
+      "variable": "status_flag"
+    },
+    {
+      "code": "007004",
+      "original": "PRESSURE",
+      "variable": "pressure_hpa"
+    },
+    {
+      "code": "010009",
+      "original": "GEOPOTENTIAL HEIGHT",
+      "variable": "height_m"
+    },
+    {
+      "code": "005015",
+      "original": "LATITUDE DISPLACEMENT (HIGH ACCURACY)",
+      "variable": "lat_disp"
+    },
+    {
+      "code": "006015",
+      "original": "LONGITUDE DISPLACEMENT (HIGH ACCURACY)",
+      "variable": "lon_disp"
+    },
+    {
+      "code": "012101",
+      "original": "TEMPERATURE/DRY-BULB TEMPERATURE",
+      "variable": "temp_C"
+    },
+    {
+      "code": "012103",
+      "original": "DEW-POINT TEMPERATURE",
+      "variable": "dewpoint_C"
+    },
+    {
+      "code": "011001",
+      "original": "WIND DIRECTION",
+      "variable": "wind_dir_deg"
+    },
+    {
+      "code": "011002",
+      "original": "WIND SPEED",
+      "variable": "wind_speed_mps"
+    },
+    {
+      "code": "011061",
+      "original": "ABSOLUTE WIND SHEAR IN 1 KM LAYER BELOW",
+      "variable": "absolute_wind_shear_in_1_km_layer_below"
+    },
+    {
+      "code": "011062",
+      "original": "ABSOLUTE WIND SHEAR IN 1 KM LAYER ABOVE",
+      "variable": "absolute_wind_shear_in_1_km_layer_above"
+    },
+    {
+      "code": "001081",
+      "original": "RADIOSONDE SERIAL NUMBER",
+      "variable": "radiosonde_serial_number"
+    },
+    {
+      "code": "001082",
+      "original": "RADIOSONDE ASCENSION NUMBER (SEE NOTE 12)",
+      "variable": "radiosonde_ascension_number_see_note_12"
+    },
+    {
+      "code": "002067",
+      "original": "RADIOSONDE OPERATING FREQUENCY",
+      "variable": "radiosonde_operating_frequency"
+    },
+    {
+      "code": "002095",
+      "original": "TYPE OF PRESSURE SENSOR",
+      "variable": "type_of_pressure_sensor"
+    },
+    {
+      "code": "002096",
+      "original": "TYPE OF TEMPERATURE SENSOR",
+      "variable": "type_of_temperature_sensor"
+    },
+    {
+      "code": "002097",
+      "original": "TYPE OF HUMIDITY SENSOR",
+      "variable": "type_of_humidity_sensor"
+    },
+    {
+      "code": "025061",
+      "original": "SOFTWARE IDENTIFICATION AND VERSION NUMBER",
+      "variable": "software_identification_and_version_number"
+    }
+  ],
+  "meta": [
+    {
+      "code": "301001",
+      "original": "(WMO",
+      "variable": "wmo"
+    },
+    {
+      "code": "001001",
+      "original": "WMO BLOCK NUMBER",
+      "variable": "wmo_block_number"
+    },
+    {
+      "code": "001002",
+      "original": "WMO STATION NUMBER",
+      "variable": "wmo_station_number"
+    },
+    {
+      "code": "001011",
+      "original": "SHIP OR MOBILE LAND STATION IDENTIFIER",
+      "variable": "ship_or_mobile_land_station_identifier"
+    },
+    {
+      "code": "002011",
+      "original": "RADIOSONDE TYPE",
+      "variable": "radiosonde_type"
+    },
+    {
+      "code": "002013",
+      "original": "SOLAR AND INFRARED RADIATION CORRECTION",
+      "variable": "solar_and_infrared_radiation_correction"
+    },
+    {
+      "code": "002014",
+      "original": "TRACKING TECHNIQUE/STATUS OF SYSTEM USED",
+      "variable": "tracking_technique_status_of_system_used"
+    },
+    {
+      "code": "002003",
+      "original": "TYPE OF MEASURING EQUIPMENT USED",
+      "variable": "type_of_measuring_equipment_used"
+    },
+    {
+      "code": "008021",
+      "original": "TIME SIGNIFICANCE",
+      "variable": "time_significance"
+    },
+    {
+      "code": "004001",
+      "original": "YEAR",
+      "variable": "year"
+    },
+    {
+      "code": "004002",
+      "original": "MONTH",
+      "variable": "month"
+    },
+    {
+      "code": "004003",
+      "original": "DAY",
+      "variable": "day"
+    },
+    {
+      "code": "004004",
+      "original": "HOUR",
+      "variable": "hour"
+    },
+    {
+      "code": "004005",
+      "original": "MINUTE",
+      "variable": "minute"
+    },
+    {
+      "code": "004006",
+      "original": "SECOND",
+      "variable": "second"
+    },
+    {
+      "code": "005001",
+      "original": "LATITUDE (HIGH ACCURACY)",
+      "variable": "latitude_high_accuracy"
+    },
+    {
+      "code": "006001",
+      "original": "LONGITUDE (HIGH ACCURACY)",
+      "variable": "longitude_high_accuracy"
+    },
+    {
+      "code": "007030",
+      "original": "HEIGHT OF STATION GROUND ABOVE MEAN SEA LEVEL (SEE NOTE 3)",
+      "variable": "height_of_station_ground_above_mean_sea_level_see_note_3"
+    },
+    {
+      "code": "007031",
+      "original": "HEIGHT OF BAROMETER ABOVE MEAN SEA LEVEL (SEE NOTE 4)",
+      "variable": "height_of_barometer_above_mean_sea_level_see_note_4"
+    },
+    {
+      "code": "007007",
+      "original": "HEIGHT",
+      "variable": "height"
+    },
+    {
+      "code": "033024",
+      "original": "STATION ELEVATION QUALITY MARK (FOR MOBILE STATIONS)",
+      "variable": "station_elevation_quality_mark_for_mobile_stations"
+    },
+    {
+      "code": "008002",
+      "original": "VERTICAL SIGNIFICANCE (SURFACE OBSERVATIONS)",
+      "variable": "vertical_significance_surface_observations"
+    },
+    {
+      "code": "020011",
+      "original": "CLOUD AMOUNT",
+      "variable": "cloud_amount"
+    },
+    {
+      "code": "020013",
+      "original": "HEIGHT OF BASE OF CLOUD",
+      "variable": "height_of_base_of_cloud"
+    },
+    {
+      "code": "020012",
+      "original": "CLOUD TYPE",
+      "variable": "cloud_type"
+    },
+    {
+      "code": "022043",
+      "original": "SEA/WATER TEMPERATURE",
+      "variable": "sea_water_temperature"
+    }
+  ]
+}
