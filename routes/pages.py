@@ -217,3 +217,8 @@ def roadmap_page():
 @pages.route("/user_guide")
 def user_guide_page():
     return render_template("user_guide.html")
+
+@pages.route("/display")
+@login_required
+def display_page():
+    return render_template("display.html")

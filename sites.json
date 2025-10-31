@@ -35,12 +35,6 @@
       "lat": 3.95929,
       "lon": 108.38576,
       "utc_offset": 7
-    },
-    {
-      "name": "terrindo",
-      "lat": -6.1718992,
-      "lon": 106.8389316,
-      "utc_offset": 7
     }
   ]
 }

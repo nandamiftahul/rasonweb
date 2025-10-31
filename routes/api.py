@@ -196,15 +196,13 @@ def api_status():
     """
     Membaca status balon dari file EOSCAN*.log di FTP tiap site.
     Status diambil dari pesan terakhir yang mengandung kata kunci tertentu.
-    Jika waktu 'preparing' (Sonde ON) ditemukan di jam di luar 00Z/12Z,
-    dianggap log menggunakan waktu lokal dan dikonversi ke UTC.
+    Tambahan: kirim juga 3 baris terakhir isi log (last_log_lines).
     """
 
     cfg = CONFIG["ftp"]
-    sites = load_sites()  # sekarang list of dict [{'name': 'aceh', 'lat':..., 'lon':...}]
+    sites = load_sites()
     results = []
 
-    # Default offset (nanti bisa diperluas per site)
     site_utc_offset = {s["name"]: int(s.get("utc_offset", 7)) for s in sites}
 
     status_patterns = {
@@ -223,6 +221,7 @@ def api_status():
                 site_name = s["name"].lower()
                 status = "offline"
                 update = "-"
+                last_log_lines = []
 
                 try:
                     ftp.cwd(f"{cfg['base_path']}/{site_name}")
@@ -250,6 +249,12 @@ def api_status():
                     f.seek(0)
                     lines = f.read().decode(errors="ignore").splitlines()
 
+                    # Ambil 3 baris terakhir log
+                    if lines:
+                        last_log_lines = lines[-3:] if len(lines) >= 3 else lines
+                        last_log_lines = [ln.strip() for ln in last_log_lines if ln.strip()]
+
+                    # Cari pola status
                     candidates = []
                     for line in lines:
                         m = re.match(r"(\d{2}:\d{2}:\d{2})\s+\d+\s+(.*)", line.strip())
@@ -267,7 +272,8 @@ def api_status():
                         results.append({
                             "name": site_name,
                             "status": "unknown",
-                            "update": file_date.strftime("%Y-%m-%d") if file_date else "-"
+                            "update": file_date.strftime("%Y-%m-%d") if file_date else "-",
+                            "last_log": "\n".join(last_log_lines)
                         })
                         continue
 
@@ -283,7 +289,7 @@ def api_status():
                         except Exception:
                             pass
 
-                    # Jika status "preparing" (Sonde ON) dan jam bukan 00Z/12Z → konversi lokal → UTC
+                    # Jika "preparing" (Sonde ON) tapi jam bukan 00Z/12Z → konversi lokal → UTC
                     if status == "preparing" and time_dt:
                         if not (23 <= time_dt.hour or time_dt.hour <= 1 or 11 <= time_dt.hour <= 13):
                             offset = site_utc_offset.get(site_name, 7)
@@ -303,7 +309,8 @@ def api_status():
                 results.append({
                     "name": site_name,
                     "status": status,
-                    "update": update
+                    "update": update,
+                    "last_log": "\n".join(last_log_lines)  # 🔹 Tambahan baru
                 })
 
     except Exception as e:
@@ -556,11 +563,23 @@ def api_time_accuracy(site):
                 # ======================================================
                 # 🔹 Hitung waktu ke 100 hPa dan burst (≈ 30 hPa)
                 # ======================================================
+                # Ambil waktu sampai tekanan tertentu
                 t100 = df_levels.loc[df_levels["pressure_hPa"] <= 100, "time_s"].min()
+                
+                # Jika tidak sampai 100 hPa, gunakan minimum pressure yang tercapai
+                if pd.isna(t100):
+                    min_pres = df_levels["pressure_hPa"].min()
+                    t100 = df_levels.loc[df_levels["pressure_hPa"] == min_pres, "time_s"].min()
+                    note = f"(fallback {min_pres:.1f} hPa)"
+                else:
+                    note = ""
+                
+                # Titik burst (atau akhir data)
                 t30 = df_levels.loc[df_levels["pressure_hPa"] <= 0, "time_s"].min()
                 if pd.isna(t30):
                     t30 = df_levels["time_s"].max()
-
+                
+                # Masukkan record walau tidak sampai 100 hPa
                 if pd.notna(t100):
                     data.append({
                         "filename": fname,
@@ -568,9 +587,10 @@ def api_time_accuracy(site):
                         "hour": hour_label,
                         "launch_time": launch_time.strftime("%Y-%m-%d %H:%M:%S"),
                         "AB": round(t100 / 60.0, 1),
-                        "CD": round(t30 / 60.0, 1) if pd.notna(t30) else None
+                        "CD": round(t30 / 60.0, 1) if pd.notna(t30) else None,
+                        "note": note
                     })
-
+                
             except Exception as e:
                 print(f"⚠️ Error parsing {fname}: {e}")
 

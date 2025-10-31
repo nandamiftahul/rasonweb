@@ -594,7 +594,18 @@
     </div>
     <div id="summary" class="summary"></div>
     <!-- 🔹 Ranking table di bawah chart -->
-    <div id="rankingSection" class="ranking-box" style="margin-top:25px;"></div>
+    <!-- 🔹 Dua tabel ranking berdampingan -->
+    <div class="ranking-container" style="margin-top:25px; display:flex; gap:20px; flex-wrap:wrap;">
+      <div id="rankingMonthly" class="ranking-box" style="flex:1;"></div>
+      <div id="rankingDaily" class="ranking-box" style="flex:1; position: relative;">
+       <div style="position:absolute; top:10px; left:10px;">
+         <label style="font-size:12px;">Date:</label>
+         <input type="date" id="dailyDate" style="padding:3px 6px; border-radius:4px; border:none;">
+       </div>
+       <div id="dailyContent" style="margin-top:30px;"></div>
+     </div>
+     
+    </div>
   </div>
   <!-- Footer -->
   <div class="footer">
@@ -728,6 +739,7 @@
       siteSelect.value = sites[0];
       await loadTimeAccuracy(sites[0], year, month);
       await showSiteRankingTable(year, month);
+      await showDailyAccuracyRanking(); 
     } catch {
       loadingMsg.textContent = "Failed to load sites.";
     }
@@ -968,7 +980,7 @@ yearSelect.addEventListener("change", ()=>{
     }
 // === Generate site ranking berdasarkan rata-rata preparation time ===
 async function showSiteRankingTable(year, month) {
-  const rankingBox = document.getElementById("rankingSection");
+  const rankingBox = document.getElementById("rankingMonthly");
   rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating ranking...</p>";
 
   try {
@@ -1019,6 +1031,90 @@ async function showSiteRankingTable(year, month) {
     rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate ranking.</p>";
   }
 }
+
+// === Generate global daily ranking across all sites for current date ===
+// === Generate global daily ranking (00Z & 12Z) for chosen date ===
+async function showDailyAccuracyRanking() {
+  const rankingBox = document.getElementById("dailyContent");
+  const dateInput = document.getElementById("dailyDate");
+  rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating daily ranking...</p>";
+
+  try {
+    // ambil tanggal dari input (kalau kosong → pakai hari ini)
+    const selected = dateInput.value ? new Date(dateInput.value + "T00:00:00Z") : new Date();
+    const targetDateStr = selected.toISOString().slice(0,10);
+    const targetLabel = selected.toLocaleDateString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric"
+    });
+
+    const res = await fetch("/api/sites_config");
+    const data = await res.json();
+    const sites = (data.sites || []).map(s => s.name).sort();
+    const results = [];
+
+    for (const site of sites) {
+      const r = await fetch(`/api/time_accuracy/${site}?year=${selected.getUTCFullYear()}&month=${selected.getUTCMonth()+1}`);
+      const j = await r.json();
+      const flights = (j.data || []).filter(e => e.date === targetDateStr);
+      if (flights.length === 0) continue;
+
+      function prepDiff(entry) {
+        if (!entry || !entry.launch_time) return null;
+        const launch = new Date(entry.launch_time.replace(" ", "T") + "Z");
+        const base = new Date(launch);
+        if (entry.hour === "00Z") base.setUTCHours(23, 30);
+        else if (entry.hour === "12Z") base.setUTCHours(11, 30);
+        else base.setUTCHours(launch.getUTCHours() - 1, 30);
+        const diff = (launch - base) / 60000;
+        return diff >= 0 && diff < 360 ? diff : null;
+      }
+
+      const h00 = flights.find(f => f.hour === "00Z");
+      const h12 = flights.find(f => f.hour === "12Z");
+      const prep00 = prepDiff(h00);
+      const prep12 = prepDiff(h12);
+      const avgVals = [prep00, prep12].filter(x => x !== null && isFinite(x));
+      const avg = avgVals.length ? avgVals.reduce((a,b)=>a+b,0) / avgVals.length : NaN;
+
+      results.push({ site, prep00, prep12, avg });
+    }
+
+    results.sort((a,b)=>(a.avg||9999)-(b.avg||9999));
+
+    rankingBox.innerHTML = `
+      <h3>📅 Daily Global Ranking (${targetLabel})</h3>
+      <table>
+        <thead>
+          <tr><th>Rank</th><th>Site</th><th>00Z (min)</th><th>12Z (min)</th><th>Avg (min)</th></tr>
+        </thead>
+        <tbody>
+          ${results.map((r,i)=>`
+            <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
+              <td>${i+1}</td>
+              <td>${r.site}</td>
+              <td>${r.prep00 != null && isFinite(r.prep00) ? r.prep00.toFixed(1) : '-'}</td>
+              <td>${r.prep12 != null && isFinite(r.prep12) ? r.prep12.toFixed(1) : '-'}</td>
+              <td>${isFinite(r.avg) ? r.avg.toFixed(1) : '-'}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    console.error("❌ Error in showDailyAccuracyRanking:", err);
+    rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate daily ranking.</p>";
+  }
+}
+
+// Jalankan otomatis saat tanggal diubah
+document.addEventListener("DOMContentLoaded", () => {
+  const input = document.getElementById("dailyDate");
+  const today = new Date().toISOString().slice(0,10);
+  input.value = today;
+  input.addEventListener("change", showDailyAccuracyRanking);
+});
+
+
 
     loadUserInfo();
   updateUTCClock(); setInterval(updateUTCClock,1000);

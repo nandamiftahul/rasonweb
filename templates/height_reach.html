@@ -610,9 +610,19 @@
 
     </div>
       <!-- 🔹 Ranking table di bawah chart -->
-  <div id="rankingSection" class="ranking-box" style="margin-top:25px;"></div>
-    </div>
-  </div>
+      <!-- 🔹 Dua tabel ranking berdampingan -->
+      <div class="ranking-container" style="margin-top:25px; display:flex; gap:20px; flex-wrap:wrap;">
+        <div id="rankingMonthly" class="ranking-box" style="flex:1;"></div>
+        <div id="rankingDaily" class="ranking-box" style="flex:1; position: relative;">
+          <!-- 📅 Calendar picker -->
+          <div style="position:absolute; top:10px; left:10px;">
+            <label style="font-size:12px;">Date:</label>
+            <input type="date" id="dailyDate" style="padding:3px 6px; border-radius:4px; border:none;">
+          </div>
+          <div id="dailyRankingContent" style="margin-top:35px;"></div>
+        </div>
+      </div>
+
 
   <!-- Footer -->
   <div class="footer">
@@ -746,6 +756,7 @@
       const month = parseInt(monthSelect.value);
       await loadHeightReach(sites[0], year, month);
       await showHeightRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
+      await showHeightDailyRanking(parseInt(yearSelect.value), parseInt(monthSelect.value));
     } catch (err) {
       console.error("❌ Failed to load site list:", err);
       loadingMsg.textContent = "Failed to load sites.";
@@ -907,10 +918,12 @@
   monthSelect.addEventListener("change", ()=>{
     loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value));
     showHeightRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
+    //showHeightDailyRanking(parseInt(yearSelect.value), parseInt(monthSelect.value));
   });
   yearSelect.addEventListener("change", ()=>{
     loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value));
     showHeightRankingTable(parseInt(yearSelect.value), parseInt(monthSelect.value));
+    //showHeightDailyRanking(parseInt(yearSelect.value), parseInt(monthSelect.value));
   });
   siteSelect.addEventListener("change", () =>
     loadHeightReach(siteSelect.value, parseInt(yearSelect.value), parseInt(monthSelect.value))
@@ -961,12 +974,66 @@
     function logoutUser() {
       window.location.href = "{{ url_for('pages.logout') }}";
     }
-// === Generate site ranking berdasarkan rata-rata maksimum ketinggian ===
-async function showHeightRankingTable(year, month) {
-  const rankingBox = document.getElementById("rankingSection");
-  rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating ranking...</p>";
+    // === Generate site ranking berdasarkan rata-rata maksimum ketinggian ===
+    async function showHeightRankingTable(year, month) {
+      const rankingBox = document.getElementById("rankingMonthly");;
+      rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating ranking...</p>";
+    
+      try {
+        const res = await fetch("/api/sites_config");
+        const data = await res.json();
+        const sites = (data.sites || []).map(s => s.name).sort();
+        const results = [];
+    
+        for (const site of sites) {
+          const r = await fetch(`/api/height_reach/${site}?year=${year}&month=${month}`);
+          const j = await r.json();
+          const heights = (j.data || []).map(e => e.max_height).filter(v => v && isFinite(v));
+    
+          const avgH = heights.length ? heights.reduce((a, b) => a + b, 0) / heights.length : NaN;
+          results.push({ site, avgH });
+        }
+    
+        // urut dari rata-rata tertinggi ke terendah
+        results.sort((a, b) => b.avgH - a.avgH);
+    
+        rankingBox.innerHTML = `
+          <h3>🏆 Site Ranking by Average Max Balloon Height (${monthName(month)} ${year})</h3>
+          <table>
+            <thead>
+              <tr><th>Rank</th><th>Site</th><th>Avg Max Height (m)</th></tr>
+            </thead>
+            <tbody>
+              ${results.map((r, i) => `
+                <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
+                  <td>${i + 1}</td>
+                  <td>${r.site}</td>
+                  <td>${isFinite(r.avgH)?r.avgH.toFixed(0):'-'}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        console.error(err);
+        rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate ranking.</p>";
+      }
+    }
+    // === Generate daily ranking per site (highest average per day) ===
+// === Generate global daily ranking across all sites for selected date ===
+async function showHeightDailyRanking(year, month) {
+  const dateInput = document.getElementById("dailyDate");
+  const rankingBox = document.getElementById("dailyRankingContent");
+
+  rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating daily ranking...</p>";
 
   try {
+    // Ambil tanggal dari input, kalau kosong → pakai hari ini
+    const selectedDate = dateInput?.value || new Date().toISOString().slice(0,10);
+    const selectedLabel = new Date(selectedDate).toLocaleDateString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric"
+    });
+
     const res = await fetch("/api/sites_config");
     const data = await res.json();
     const sites = (data.sites || []).map(s => s.name).sort();
@@ -975,38 +1042,58 @@ async function showHeightRankingTable(year, month) {
     for (const site of sites) {
       const r = await fetch(`/api/height_reach/${site}?year=${year}&month=${month}`);
       const j = await r.json();
-      const heights = (j.data || []).map(e => e.max_height).filter(v => v && isFinite(v));
+      const flights = (j.data || []).filter(e => e.date === selectedDate);
 
-      const avgH = heights.length ? heights.reduce((a, b) => a + b, 0) / heights.length : NaN;
-      results.push({ site, avgH });
+      if (flights.length === 0) continue;
+
+      const h00 = flights.find(f => f.hour === "00Z")?.max_height || null;
+      const h12 = flights.find(f => f.hour === "12Z")?.max_height || null;
+      const avg = [h00, h12].filter(v => v != null && isFinite(v)).length
+        ? [h00, h12].filter(v => v != null && isFinite(v))
+            .reduce((a,b)=>a+b,0) / [h00, h12].filter(v => v != null && isFinite(v)).length
+        : NaN;
+
+      results.push({ site, h00, h12, avg });
     }
 
-    // urut dari rata-rata tertinggi ke terendah
-    results.sort((a, b) => b.avgH - a.avgH);
+    // Urutkan ranking berdasarkan rata-rata tertinggi
+    results.sort((a,b)=>(b.avg||0)-(a.avg||0));
 
     rankingBox.innerHTML = `
-      <h3>🏆 Site Ranking by Average Max Balloon Height (${monthName(month)} ${year})</h3>
+      <h3>📅 Daily Ranking (Global) – ${selectedLabel}</h3>
       <table>
         <thead>
-          <tr><th>Rank</th><th>Site</th><th>Avg Max Height (m)</th></tr>
+          <tr><th>Rank</th><th>Site</th><th>00Z (m)</th><th>12Z (m)</th><th>Avg (m)</th></tr>
         </thead>
         <tbody>
           ${results.map((r, i) => `
             <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
-              <td>${i + 1}</td>
+              <td>${i+1}</td>
               <td>${r.site}</td>
-              <td>${isFinite(r.avgH)?r.avgH.toFixed(0):'-'}</td>
+              <td>${r.h00 ? r.h00.toFixed(0) : '-'}</td>
+              <td>${r.h12 ? r.h12.toFixed(0) : '-'}</td>
+              <td>${isFinite(r.avg)?r.avg.toFixed(0):'-'}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>
     `;
   } catch (err) {
-    console.error(err);
-    rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate ranking.</p>";
+    console.error("❌ Error in showHeightDailyRanking:", err);
+    rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate daily ranking.</p>";
   }
 }
-    
+
+// === Set default date dan event listener ===
+document.addEventListener("DOMContentLoaded", ()=>{
+  const input = document.getElementById("dailyDate");
+  const today = new Date().toISOString().slice(0,10);
+  input.value = today;
+  input.addEventListener("change", ()=> {
+    showHeightDailyRanking(parseInt(yearSelect.value), parseInt(monthSelect.value));
+  });
+});
+
     loadUserInfo();
   updateUTCClock();
   setInterval(updateUTCClock, 1000);
