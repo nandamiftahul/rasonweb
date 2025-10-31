@@ -106,6 +106,7 @@ def api_last_active():
 @api.route("/api/sites")
 @login_required
 def api_sites():
+    """Return list of sites with alias names (no metadata)."""
     ext = request.args.get("ext") or None
     limit = request.args.get("limit")
     start_date = request.args.get("start_date")
@@ -114,6 +115,7 @@ def api_sites():
     start_dt = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
     end_dt = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
 
+    # 🔹 Ambil semua site data
     sites = fetch_all_sites(
         ext_filter=[ext] if ext else None,
         limit=int(limit) if limit else None,
@@ -121,11 +123,26 @@ def api_sites():
         start_date=start_dt,
         end_date=end_dt
     )
-    return jsonify(sites)
+
+    # 🔹 Ambil alias mapping dari sites.json
+    alias_map = {s["name"]: s.get("alias", s["name"].title()) for s in load_sites()}
+
+    # 🔹 Ganti key utama dari nama site → alias
+    aliased_sites = {}
+    for site_name, files in sites.items():
+        alias = alias_map.get(site_name.lower(), site_name.title())
+        # simpan juga kode asli agar masih bisa dikenali di frontend
+        for f in files:
+            f["site_code"] = site_name
+        aliased_sites[alias] = files
+
+    return jsonify(aliased_sites)
+
 
 @api.route("/api/sites_with_meta")
 @login_required
 def api_sites_with_meta():
+    """Return list of sites with alias + metadata."""
     ext = request.args.get("ext") or None
     limit = request.args.get("limit")
     start_date = request.args.get("start_date")
@@ -141,34 +158,49 @@ def api_sites_with_meta():
         start_date=start_dt,
         end_date=end_dt
     )
-    # 🔹 Merge manufactured info from MODEM_LOOKUP based on serial number
-    for site, files in sites.items():
+
+    # 🔹 Alias mapping
+    alias_map = {s["name"]: s.get("alias", s["name"].title()) for s in load_sites()}
+
+    # 🔹 Inject manufactured info + site_code
+    aliased_sites = {}
+    for site_name, files in sites.items():
+        alias = alias_map.get(site_name.lower(), site_name.title())
         for f in files:
             serial_raw = f.get("radiosonde_serial_number")
-            
             sn_int = parse_serial_to_int(serial_raw)
             if sn_int and sn_int in MODEM_LOOKUP:
                 f["manufactured"] = MODEM_LOOKUP[sn_int]
             else:
                 f["manufactured"] = "-"
-    
-    return jsonify(sites)
+            f["site_code"] = site_name
+        aliased_sites[alias] = files
 
+    return jsonify(aliased_sites)
 @api.route("/api/latest_status")
 @login_required
 def api_latest_status():
     """
     Ambil status terakhir dari setiap site radiosonde.
     Mengembalikan 6 site terbaru dengan kolom:
-    Site, Launch Time, End Time, Status, Termination,
+    Site, Alias, Launch Time, End Time, Status, Termination,
     End Pressure, Max Height, End Distance, Ascent Rate.
     """
     now_utc = datetime.utcnow()
     start_date = now_utc - timedelta(days=1)
     end_date = now_utc + timedelta(days=1)
 
-    # 🔹 Ambil hanya beberapa file terbaru dari window waktu 2 hari
-    sites = fetch_all_sites(with_meta=True, ext_filter= [".bfr",".bin"], start_date=start_date, end_date=end_date)
+    # 🔹 Ambil daftar site + alias
+    sites_info = load_sites()
+    alias_map = {s["name"]: s.get("alias", s["name"].title()) for s in sites_info}
+
+    # 🔹 Ambil file terbaru window 2 hari
+    sites = fetch_all_sites(
+        with_meta=True,
+        ext_filter=[".bfr", ".bin"],
+        start_date=start_date,
+        end_date=end_date
+    )
 
     summary = []
     for site, files in sites.items():
@@ -177,6 +209,7 @@ def api_latest_status():
         f = files[0]
         summary.append({
             "site": site,
+            "alias": alias_map.get(site.lower(), site.title()),
             "launch_time": f.get("launch_time", "-"),
             "end_time": f.get("end_time", "-"),
             "status": "✅ OK" if f.get("flight_issues") == ["OK"] else "⚠️ Check",
@@ -186,8 +219,10 @@ def api_latest_status():
             "end_distance": f.get("end_distance", "-"),
             "ascent_rate": f.get("avg_ascent_rate", "-")
         })
-    # Urutkan biar tampil konsisten (misal abjad)
+
+    # 🔹 Urutkan biar konsisten (misal abjad)
     summary = sorted(summary, key=lambda x: x["site"])[:6]
+
     return jsonify(summary)
 
 @api.route("/api/status")
@@ -845,11 +880,10 @@ def manage_users():
 @api.route("/api/sites_config", methods=["GET", "POST", "PUT", "DELETE"])
 @login_required
 def manage_sites():
-    # --- Semua user boleh GET ---
     if request.method == "GET":
-        return jsonify({"sites": SITE_LIST})
-
-    # --- Hanya admin boleh ubah ---
+        sites = sorted(load_sites(), key=lambda s: s.get("alias", s["name"]).lower())
+        return jsonify({"sites": sites})
+    
     if session.get("user") != "admin":
         return jsonify({"error": "Unauthorized (admin only)"}), 403
 
@@ -858,29 +892,44 @@ def manage_sites():
     lat = float(data.get("lat", 0))
     lon = float(data.get("lon", 0))
     offset = int(data.get("utc_offset", 7))
-
     if not name:
         return jsonify({"error": "Missing site name"}), 400
 
-    if request.method == "POST":
-        if any(s["name"] == name for s in SITE_LIST):
-            return jsonify({"error": "Site already exists"}), 400
-        SITE_LIST.append({"name": name, "lat": lat, "lon": lon, "utc_offset": offset})
-        save_sites()
-        return jsonify({"success": True, "sites": SITE_LIST})
+    sites = load_sites()
 
+    if request.method == "POST":
+        alias = data.get("alias", name.title())
+        if any(s["name"] == name for s in sites):
+            return jsonify({"error": "Site already exists"}), 400
+    
+        sites.append({
+            "name": name,
+            "alias": alias,
+            "lat": lat,
+            "lon": lon,
+            "utc_offset": offset
+        })
+        save_sites(sites)
+        return jsonify({"success": True, "sites": sites})
+    
     if request.method == "PUT":
-        for s in SITE_LIST:
+        for s in sites:
             if s["name"] == name:
-                s["lat"], s["lon"], s["utc_offset"] = lat, lon, offset
-                save_sites()
-                return jsonify({"success": True, "sites": SITE_LIST})
+                s.update({
+                    "alias": data.get("alias", s.get("alias", name.title())),
+                    "lat": lat,
+                    "lon": lon,
+                    "utc_offset": offset
+                })
+                save_sites(sites)
+                return jsonify({"success": True, "sites": sites})
         return jsonify({"error": "Site not found"}), 404
+    
 
     if request.method == "DELETE":
-        SITE_LIST[:] = [s for s in SITE_LIST if s["name"] != name]
-        save_sites()
-        return jsonify({"success": True, "sites": SITE_LIST})
+        new_sites = [s for s in sites if s["name"] != name]
+        save_sites(new_sites)
+        return jsonify({"success": True, "sites": new_sites})
 
 @api.route("/api/trajectory3d")
 @login_required

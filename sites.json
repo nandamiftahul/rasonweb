@@ -2,36 +2,42 @@
   "sites": [
     {
       "name": "aceh",
+      "alias": "Sultan Iskandar Muda",
       "lat": 5.52256,
       "lon": 95.41685,
       "utc_offset": 7
     },
     {
       "name": "tarakan",
+      "alias": "Juwata",
       "lat": 3.32708,
       "lon": 117.57052,
       "utc_offset": 8
     },
     {
       "name": "sorong",
+      "alias": "Dominique Edward Osok",
       "lat": -0.89059,
       "lon": 131.28581,
       "utc_offset": 9
     },
     {
       "name": "cilacap",
+      "alias": "Tunggul Wulung",
       "lat": -7.71897,
       "lon": 109.01487,
       "utc_offset": 7
     },
     {
       "name": "pangkalanbun",
+      "alias": "Iskandar",
       "lat": -2.70508,
       "lon": 111.66573,
       "utc_offset": 7
     },
     {
       "name": "ranai",
+      "alias": "Ranai",
       "lat": 3.95929,
       "lon": 108.38576,
       "utc_offset": 7

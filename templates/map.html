@@ -1357,7 +1357,6 @@ canvas {
         }
       }, 700);
     });
-// === 🔹 Populate site dropdown dynamically from backend ===
 async function populateSites() {
   const select = document.getElementById("siteSelect");
   if (!select) return;
@@ -1365,7 +1364,6 @@ async function populateSites() {
 
   try {
     const res = await fetch("/api/sites_config");
-    if (!res.ok) throw new Error("Failed to load sites list");
     const data = await res.json();
     const sites = data.sites || [];
 
@@ -1375,20 +1373,18 @@ async function populateSites() {
     }
 
     select.innerHTML = "";
-
-    // ✅ Loop menyesuaikan struktur baru: { name, lat, lon }
     for (const s of sites) {
-      const siteName = s.name || s; // fallback kalau backend masih string
-      const nameDisplay = siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const code = s.name;
+      const alias = s.alias || code;
+      const display = `${alias} (${code})`;
       const opt = document.createElement("option");
-      opt.value = siteName;
-      opt.textContent = nameDisplay;
+      opt.value = code;
+      opt.textContent = display;
       select.appendChild(opt);
     }
 
-    // 🔄 Restore pilihan terakhir
     const saved = localStorage.getItem("siteSelect");
-    if (saved && sites.some(x => (x.name || x) === saved)) {
+    if (saved && sites.some(x => x.name === saved)) {
       select.value = saved;
     }
 
@@ -1397,8 +1393,6 @@ async function populateSites() {
     select.innerHTML = `<option value="">(Error loading sites)</option>`;
   }
 }
-
-// Jalankan saat halaman siap
 window.addEventListener("DOMContentLoaded", populateSites);
 
   </script>

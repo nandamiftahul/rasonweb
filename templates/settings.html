@@ -288,13 +288,14 @@
 <div id="tab-sites" class="tab-content">
   <table id="siteTable">
     <thead>
-      <tr><th>Site Name</th><th>Latitude</th><th>Longitude</th><th>UTC Offset</th><th>Action</th></tr>
+      <tr><th>Site Name</th><th>Alias</th><th>Latitude</th><th>Longitude</th><th>UTC Offset</th><th>Action</th></tr>
     </thead>
     <tbody></tbody>
   </table>
 
   <div class="add-section">
     <input type="text" id="newSiteName" placeholder="e.g. pontianak">
+    <input type="text" id="newSiteAlias" placeholder="e.g. Supadio Airport">
     <input type="number" step="0.0001" id="newSiteLat" placeholder="Lat">
     <input type="number" step="0.0001" id="newSiteLon" placeholder="Lon">
     <input type="number" id="newSiteOffset" placeholder="UTC" value="7">
@@ -702,11 +703,12 @@ async function loadSites() {
     tbody.innerHTML += `
       <tr>
         <td>${s.name}</td>
+        <td>${s.alias || "-"}</td>
         <td>${s.lat ?? "-"}</td>
         <td>${s.lon ?? "-"}</td>
         <td>${s.utc_offset ?? 7}</td>
         <td>
-          <button class="btn-edit" onclick="editSite('${s.name}', ${s.lat}, ${s.lon}, ${s.utc_offset})">Edit</button>
+          <button class="btn-edit" onclick="editSite('${s.name}', ${s.lat}, ${s.lon}, ${s.utc_offset}, '${s.alias || ''}')">Edit</button>
           <button class="btn-del" onclick="deleteSite('${s.name}')">Delete</button>
         </td>
       </tr>`;
@@ -728,21 +730,25 @@ async function loadSites() {
 
 async function addSite() {
   const name = document.getElementById("newSiteName").value.trim();
+  const alias = document.getElementById("newSiteAlias").value.trim();
   const lat = parseFloat(document.getElementById("newSiteLat").value || 0);
   const lon = parseFloat(document.getElementById("newSiteLon").value || 0);
   const utc_offset = parseInt(document.getElementById("newSiteOffset").value || 7);
+
   if (!name) return alert("Please enter site name");
+
   const res = await fetch('/api/sites_config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name, lat, lon, utc_offset})
+    body: JSON.stringify({name, alias, lat, lon, utc_offset})
   });
   const json = await res.json();
   alert(json.success ? "✅ Site added" : json.error);
   loadSites();
 }
 
-async function editSite(name, lat, lon, utc_offset) {
+async function editSite(name, lat, lon, utc_offset, alias) {
+  const newAlias = prompt(`Alias name for ${name}:`, alias || "");
   const newLat = prompt(`Latitude for ${name}:`, lat);
   const newLon = prompt(`Longitude for ${name}:`, lon);
   const newUTC = prompt(`UTC offset for ${name}:`, utc_offset);
@@ -751,7 +757,13 @@ async function editSite(name, lat, lon, utc_offset) {
   const res = await fetch('/api/sites_config', {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name, lat: parseFloat(newLat), lon: parseFloat(newLon), utc_offset: parseInt(newUTC)})
+    body: JSON.stringify({
+      name,
+      alias: newAlias,
+      lat: parseFloat(newLat),
+      lon: parseFloat(newLon),
+      utc_offset: parseInt(newUTC)
+    })
   });
   const json = await res.json();
   alert(json.success ? "✅ Site updated" : json.error);

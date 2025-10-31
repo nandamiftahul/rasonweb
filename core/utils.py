@@ -206,39 +206,43 @@ def generate_weather_analysis(df):
     return "<br>".join(text)
 
 SITE_LIST = []
-
+# core/utils.py
 def load_sites():
-    """Load sites.json (support dict or string format, with optional lat/lon/utc_offset)."""
-    global SITE_LIST
+    """Return list of sites from sites.json (support alias)."""
     try:
         with open(SITES_FILE, "r", encoding="utf-8") as f:
             data = _json.load(f)
         sites_raw = data.get("sites", data) if isinstance(data, dict) else data
-        SITE_LIST = []
+        sites = []
         for s in sites_raw:
             if isinstance(s, str):
-                SITE_LIST.append({"name": s.lower(), "lat": 0.0, "lon": 0.0, "utc_offset": 7})
+                sites.append({
+                    "name": s.lower(),
+                    "alias": s.title(),  # fallback
+                    "lat": 0.0,
+                    "lon": 0.0,
+                    "utc_offset": 7
+                })
             elif isinstance(s, dict):
-                SITE_LIST.append({
+                sites.append({
                     "name": s.get("name", "").lower(),
+                    "alias": s.get("alias", s.get("name", "").title()),
                     "lat": float(s.get("lat", 0)),
                     "lon": float(s.get("lon", 0)),
                     "utc_offset": int(s.get("utc_offset", 7))
                 })
-        print(f"✅ Loaded {len(SITE_LIST)} sites.")
-        return SITE_LIST
+        print(f"✅ Loaded {len(sites)} sites (with alias).")
+        return sites
     except Exception as e:
         print(f"[WARN] load_sites() failed: {e}")
-        SITE_LIST = []
         return []
 
-def save_sites():
-    """Save site list (dict format, with utc_offset) to sites.json"""
-    global SITE_LIST
+def save_sites(sites):
+    """Write list of sites into sites.json ({'sites':[...]})"""
     try:
         with open(SITES_FILE, "w", encoding="utf-8") as f:
-            _json.dump({"sites": SITE_LIST}, f, indent=2)
-        print(f"💾 Saved {len(SITE_LIST)} sites to {SITES_FILE}")
+            _json.dump({"sites": sites}, f, indent=2, ensure_ascii=False)
+        print(f"💾 Saved {len(sites)} sites to {SITES_FILE}")
     except Exception as e:
         print(f"[WARN] save_sites() failed: {e}")
 
@@ -269,6 +273,3 @@ def load_modem_lookup(json_path="list_data_modem.json"):
     return lookup
 
 MODEM_LOOKUP = load_modem_lookup("list_data_modem.json")
-
-# Auto-load saat modul diimport
-load_sites()

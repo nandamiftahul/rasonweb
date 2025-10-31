@@ -275,83 +275,105 @@
       return String(s || '').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
     }
 
-    async function loadSitesFromConfig() {
-      try {
-        const res = await fetch("/api/sites_config");
-        const data = await res.json();
-        if (Array.isArray(data.sites)) {
-          sites = data.sites.map(s => ({
-            name: s.name,
-            lat: parseFloat(s.lat),
-            lon: parseFloat(s.lon)
-          }));
-        }
-        drawStaticMarkers();
-        updateSiteStatus();
-      } catch (err) {
-        console.error("❌ Failed to load sites:", err);
-      }
-    }
+let siteAliasMap = {}; // 🔹 cache alias
 
-    function drawStaticMarkers() {
-      siteMarkers.clearLayers();
-      sites.forEach(site => {
-        const color = "red";
-        L.circleMarker([site.lat, site.lon], {
-          pane: 'markerPane',
-          radius: 10,
-          fillColor: color,
-          color: "#fff",
-          weight: 2,
-          fillOpacity: 0.9
-        }).addTo(siteMarkers);
+async function loadSitesFromConfig() {
+  try {
+    const res = await fetch("/api/sites_config");
+    const data = await res.json();
+
+    if (Array.isArray(data.sites)) {
+      siteAliasMap = {};
+      sites = data.sites.map(s => {
+        const name = (s.name || "").toLowerCase();
+        const alias = s.alias || name.charAt(0).toUpperCase() + name.slice(1);
+        siteAliasMap[name] = alias;
+        return {
+          name,
+          alias,
+          lat: parseFloat(s.lat),
+          lon: parseFloat(s.lon)
+        };
       });
     }
 
-    async function updateSiteStatus() {
-      try {
-        const res = await fetch("/api/status", { credentials: 'same-origin' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const statuses = await res.json();
-        const byName = new Map(statuses.map(st => [norm(st.name || st.site), st]));
+    drawStaticMarkers();
+    updateSiteStatus();
+  } catch (err) {
+    console.error("❌ Failed to load sites:", err);
+  }
+}
 
-        // === Update Map Markers ===
-        siteMarkers.clearLayers();
-        sites.forEach(site => {
-          const st = byName.get(norm(site.name)) || { status: 'offline', update: '-' };
-          const color = getColorByStatus(st.status);
-          L.circleMarker([site.lat, site.lon], {
-            pane: 'markerPane',
-            radius: 10,
-            fillColor: color,
-            color: "#fff",
-            weight: 2,
-            fillOpacity: 0.9
-          }).addTo(siteMarkers);
-        });
+function drawStaticMarkers() {
+  siteMarkers.clearLayers();
+  sites.forEach(site => {
+    const label = `${site.alias} (${site.name})`;
+    L.circleMarker([site.lat, site.lon], {
+      pane: 'markerPane',
+      radius: 10,
+      fillColor: "red",
+      color: "#fff",
+      weight: 2,
+      fillOpacity: 0.9
+    })
+    .bindTooltip(label, { direction: "top", offset: [0, -10], opacity: 0.9 })
+    .addTo(siteMarkers);
+  });
+}
 
-        // === Update Left Panel ===
-        const panel = document.getElementById("statusList");
-        panel.innerHTML = "";
-        statuses.slice(0, 6).forEach(st => {
-          const color = getColorByStatus(st.status);
-          const div = document.createElement("div");
-          div.className = "status-card";
-          div.innerHTML = `
-            <div class="site-name">
-              <span class="status-dot" style="background:${color}"></span>${st.name.toUpperCase()}
-            </div>
-            <div><b>Status:</b> ${st.status}</div>
-            <div><b>Last update:</b> ${st.update || "-"}</div>
-            <pre>${(st.last_log || "").trim()}</pre>
-          `;
-          panel.appendChild(div);
-        });
+async function updateSiteStatus() {
+  try {
+    const res = await fetch("/api/status", { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const statuses = await res.json();
+    const byName = new Map(statuses.map(st => [norm(st.name || st.site), st]));
 
-      } catch (err) {
-        console.error("⚠️ Failed to update site status:", err);
-      }
-    }
+    // === Update Map Markers ===
+    siteMarkers.clearLayers();
+    sites.forEach(site => {
+      const st = byName.get(norm(site.name)) || { status: 'offline', update: '-' };
+      const color = getColorByStatus(st.status);
+      const label = `${site.alias} (${site.name})`;
+      L.circleMarker([site.lat, site.lon], {
+        pane: 'markerPane',
+        radius: 10,
+        fillColor: color,
+        color: "#fff",
+        weight: 2,
+        fillOpacity: 0.9
+      })
+      .bindTooltip(label, { direction: "top", offset: [0, -10], opacity: 0.9 })
+      .addTo(siteMarkers);
+    });
+
+    // === Update Left Panel ===
+    const panel = document.getElementById("statusList");
+    panel.innerHTML = "";
+    statuses.slice(0, 6).forEach(st => {
+      const color = getColorByStatus(st.status);
+      const siteName = (st.name || "").toLowerCase();
+      const alias = siteAliasMap[siteName] || siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const label = `${alias} (${siteName})`;
+
+      const div = document.createElement("div");
+      div.className = "status-card";
+      div.innerHTML = `
+        <div class="site-name">
+          <span class="status-dot" style="background:${color}"></span>${label}
+        </div>
+        <div><b>Status:</b> ${st.status}</div>
+        <div><b>Last update:</b> ${st.update || "-"}</div>
+        <pre>${(st.last_log || "").trim()}</pre>
+      `;
+      panel.appendChild(div);
+    });
+
+  } catch (err) {
+    console.error("⚠️ Failed to update site status:", err);
+  }
+}
+
+
 
     // === Legend di kanan bawah ===
     const legend = L.control({ position: "bottomright" });

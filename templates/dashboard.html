@@ -706,7 +706,7 @@
           }
           const dataDate = (f.file_date || "-").replace(/\s*UTC\s*$/, "");
           html += `<tr>
-            <td>${site}</td>
+            <td>${site} <br><small style="opacity:0.8;">(${f.site_code || '-'})</small></td>
             <td><a href='/load_from_ftp/${site}/${f.name}' target='_blank'>📄</a></td>
             <td>${dataDate}</td>`;
             if (withMeta) {

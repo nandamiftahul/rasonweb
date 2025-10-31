@@ -660,19 +660,21 @@ async function populateSitesEA() {
 
     select.innerHTML = "";
 
-    // ✅ Loop menyesuaikan struktur baru: { name, lat, lon }
+    // ✅ Tampilkan alias(name) secara konsisten
     for (const s of sites) {
-      const siteName = s.name || s; // fallback kalau backend masih string
-      const nameDisplay = siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const siteName = (s.name || "").toLowerCase();
+      const alias = s.alias || siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const label = `${alias} (${siteName})`;
+
       const opt = document.createElement("option");
       opt.value = siteName;
-      opt.textContent = nameDisplay;
+      opt.textContent = label;
       select.appendChild(opt);
     }
 
     // 🔄 Restore pilihan terakhir
     const saved = localStorage.getItem("siteSelect");
-    if (saved && sites.some(x => (x.name || x) === saved)) {
+    if (saved && sites.some(x => (x.name || "").toLowerCase() === saved.toLowerCase())) {
       select.value = saved;
     }
 

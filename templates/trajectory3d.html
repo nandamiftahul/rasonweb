@@ -1004,7 +1004,7 @@ function logoutUser() {
   window.location.href = "{{ url_for('pages.logout') }}";
 }
 
-// === 🔹 Populate site dropdown dynamically from backend ===
+// === 🔹 Populate site dropdown dynamically from backend (with alias) ===
 async function populateSites() {
   const select = document.getElementById("siteSelect");
   if (!select) return;
@@ -1023,19 +1023,20 @@ async function populateSites() {
 
     select.innerHTML = "";
 
-    // ✅ Loop menyesuaikan struktur baru: { name, lat, lon }
     for (const s of sites) {
-      const siteName = s.name || s; // fallback kalau backend masih string
-      const nameDisplay = siteName.charAt(0).toUpperCase() + siteName.slice(1);
+      const code = s.name;
+      const alias = s.alias || code;
+      const displayText = `${alias} (${code})`;
+
       const opt = document.createElement("option");
-      opt.value = siteName;
-      opt.textContent = nameDisplay;
+      opt.value = code;           // backend tetap menerima kode asli
+      opt.textContent = displayText;
       select.appendChild(opt);
     }
 
-    // 🔄 Restore pilihan terakhir
+    // 🔄 Pulihkan pilihan terakhir dari localStorage (jika ada)
     const saved = localStorage.getItem("siteSelect");
-    if (saved && sites.some(x => (x.name || x) === saved)) {
+    if (saved && sites.some(x => x.name === saved)) {
       select.value = saved;
     }
 

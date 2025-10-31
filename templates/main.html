@@ -565,7 +565,7 @@
           const card = document.createElement("div");
           card.className = "card";
           card.innerHTML = `
-            <h3>📍 ${site.site}</h3>
+            <h3>📍 ${site.alias || site.site}</h3>
             <p><b>Launch:</b> ${site.launch_time}</p>
             <p><b>End:</b> ${site.end_time}</p>
             <p><b>Status:</b> ${site.status}</p>
@@ -632,7 +632,8 @@ async function loadSitesFromConfig() {
 
     if (Array.isArray(data.sites) && data.sites.length > 0) {
       sites = data.sites.map(s => ({
-        name: s.name.charAt(0).toUpperCase() + s.name.slice(1),
+        name: s.name, 
+        alias: s.alias ? s.alias : s.name.charAt(0).toUpperCase() + s.name.slice(1),
         lat: parseFloat(s.lat) || 0,
         lon: parseFloat(s.lon) || 0
       }));
@@ -687,9 +688,9 @@ async function loadSitesFromConfig() {
           fillOpacity: 0.9
         }).addTo(siteMarkers);
         m.bindTooltip(
-          `<b>${site.name}</b><br>
-           Status: <span style="color:${color};font-weight:bold">offline</span><br>
-           <small>Last update: -</small>`,
+          `<b>${site.alias}</b> <small style="opacity:0.8;">(${site.name})</small><br>
+           Status: <span style="color:${color};font-weight:bold">${st?.status || 'offline'}</span><br>
+           <small>Last update: ${st?.update || '-'}</small>`,
           { direction: "top", offset: [0, -5] }
         );
       });
@@ -719,11 +720,10 @@ async function loadSitesFromConfig() {
             weight: 2,
             fillOpacity: 0.9
           }).addTo(siteMarkers);
-    
           m.bindTooltip(
-            `<b>${site.name}</b><br>
-             Status: <span style="color:${color};font-weight:bold">${st.status}</span><br>
-             <small>Last update: ${st.update || "-"}</small>`,
+            `<b>${site.alias}</b> <small style="opacity:0.8;">(${site.name})</small><br>
+             Status: <span style="color:${color};font-weight:bold">${st?.status || 'offline'}</span><br>
+             <small>Last update: ${st?.update || '-'}</small>`,
             { direction: "top", offset: [0, -5] }
           );
         });

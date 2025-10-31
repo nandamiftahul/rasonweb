@@ -712,39 +712,44 @@
   }
 
   // ===== Load available sites =====
-  async function loadSites() {
-    loadingMsg.textContent = "Loading sites...";
-    const year  = parseInt(yearSelect.value);
-    const month = parseInt(monthSelect.value);
-    const { start, end } = getMonthRange(year, month);
+async function loadSites() {
+  loadingMsg.textContent = "Loading sites...";
+  const year  = parseInt(yearSelect.value);
+  const month = parseInt(monthSelect.value);
 
-    try {
-      const res = await fetch("/api/sites_config");
-      const data = await res.json();
-      const sites = (data.sites || []).map(s => s.name).sort();
-  
-      if (sites.length === 0) {
-        siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
-        return;
-      }
-  
-      siteSelect.innerHTML = "";
-      sites.forEach(s => {
-        const opt = document.createElement("option");
-        opt.value = s;
-        opt.textContent = s;
-        siteSelect.appendChild(opt);
-      });
-  
-      siteSelect.value = sites[0];
-      await loadTimeAccuracy(sites[0], year, month);
-      await showSiteRankingTable(year, month);
-      await showDailyAccuracyRanking(); 
-    } catch {
-      loadingMsg.textContent = "Failed to load sites.";
+  try {
+    const res = await fetch("/api/sites_config");
+    const data = await res.json();
+    const sites = (data.sites || []).sort((a,b)=>a.name.localeCompare(b.name));
+
+    if (!sites.length) {
+      siteSelect.innerHTML = `<option disabled selected>No sites found</option>`;
+      return;
     }
 
+    siteSelect.innerHTML = "";
+    for (const s of sites) {
+      const alias = s.alias || s.name.charAt(0).toUpperCase() + s.name.slice(1);
+      const name = s.name.toLowerCase();
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = `${alias} (${name})`;   // ✅ format konsisten Alias (name)
+      siteSelect.appendChild(opt);
+    }
+
+    // simpan global
+    window.siteList = sites;
+
+    // auto-load
+    siteSelect.value = sites[0].name;
+    await loadTimeAccuracy(sites[0].name, year, month);
+    await showSiteRankingTable(year, month, sites);
+    await showDailyAccuracyRanking(sites);
+  } catch (err) {
+    console.error(err);
+    loadingMsg.textContent = "Failed to load sites.";
   }
+}
 
   // ===== Single source of truth =====
   async function loadTimeAccuracy(site, year, month) {
@@ -979,61 +984,58 @@ yearSelect.addEventListener("change", ()=>{
       window.location.href = "{{ url_for('pages.logout') }}";
     }
 // === Generate site ranking berdasarkan rata-rata preparation time ===
-async function showSiteRankingTable(year, month) {
+async function showSiteRankingTable(year, month, siteList = window.siteList || []) {
   const rankingBox = document.getElementById("rankingMonthly");
   rankingBox.innerHTML = "<p style='color:#dbeafe;'>⏳ Calculating ranking...</p>";
 
   try {
-    const res = await fetch("/api/sites_config");
-    const data = await res.json();
-    const sites = (data.sites || []).map(s => s.name).sort();
     const results = [];
 
-    for (const site of sites) {
+    for (const s of siteList) {
+      const site = s.name;
+      const alias = s.alias || "";
       const r = await fetch(`/api/time_accuracy/${site}?year=${year}&month=${month}`);
       const j = await r.json();
+
       const arr = (j.data || []).map(e => {
         if (!e.launch_time) return null;
         const launch = new Date(e.launch_time.replace(" ", "T") + "Z");
         const base = new Date(launch);
-        if (e.hour === "00Z") base.setUTCHours(23, 30);
-        else if (e.hour === "12Z") base.setUTCHours(11, 30);
-        else base.setUTCHours(launch.getUTCHours() - 1, 30);
-        const diff = (launch - base) / 60000;
+        if (e.hour === "00Z") base.setUTCHours(23,30);
+        else if (e.hour === "12Z") base.setUTCHours(11,30);
+        else base.setUTCHours(launch.getUTCHours()-1,30);
+        const diff = (launch - base)/60000;
         return diff >= 0 && diff < 360 ? diff : null;
       });
-      const valid = arr.filter(x => x !== null);
-      const avg = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : NaN;
-      results.push({ site, avg });
+
+      const valid = arr.filter(x=>x!==null);
+      const avg = valid.length ? valid.reduce((a,b)=>a+b,0)/valid.length : NaN;
+      results.push({ site, alias, avg });
     }
 
-    results.sort((a, b) => a.avg - b.avg);
+    results.sort((a,b)=>(a.avg||9999)-(b.avg||9999));
 
     rankingBox.innerHTML = `
       <h3>🏆 Site Ranking by Avg Preparation Time (${monthName(month)} ${year})</h3>
       <table>
-        <thead>
-          <tr><th>Rank</th><th>Site</th><th>Avg (min)</th></tr>
-        </thead>
+        <thead><tr><th>Rank</th><th>Site</th><th>Avg (min)</th></tr></thead>
         <tbody>
-          ${results.map((r, i) => `
+          ${results.map((r,i)=>`
             <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
-              <td>${i + 1}</td>
-              <td>${r.site}</td>
+              <td>${i+1}</td>
+              <td>${r.alias ? `${r.alias} (${r.site})` : r.site}</td>   <!-- ✅ Alias (name) -->
               <td>${isFinite(r.avg)?r.avg.toFixed(1):'-'}</td>
-            </tr>
-          `).join("")}
+            </tr>`).join("")}
         </tbody>
-      </table>
-    `;
+      </table>`;
   } catch (err) {
     console.error(err);
     rankingBox.innerHTML = "<p style='color:#fca5a5;'>❌ Failed to calculate ranking.</p>";
   }
 }
 
+
 // === Generate global daily ranking across all sites for current date ===
-// === Generate global daily ranking (00Z & 12Z) for chosen date ===
 async function showDailyAccuracyRanking() {
   const rankingBox = document.getElementById("dailyContent");
   const dateInput = document.getElementById("dailyDate");
@@ -1049,10 +1051,12 @@ async function showDailyAccuracyRanking() {
 
     const res = await fetch("/api/sites_config");
     const data = await res.json();
-    const sites = (data.sites || []).map(s => s.name).sort();
+    const sites = (data.sites || []).sort((a,b)=>a.name.localeCompare(b.name));
     const results = [];
 
-    for (const site of sites) {
+    for (const s of sites) {
+      const site = s.name;
+      const alias = s.alias || s.name; // ✅ fallback kalau alias kosong
       const r = await fetch(`/api/time_accuracy/${site}?year=${selected.getUTCFullYear()}&month=${selected.getUTCMonth()+1}`);
       const j = await r.json();
       const flights = (j.data || []).filter(e => e.date === targetDateStr);
@@ -1076,7 +1080,8 @@ async function showDailyAccuracyRanking() {
       const avgVals = [prep00, prep12].filter(x => x !== null && isFinite(x));
       const avg = avgVals.length ? avgVals.reduce((a,b)=>a+b,0) / avgVals.length : NaN;
 
-      results.push({ site, prep00, prep12, avg });
+      // ✅ Simpan nama + alias agar mudah ditampilkan
+      results.push({ site, alias, prep00, prep12, avg });
     }
 
     results.sort((a,b)=>(a.avg||9999)-(b.avg||9999));
@@ -1091,7 +1096,7 @@ async function showDailyAccuracyRanking() {
           ${results.map((r,i)=>`
             <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
               <td>${i+1}</td>
-              <td>${r.site}</td>
+              <td>${r.alias} (${r.site})</td>  <!-- ✅ Format konsisten -->
               <td>${r.prep00 != null && isFinite(r.prep00) ? r.prep00.toFixed(1) : '-'}</td>
               <td>${r.prep12 != null && isFinite(r.prep12) ? r.prep12.toFixed(1) : '-'}</td>
               <td>${isFinite(r.avg) ? r.avg.toFixed(1) : '-'}</td>

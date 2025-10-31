@@ -704,26 +704,62 @@ td {
     }
   }
 
-  function renderTable(data){
-    const endDay=new Date(data.year,data.month,0).getDate();
-    const selectedHour=$("#hourSelect").val();
-    let html="<table><tr><th>Site</th>";
-    for(let d=1;d<=endDay;d++) html+=`<th>${String(d).padStart(2,'0')}</th>`;
-    html+="</tr>";
+let siteAliasMap = {}; // 🔹 cache alias biar efisien
 
-    data.sites.forEach(site=>{
-      const siteName = site.name || site.site || "-";
-      html+=`<tr><td>${siteName.charAt(0).toUpperCase() + siteName.slice(1)}</td>`;
-      for(let d=1;d<=endDay;d++){
-        const info=site.days[d]?.[selectedHour] || {color:"red",tooltip:"no data"};
-        html+=`<td><div class='tooltip'><span class='circle ${info.color}'></span><span class='tooltiptext'>${selectedHour}Z - ${info.tooltip}</span></div></td>`;
-      }
-      html+="</tr>";
+// 🔹 Load alias mapping saat awal halaman dibuka
+async function loadSiteAliases() {
+  try {
+    const res = await fetch("/api/sites_config");
+    const data = await res.json();
+    siteAliasMap = {};
+    (data.sites || []).forEach(s => {
+      siteAliasMap[s.name.toLowerCase()] = s.alias || s.name;
     });
-    html+="</table>";
-    $("#tableContainer").html(html);
+  } catch (err) {
+    console.warn("⚠️ Failed to load alias list:", err);
   }
-  loadData();
+}
+
+async function loadData(){
+  const m=$("#monthSelect").val(), y=$("#yearSelect").val();
+  $("#tableContainer").html("<p style='text-align:center;'>⏳ Loading...</p>");
+  try{
+    const res=await fetch(`/api/data_availability?month=${m}&year=${y}`);
+    const data=await res.json();
+    if(!data.sites) throw new Error("No data");
+    renderTable(data);
+  }catch(e){
+    $("#tableContainer").html(`<p style='text-align:center;color:#f87171;'>Error: ${e}</p>`);
+  }
+}
+
+// ✅ versi baru renderTable
+function renderTable(data){
+  const endDay=new Date(data.year,data.month,0).getDate();
+  const selectedHour=$("#hourSelect").val();
+  let html="<table><tr><th>Site</th>";
+  for(let d=1;d<=endDay;d++) html+=`<th>${String(d).padStart(2,'0')}</th>`;
+  html+="</tr>";
+
+  data.sites.forEach(site=>{
+    const name = (site.name || site.site || "-").toLowerCase();
+    const alias = siteAliasMap[name] || name.charAt(0).toUpperCase() + name.slice(1);
+    const siteLabel = `${alias} (${name})`;   // ✅ konsisten
+
+    html+=`<tr><td>${siteLabel}</td>`;
+    for(let d=1;d<=endDay;d++){
+      const info=site.days[d]?.[selectedHour] || {color:"red",tooltip:"no data"};
+      html+=`<td><div class='tooltip'><span class='circle ${info.color}'></span><span class='tooltiptext'>${selectedHour}Z - ${info.tooltip}</span></div></td>`;
+    }
+    html+="</tr>";
+  });
+  html+="</table>";
+  $("#tableContainer").html(html);
+}
+
+// 🔹 Load alias dulu sebelum pertama kali load data
+loadSiteAliases().then(loadData);
+
     // === UTC Clock ===
     function updateUTCClock() {
       const now = new Date();
