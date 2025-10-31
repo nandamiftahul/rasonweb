@@ -707,7 +707,7 @@
           const dataDate = (f.file_date || "-").replace(/\s*UTC\s*$/, "");
           html += `<tr>
             <td>${site} <br><small style="opacity:0.8;">(${f.site_code || '-'})</small></td>
-            <td><a href='/load_from_ftp/${site}/${f.name}' target='_blank'>📄</a></td>
+            <td><a href='/load_from_ftp/${f.site_code || '-'}/${f.name}' target='_blank'>📄</a></td>
             <td>${dataDate}</td>`;
             if (withMeta) {
               const cleanLaunch = (f.launch_time || "-").replace(/\s*UTC\s*$/, "");
@@ -726,9 +726,9 @@
                 <td>${f.avg_ascent_rate || "-"}</td>`;
             }
             html += `
-              <td><a href='/download/${site}/${f.name}' target='_blank'>⬇</a></td>
-              <td><a href='/download_wmo/${site}/${f.name}' target='_blank'>⬇</a></td>
-              <td><a href='/raob/${site}/${f.name}' target='_blank'>📊</a></td>
+              <td><a href='/download/${f.site_code || '-'}/${f.name}' target='_blank'>⬇</a></td>
+              <td><a href='/download_wmo/${f.site_code || '-'}/${f.name}' target='_blank'>⬇</a></td>
+              <td><a href='/raob/${f.site_code || '-'}/${f.name}' target='_blank'>📊</a></td>
             </tr>`;
         });
       }
