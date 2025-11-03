@@ -31,6 +31,7 @@ from core.utils import (
     excel_date_to_str, save_sites,
     generate_weather_analysis,
     SITE_LIST, parse_serial_to_int,
+    parse_log_date,
     MODEM_LOOKUP, SENSOR_MAPS, REASON_MAP,
 )
 from config.settings import (
@@ -262,14 +263,16 @@ def api_status():
                     ftp.cwd(f"{cfg['base_path']}/{site_name}")
                     files = ftp.nlst()
                     log_files = [f for f in files if re.match(r"EOSCAN.*\.log$", f, re.IGNORECASE)]
+                    #print(f"[DEBUG] {site_name}: log = {log_files}")
                     if not log_files:
                         raise FileNotFoundError("Tidak ada file EOSCAN*.log")
-
-                    log_files.sort(reverse=True)
+                    
+                    log_files.sort(key=parse_log_date, reverse=True)
                     latest_log = log_files[0]
-
+                    print(f"[DEBUG] {site_name}: latest_log = {latest_log}")
                     # Ambil tanggal dari nama file
-                    date_match = re.search(r"(\d{1,2}) ([A-Za-z]{3}) (\d{2})", latest_log)
+                    date_match = re.search(r"(\d{1,2})[ _-]?([A-Za-z]{3})[ _-]?(\d{2})", latest_log, re.IGNORECASE)
+
                     file_date = None
                     if date_match:
                         day, mon, yy = date_match.groups()

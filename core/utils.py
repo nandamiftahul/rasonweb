@@ -78,6 +78,22 @@ def safe_float(val):
     except (TypeError, ValueError):
         return np.nan
 
+# Ambil tanggal dari nama file (atau fallback ke waktu modifikasi)
+def parse_log_date(filename):
+    m = re.search(r"(\d{1,2})[ _-]?([A-Za-z]{3})[ _-]?(\d{2})", filename, re.IGNORECASE)
+    if m:
+        day, mon, yy = m.groups()
+        try:
+            return datetime.strptime(f"{day} {mon} 20{yy}", "%d %b %Y")
+        except Exception:
+            pass
+    # fallback ke tanggal modifikasi di FTP
+    try:
+        modified = ftp.sendcmd(f"MDTM {filename}")
+        return datetime.strptime(modified[4:], "%Y%m%d%H%M%S")
+    except Exception:
+        return datetime.min
+
 # --- helper: ambil angka saja, aman untuk "12345", "12345.0", "SN-12345", dll.
 def parse_serial_to_int(val):
     if val is None:
