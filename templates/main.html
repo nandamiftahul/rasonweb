@@ -319,9 +319,7 @@
       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
       margin-bottom: 30px;
     }
-    #indoMap.indo-bg {
-      background: linear-gradient(180deg, #0b335f 0%, #0a2a6b 50%, #07325e 100%);
-    }
+
     /* --- Sticky Footer yang menyesuaikan sidebar --- */
     .footer {
       position: fixed;
@@ -589,104 +587,45 @@
     setInterval(loadLatestStatus, 10 * 60 * 1000);
 
     // Leaflet Map
-// ==== Map tanpa tiles, fokus Indonesia ====
-var map = L.map('indoMap', {
-  zoomControl: true,
-  attributionControl: false
-}).setView([-2, 118], 5);
-
-// Pastikan layout map stabil setelah render awal
-setTimeout(() => map.invalidateSize(), 500);
-
-// Batas pan supaya tidak ngelayang ke luar NKRI
-const indoBounds = L.latLngBounds(
-  L.latLng(-12.5, 94.5),   // SW
-  L.latLng(  7.5, 141.0)   // NE
-);
-map.setMaxBounds(indoBounds.pad(0.05));
-map.on('drag', () => map.panInsideBounds(indoBounds, { animate:false }));
-
-// Latar laut (gradien) → pakai CSS yang sudah kamu buat
-document.getElementById('indoMap').classList.add('indo-bg');
-
-// Panes & urutan z-index
-map.createPane('provincePane');  map.getPane('provincePane').style.zIndex = 500;
-map.createPane('maskPane');      map.getPane('maskPane').style.zIndex     = 600; // mask di atas provinsi
-map.createPane('markerPane');    map.getPane('markerPane').style.zIndex   = 650; // marker paling atas
-
-// ==== Muat GeoJSON provinsi, render, lalu bikin mask ====
-fetch("{{ url_for('static', filename='geojson/indonesia.geojson') }}")
-  .then(r => r.json())
-  .then(geo => {
-    // 1) Layer provinsi (warna, border, tooltip)
-    const provLayer = L.geoJSON(geo, {
-      pane: 'provincePane',
-      style: {
-        fillColor: "#4cc9f0",
-        color: "white",
-        weight: 1,
-        fillOpacity: 0.40
-      },
-      onEachFeature: (feat, layer) => {
-        layer.on({
-          mouseover: e => e.target.setStyle({ fillOpacity: 0.55 }),
-          mouseout:  e => e.target.setStyle({ fillOpacity: 0.40 })
-        });
-        const nm = feat.properties?.NAME_1 || "Provinsi";
-        layer.bindTooltip(nm, { direction:"center", opacity:0.85, sticky:false });
-      }
-    }).addTo(map);
-
-    // 2) Fit otomatis ke batas NKRI
-    map.fitBounds(provLayer.getBounds().pad(0.05));
-
-    // 3) Siapkan outer ring dunia (persegi menutupi seluruh globe)
-    const worldRing = [
-      [ 89.9, -179.9],
-      [ 89.9,  179.9],
-      [-89.9,  179.9],
-      [-89.9, -179.9]
-    ];
-
-    // 4) Kumpulkan outer ring dari setiap provinsi (Polygon & MultiPolygon)
-    const holes = [];
-    geo.features.forEach(f => {
-      const g = f.geometry;
-      if (!g) return;
-
-      if (g.type === "Polygon") {
-        // GeoJSON koordinatnya [lon, lat] → Leaflet maunya [lat, lon]
-        const outer = g.coordinates[0].map(([lon, lat]) => [lat, lon]);
-        holes.push(outer);
-      } else if (g.type === "MultiPolygon") {
-        g.coordinates.forEach(poly => {
-          const outer = poly[0].map(([lon, lat]) => [lat, lon]);
-          holes.push(outer);
-        });
-      }
-    });
-
-    // 5) Gambar mask (luar Indonesia gelap, Indonesia bolong/terlihat)
-    L.polygon([worldRing, ...holes], {
-      pane: 'maskPane',
-      stroke: false,
-      fill: true,
-      fillColor: "#000",
-      fillOpacity: 0.45,
-      fillRule: "evenodd",   // KUNCI: jadikan 'holes' transparan
-      interactive: false     // jangan blokir interaksi marker/tooltip
-    }).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap & CartoDB',
-  subdomains: 'abcd',
-  maxZoom: 19
-}).addTo(map);
-  });
-   
+    var map = L.map('indoMap').setView([-2, 118], 5);
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 500)
+    // --- Panes & z-index (marker di atas provinsi) ---
+    map.createPane('provincePane');
+    map.createPane('markerPane');
+    map.getPane('provincePane').style.zIndex = 400;
+    map.getPane('markerPane').style.zIndex = 650;
     
-  // --- Titik site (koordinat tetap di sini) ---
-  let sites = [];
-  async function loadSitesFromConfig() {
+    // --- Base layer ---
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // --- Layer provinsi (lebih transparan supaya marker jelas) ---
+    fetch("{{ url_for('static', filename='geojson/indonesia.geojson') }}")
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, {
+          pane: 'provincePane',
+          style: {
+            fillColor: "#3388ff",
+            weight: 1,
+            color: "white",
+            fillOpacity: 0.25
+          },
+          onEachFeature: (feature, layer) => {
+            layer.on({
+              mouseover: e => e.target.setStyle({ fillOpacity: 0.4 }),
+              mouseout:  e => e.target.setStyle({ fillOpacity: 0.25 })
+            });
+          }
+        }).addTo(map);
+      });
+    
+    // --- Titik site (koordinat tetap di sini) ---
+    let sites = [];
+async function loadSitesFromConfig() {
   try {
     const res = await fetch("/api/sites_config");
     const data = await res.json();
@@ -736,27 +675,26 @@ fetch("{{ url_for('static', filename='geojson/indonesia.geojson') }}")
     }
     
     // --- Gambar marker offline sebagai fallback awal ---
-function drawStaticMarkers() {
-  siteMarkers.clearLayers();
-  sites.forEach(site => {
-    const color = getColorByStatus('offline');
-    const m = L.circleMarker([site.lat, site.lon], {
-      pane: 'markerPane',
-      radius: 10,
-      fillColor: color,
-      color: "#fff",
-      weight: 2,
-      fillOpacity: 0.9
-    }).addTo(siteMarkers);
-    m.bindTooltip(
-      `<b>${site.alias}</b> <small style="opacity:0.8;">(${site.name})</small><br>
-       Status: <span style="color:${color};font-weight:bold">offline</span><br>
-       <small>Last update: -</small>`,
-      { direction: "top", offset: [0, -5] }
-    );
-  });
-}
-
+    function drawStaticMarkers() {
+      siteMarkers.clearLayers();
+      sites.forEach(site => {
+        const color = getColorByStatus('offline');
+        const m = L.circleMarker([site.lat, site.lon], {
+          pane: 'markerPane',
+          radius: 10,
+          fillColor: color,
+          color: "#fff",
+          weight: 2,
+          fillOpacity: 0.9
+        }).addTo(siteMarkers);
+        m.bindTooltip(
+          `<b>${site.alias}</b> <small style="opacity:0.8;">(${site.name})</small><br>
+           Status: <span style="color:${color};font-weight:bold">${st?.status || 'offline'}</span><br>
+           <small>Last update: ${st?.update || '-'}</small>`,
+          { direction: "top", offset: [0, -5] }
+        );
+      });
+    }
     drawStaticMarkers(); // tampil duluan biar nggak “kosong”
     
     // --- Ambil status nyata dari backend (bawa cookie login!) ---
