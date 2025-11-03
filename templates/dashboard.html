@@ -675,7 +675,7 @@
           <th>Distance<br><small>(km)</small></th>
           <th>Ascent<br><small>(m/s)</small></th>
         `;
-      html += `<th>.bfr</th><th>WMO</th><th>Analysis</th></tr></thead><tbody>`;
+      html += `<th>BUFR</th><th>WMO</th><th>Graph</th></tr></thead><tbody>`;
 
       for (const [site, files] of Object.entries(sites)) {
         files.forEach(f => {
