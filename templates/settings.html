@@ -724,7 +724,7 @@ async function loadSites() {
   // refresh dropdown FTP compare
   const ftpSel = document.getElementById("ftpSiteSelect");
   if (ftpSel) {
-    ftpSel.innerHTML = data.sites.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+    ftpSel.innerHTML = data.sites.map(s => `<option value="${s.name}">${s.alias || s.name}</option>`).join("");
   }
 }
 
@@ -999,139 +999,121 @@ async function deleteSite(name) {
     let currentDB = [];
     
     // ===== LOAD FTP FILES =====
-    async function loadFTPFiles() {
-      const site  = document.getElementById("ftpSiteSelect").value;
-      const ftype = document.getElementById("ftpTypeSelect").value;
-      const start = document.getElementById("ftpStartDate").value;
-      const end   = document.getElementById("ftpEndDate").value;
-    
-      document.getElementById("ftpLoading").style.display = "block";
-      document.getElementById("dbLoading").style.display  = "block";
-    
-      try {
-        let url = `/api/sites?ext=${encodeURIComponent(ftype)}&limit=200`;
-        if (start) url += `&start_date=${start}`;
-        if (end)   url += `&end_date=${end}`;
-    
-        const res  = await fetch(url);
-        const data = await res.json();
-        currentFTP = (data[site] || []).map(f => f.name);
-    
-        // lanjut load DB setelah FTP selesai
-        await loadDBFiles();
-      } catch (err) {
-        alert("❌ Failed to load FTP data");
-        console.error(err);
-      } finally {
-        document.getElementById("ftpLoading").style.display = "none";
-        document.getElementById("dbLoading").style.display  = "none";
-      }
-    }
-    
+async function loadFTPFiles() {
+  const site  = document.getElementById("ftpSiteSelect").value;
+  const ftype = document.getElementById("ftpTypeSelect").value;
+  const start = document.getElementById("ftpStartDate").value;
+  const end   = document.getElementById("ftpEndDate").value;
+
+  document.getElementById("ftpLoading").style.display = "block";
+  document.getElementById("dbLoading").style.display  = "block";
+
+  try {
+    let url = `/api/sites?ext=${encodeURIComponent(ftype)}&limit=200`;
+    if (start) url += `&start_date=${start}`;
+    if (end)   url += `&end_date=${end}`;
+
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    // 🧠 Kumpulkan semua file di mana site_code = site yg dipilih
+    const allFiles = Object.values(data)
+      .flat() // gabung semua array
+      .filter(f => f.site_code === site);
+
+    currentFTP = allFiles.map(f => f.name);
+    await loadDBFiles(allFiles);
+  } catch (err) {
+    alert("❌ Failed to load FTP data");
+    console.error(err);
+  } finally {
+    document.getElementById("ftpLoading").style.display = "none";
+    document.getElementById("dbLoading").style.display  = "none";
+  }
+}
+
     // ===== LOAD DB FILES =====
-    async function loadDBFiles() {
-      const site = document.getElementById("ftpSiteSelect").value;
-      try {
-        const res  = await fetch(`/api/db_files/${site}`);
-        const data = await res.json();
-        currentDB  = (data.files || []).map(f => f.filename);
-        renderCompareTables();
-      } catch (err) {
-        console.error("❌ Failed to load DB files:", err);
-      }
-    }
+async function loadDBFiles(allFiles = []) {
+  const site = document.getElementById("ftpSiteSelect").value;
+  try {
+    const res  = await fetch(`/api/db_files/${site}`);
+    const data = await res.json();
+    currentDB  = (data.files || []).map(f => f.filename);
 
-
-    
+    renderCompareTables(allFiles); // kirim juga list FTP terbaru
+  } catch (err) {
+    console.error("❌ Failed to load DB files:", err);
+  }
+}
+ 
     // ===== RENDER COMPARISON TABLES =====
-    async function renderCompareTables() {
-      const site = document.getElementById("ftpSiteSelect").value;
-      const ftype = document.getElementById("ftpTypeSelect").value;
-      const start = document.getElementById("ftpStartDate").value;
-      const end = document.getElementById("ftpEndDate").value;
-    
-      if (!site) return;
-    
-      const tbodyFTP = document.querySelector("#ftpTable tbody");
-      const tbodyDB = document.querySelector("#dbTable tbody");
-      tbodyFTP.innerHTML = "";
-      tbodyDB.innerHTML = "";
-    
-      // Build URL FTP
-      let url = `/api/sites?ext=${encodeURIComponent(ftype)}&limit=200`;
-      if (start) url += `&start_date=${start}`;
-      if (end) url += `&end_date=${end}`;
-    
-      // --- FTP SIDE ---
-      const ftpRes = await fetch(url);
-      const ftpData = await ftpRes.json();
-      let ftpFiles = (ftpData[site] || []);
-    
-      // 🧩 Sort descending by file_date (newest first)
-      ftpFiles.sort((a, b) => {
-        const da = new Date(a.file_date || 0);
-        const db = new Date(b.file_date || 0);
-        return db - da;
-      });
-    
-      ftpFiles.forEach(f => {
-        const inDB = currentDB.includes(f.name);
-        const indicator = inDB ? "🟢" : "🟡";
-        tbodyFTP.innerHTML += `
-          <tr>
-            <td>${indicator}</td>
-            <td><input type="checkbox" name="ftpSel" value="${f.name}"></td>
-            <td>${f.name}</td>
-            <td>${f.file_date || "-"}</td>
-            <td><button onclick="insertToDB('${site}','${f.name}')">📥 Insert</button></td>
-          </tr>`;
-      });
-    
-      // --- DB SIDE ---
-      const dbRes = await fetch(`/api/db_files/${site}`);
-      const dbData = await dbRes.json();
-      let dbFiles = (dbData.files || []);
-      
-      // === 🔹 Filter DB files berdasarkan file type (ekstensi) ===
-      if (ftype) {
-        const ext = ftype.replace(".", "").toLowerCase();
-        dbFiles = dbFiles.filter(f => f.filename && f.filename.toLowerCase().endsWith(ext));
-      }
-      
-      // === 🔹 Filter DB files berdasarkan start dan end date ===
-      if (start || end) {
-        const startDate = start ? new Date(start) : null;
-        const endDate = end ? new Date(end) : null;
-        dbFiles = dbFiles.filter(f => {
-          if (!f.file_date) return false;
-          const fileDate = new Date(f.file_date);
-          if (startDate && fileDate < startDate) return false;
-          if (endDate && fileDate > endDate) return false;
-          return true;
-        });
-      }
-   
-      // 🧩 Sort descending by file_date
-      dbFiles.sort((a, b) => {
-        const da = new Date(a.file_date || 0);
-        const db = new Date(b.file_date || 0);
-        return db - da;
-      });
-    
-      dbFiles.forEach(f => {
-        const inFTP = currentFTP.includes(f.filename);
-        const indicator = inFTP ? "🟢" : "🔴";
-        tbodyDB.innerHTML += `
-          <tr>
-            <td>${indicator}</td>
-            <td><input type="checkbox" name="dbSel" value="${f.filename}"></td>
-            <td>${f.filename}</td>
-            <td>${f.file_date || "-"}</td>
-            <td><button onclick="redoFile('${site}','${f.filename}')">🔁 Redownload</button></td>
-          </tr>`;
-      });
-    }
+async function renderCompareTables(allFTP = []) {
+  const site = document.getElementById("ftpSiteSelect").value;
+  const ftype = document.getElementById("ftpTypeSelect").value;
+  const start = document.getElementById("ftpStartDate").value;
+  const end   = document.getElementById("ftpEndDate").value;
 
+  const tbodyFTP = document.querySelector("#ftpTable tbody");
+  const tbodyDB  = document.querySelector("#dbTable tbody");
+  tbodyFTP.innerHTML = "";
+  tbodyDB.innerHTML  = "";
+
+  // ==== FTP SIDE ====
+  let ftpFiles = allFTP;
+  ftpFiles.sort((a, b) => new Date(b.file_date) - new Date(a.file_date));
+
+  ftpFiles.forEach(f => {
+    const inDB = currentDB.includes(f.name);
+    const indicator = inDB ? "🟢" : "🟡";
+    tbodyFTP.innerHTML += `
+      <tr>
+        <td>${indicator}</td>
+        <td><input type="checkbox" name="ftpSel" value="${f.name}"></td>
+        <td>${f.name}</td>
+        <td>${f.file_date || "-"}</td>
+        <td><button onclick="insertToDB('${site}','${f.name}')">📥 Insert</button></td>
+      </tr>`;
+  });
+
+  // ==== DB SIDE ====
+  const res = await fetch(`/api/db_files/${site}`);
+  const data = await res.json();
+  let dbFiles = (data.files || []);
+
+  // filter ekstensi
+  if (ftype) {
+    const ext = ftype.replace(".", "").toLowerCase();
+    dbFiles = dbFiles.filter(f => f.filename.toLowerCase().endsWith(ext));
+  }
+
+  // filter tanggal
+  if (start || end) {
+    const startDate = start ? new Date(start) : null;
+    const endDate = end ? new Date(end) : null;
+    dbFiles = dbFiles.filter(f => {
+      const fileDate = new Date(f.file_date);
+      if (startDate && fileDate < startDate) return false;
+      if (endDate && fileDate > endDate) return false;
+      return true;
+    });
+  }
+
+  // sort by file_date
+  dbFiles.sort((a, b) => new Date(b.file_date) - new Date(a.file_date));
+
+  dbFiles.forEach(f => {
+    const inFTP = allFTP.some(ff => ff.name === f.filename);
+    const indicator = inFTP ? "🟢" : "🔴";
+    tbodyDB.innerHTML += `
+      <tr>
+        <td>${indicator}</td>
+        <td><input type="checkbox" name="dbSel" value="${f.filename}"></td>
+        <td>${f.filename}</td>
+        <td>${f.file_date || "-"}</td>
+        <td><button onclick="redoFile('${site}','${f.filename}')">🔁 Redownload</button></td>
+      </tr>`;
+  });
+}
 
     async function insertToDB(site, filename) {
       const ok = confirm(`Insert ${filename} from FTP into database?`);
@@ -1164,8 +1146,9 @@ async function deleteSite(name) {
     }
     
 
-    function reloadFTP() { loadFTPFiles(); loadDBFiles(); }
-    function reloadDB() { loadFTPFiles(); loadDBFiles(); }
+function reloadFTP() { loadFTPFiles(); }
+function reloadDB() { loadFTPFiles(); }
+
 
     
     async function populateCompareDropdowns() {
