@@ -15,6 +15,7 @@
 <link href="{{ url_for('static', filename='libs/maplibre/maplibre-gl.css') }}" rel="stylesheet">
 <script src="{{ url_for('static', filename='libs/maplibre/maplibre-gl.js') }}"></script>
 <script src="{{ url_for('static', filename='libs/deckgl/deck.gl.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
 <style>
   * { box-sizing: border-box; }
@@ -445,7 +446,9 @@
   <span id="sp-val">1×</span>
   <input id="prog" type="range" min="0" max="100" step="0.5" value="0" style="flex:1;">
   <span id="st-elap">0 s</span>
+  <button id="btn-export">🌍 Export KML</button>
 </div>
+
   </div>
 
   <!-- Footer -->
@@ -876,6 +879,96 @@ document.querySelectorAll("#mapLayerControl button").forEach(btn => {
     })(last);
     updateLevelInfo(0);
   });
+
+// === 🌍 FULL Export 3D Trajectory + Ground Lines + Custom Icons (KMZ offline) ===
+document.getElementById("btn-export").onclick = async () => {
+  if (!d || !d.trip || !d.trip.path || !d.trip.timestamps) {
+    alert("⚠️ Data trajectory belum tersedia!");
+    return;
+  }
+
+  const path = d.trip.path;
+  const t0 = new Date(d.meta.launch_time || new Date());
+  const timestamps = d.trip.timestamps.map(
+    s => new Date(t0.getTime() + s * 1000).toISOString()
+  );
+
+  // ==== HEADER ====
+  let kml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n` +
+    `<Document>\n<name>${d.station.name || "Radiosonde Trajectory"}</name>\n` +
+
+    // Style utama lintasan & ground
+    `<Style id="trajStyle"><LineStyle><color>ff0000ff</color><width>3</width></LineStyle></Style>\n` +
+    `<Style id="groundStyle"><LineStyle><color>88ffffff</color><width>1</width></LineStyle></Style>\n` +
+
+    // Ikon Start & Burst (local)
+    `<Style id="startStyle"><IconStyle><scale>1.3</scale><Icon><href>start.png</href></Icon></IconStyle></Style>\n` +
+    `<Style id="burstStyle"><IconStyle><scale>1.3</scale><Icon><href>burst.png</href></Icon></IconStyle></Style>\n`;
+
+  // ==== LINTASAN UTAMA ====
+  kml += `<Placemark>\n<name>3D Radiosonde Path</name>\n<styleUrl>#trajStyle</styleUrl>\n` +
+         `<gx:Track>\n<altitudeMode>absolute</altitudeMode>\n`;
+
+  for (let i = 0; i < timestamps.length; i++)
+    kml += `<when>${timestamps[i]}</when>\n`;
+
+  for (let i = 0; i < path.length; i++) {
+    const [lon, lat, alt] = path[i];
+    kml += `<gx:coord>${lon} ${lat} ${alt}</gx:coord>\n`;
+  }
+
+  kml += `</gx:Track>\n</Placemark>\n`;
+
+  // ==== GARIS VERTIKAL KE GROUND ====
+  for (let i = 0; i < path.length; i += Math.max(1, Math.floor(path.length / 40))) {
+    const [lon, lat, alt] = path[i];
+    kml += `<Placemark><styleUrl>#groundStyle</styleUrl><LineString>` +
+           `<altitudeMode>absolute</altitudeMode><coordinates>` +
+           `${lon},${lat},0 ${lon},${lat},${alt}</coordinates>` +
+           `</LineString></Placemark>\n`;
+  }
+
+  // ==== TITIK AWAL & BURST ====
+  const start = path[0], end = path.at(-1);
+  if (start)
+    kml += `<Placemark><name>Start</name><styleUrl>#startStyle</styleUrl>` +
+           `<Point><altitudeMode>absolute</altitudeMode>` +
+           `<coordinates>${start[0]},${start[1]},${start[2]}</coordinates></Point></Placemark>\n`;
+
+  if (end)
+    kml += `<Placemark><name>Burst</name><styleUrl>#burstStyle</styleUrl>` +
+           `<Point><altitudeMode>absolute</altitudeMode>` +
+           `<coordinates>${end[0]},${end[1]},${end[2]}</coordinates></Point></Placemark>\n`;
+
+  kml += `</Document>\n</kml>`;
+
+  // ==== BUNDLING: Buat KMZ ====
+  const zip = new JSZip();
+  zip.file("trajectory.kml", kml);
+
+  // Fetch ikon lokal (ganti path sesuai projectmu)
+  const [startIcon, burstIcon] = await Promise.all([
+    fetch("/static/images/balloon_green.png"),
+    fetch("/static/images/balloon_red.png")
+  ]);
+
+  // Masukkan ke KMZ
+  zip.file("start.png", await startIcon.blob());
+  zip.file("burst.png", await burstIcon.blob());
+
+  const content = await zip.generateAsync({ type: "blob" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(content);
+  a.download = `${(d.station.name || "trajectory")}_${t0.toISOString().replace(/[:.]/g, "-")}.kmz`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+
+  alert("✅ KMZ 3D berhasil dibuat dan siap dibuka di Google Earth!");
+};
+
 
   // === Kompas Utara (North Indicator) ===
   const northArrow = document.getElementById("northArrow");

@@ -539,6 +539,7 @@ canvas {
     <span id="frameText">0/0</span>
   
     <button onclick="toggleCharts()" id="chartsBtn">📊 Show Charts</button>
+    <button onclick="exportKML()">🌍 Export KML</button>
   </div>
 
   <!-- 📊 Charts panel sekarang di luar map -->
@@ -1394,6 +1395,57 @@ async function populateSites() {
   }
 }
 window.addEventListener("DOMContentLoaded", populateSites);
+function exportKML() {
+  if (!allLevels.length) {
+    alert("⚠️ Tidak ada data radiosonde untuk diekspor!");
+    return;
+  }
+
+  let kml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<kml xmlns="http://www.opengis.net/kml/2.2" ` +
+    `xmlns:gx="http://www.google.com/kml/ext/2.2">\n` +
+    `<Document>\n` +
+    `<name>Radiosonde Trajectory</name>\n` +
+    `<Style id="balloonPath"><LineStyle><color>ff0000ff</color><width>3</width></LineStyle></Style>\n`;
+
+  // ---- gx:Track (animasi lintasan) ----
+  kml += `<Placemark>\n<name>Trajectory</name>\n<styleUrl>#balloonPath</styleUrl>\n<gx:Track>\n`;
+
+  for (const lvl of allLevels) {
+    if (!lvl.latitude || !lvl.longitude) continue;
+    const t = Number(lvl.time_s) || 0;
+    const dt = new Date(launchDateUTC.getTime() + t * 1000).toISOString();
+    kml += `<when>${dt}</when>\n`;
+  }
+  for (const lvl of allLevels) {
+    if (!lvl.latitude || !lvl.longitude) continue;
+    const h = lvl.height_m || 0;
+    kml += `<gx:coord>${lvl.longitude} ${lvl.latitude} ${h}</gx:coord>\n`;
+  }
+  kml += `</gx:Track>\n</Placemark>\n`;
+
+  // ---- Titik akhir (burst point) ----
+  const last = allLevels[allLevels.length - 1];
+  if (last && last.latitude && last.longitude) {
+    kml += `<Placemark>\n<name>End Point</name>\n` +
+           `<Point><coordinates>${last.longitude},${last.latitude},${last.height_m || 0}</coordinates></Point>\n</Placemark>\n`;
+  }
+
+  kml += `</Document>\n</kml>`;
+
+  // ---- Simpan ke file ----
+  const blob = new Blob([kml], { type: "application/vnd.google-earth.kml+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const fname = `radiosonde_${(launchDateUTC?.toISOString() || "unknown").replace(/[:.]/g,"-")}.kml`;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
   </script>
 </body>
