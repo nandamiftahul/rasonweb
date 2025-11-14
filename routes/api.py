@@ -30,8 +30,9 @@ from core.utils import (
     analyze_flight,load_sites,
     excel_date_to_str, save_sites,
     generate_weather_analysis,
+    normalize_primary, infer_secondary_from_qc,
     SITE_LIST, parse_serial_to_int,
-    parse_log_date,
+    parse_log_date, COMBINED_REASON_MAP,
     MODEM_LOOKUP, SENSOR_MAPS, REASON_MAP,
 )
 from config.settings import (
@@ -139,11 +140,9 @@ def api_sites():
 
     return jsonify(aliased_sites)
 
-
 @api.route("/api/sites_with_meta")
 @login_required
 def api_sites_with_meta():
-    """Return list of sites with alias + metadata."""
     ext = request.args.get("ext") or None
     limit = request.args.get("limit")
     start_date = request.args.get("start_date")
@@ -159,25 +158,68 @@ def api_sites_with_meta():
         start_date=start_dt,
         end_date=end_dt
     )
-
-    # 🔹 Alias mapping
+    
     alias_map = {s["name"]: s.get("alias", s["name"].title()) for s in load_sites()}
-
-    # 🔹 Inject manufactured info + site_code
     aliased_sites = {}
+
     for site_name, files in sites.items():
         alias = alias_map.get(site_name.lower(), site_name.title())
+
         for f in files:
+            # =========================
+            # INJECT SERIAL / MANUFACTURE
+            # =========================
             serial_raw = f.get("radiosonde_serial_number")
             sn_int = parse_serial_to_int(serial_raw)
             if sn_int and sn_int in MODEM_LOOKUP:
                 f["manufactured"] = MODEM_LOOKUP[sn_int]
             else:
                 f["manufactured"] = "-"
+
             f["site_code"] = site_name
+            # =============================
+            # 🔵 COMBINED REASON MATCHING (Solution A)
+            # =============================
+            
+            primary_raw = f.get("reason_for_termination", "")
+            primary_clean = normalize_primary(primary_raw)
+            
+            issues_text = ", ".join(f.get("flight_issues", []) or [])
+            secondary_clean = infer_secondary_from_qc(issues_text)
+            
+            combined_code = "-"
+            combined_color = ""
+            combined_meaning = ""
+            
+            for code, info in COMBINED_REASON_MAP.items():
+                # primary MUST match 100%
+                if info["primary"].lower() == primary_clean:
+                    # secondary is best-effort: startswith()
+                    if secondary_clean and info["secondary"].lower().startswith(secondary_clean):
+                        combined_code = code
+                        combined_meaning = info["meaning"]
+            
+                        if info["primary"] == "Balloon Burst":
+                            combined_color = "burst"
+                        elif info["primary"] == "Ascent Stop":
+                            combined_color = "ascent"
+                        elif info["primary"] == "Telemetry Interrupted":
+                            combined_color = "telemetry"
+                        elif info["primary"] == "Temperature KO":
+                            combined_color = "temp"
+                        else:
+                            combined_color = "other"
+                        break
+            
+            # inject ke response
+            f["combined_code"] = combined_code
+            f["combined_color"] = combined_color
+            f["combined_meaning"] = combined_meaning
+
         aliased_sites[alias] = files
 
     return jsonify(aliased_sites)
+
 @api.route("/api/latest_status")
 @login_required
 def api_latest_status():
@@ -2212,3 +2254,118 @@ def upload_bufr():
         print("[UPLOAD_BUFR] ❌ Exception:", e)
         return jsonify({"success": False, "error": str(e)})
 
+@api.route("/download_zip/<site>/<filename>")
+@login_required
+def download_zip(site, filename):
+    import zipfile
+    from io import BytesIO
+
+    cfg = CONFIG["ftp"]
+    local_bufr = os.path.join(UPLOAD_FOLDER, filename)
+
+    # ===============================
+    # 1) Download BUFR/BFR
+    # ===============================
+    try:
+        with ftplib.FTP() as ftp:
+            ftp.connect(cfg["host"], cfg.get("port", 21))
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.cwd(f"{cfg['base_path']}/{site}")
+            with open(local_bufr, "wb") as f:
+                ftp.retrbinary(f"RETR {filename}", f.write)
+    except Exception as e:
+        return f"FTP BUFR error: {e}", 500
+
+    # ===============================
+    # 2) WMO TXT (existing)
+    # ===============================
+    wmo_resp = download_wmo(site, filename)
+    wmo_text = wmo_resp.get_data(as_text=True)
+    wmo_name = filename + "_WMO.txt"
+
+    # ===============================
+    # 3) RAW FILE (metadata + table)
+    # ===============================
+    raw_name = filename.replace(".bfr", "").replace(".bufr", "") + ".raw"
+
+    # 🔥 PAKAI SISTEM CACHE YANG SUDAH ADA
+    ftype = filename.split(".")[-1].lower()
+    if ftype not in ["bufr", "bfr", "bfh", "bin"]:
+        ftype = "bfr"
+
+    # --- Cek dari DB dulu
+    cached = db_get(ftype, site, filename)
+    if cached:
+        df_meta, df_levels = cached
+    else:
+        # fallback decode
+        decoded = decode_bufr(local_bufr)
+        df_meta, df_levels = parse_bufr(decoded, site=site)
+        db_insert(ftype, site, filename,
+                  extract_date_from_filename(filename),
+                  df_meta, df_levels)
+
+    # --- Build RAW content
+    raw_lines = []
+    raw_lines.append("# RAW RADIOSONDE DATA")
+    raw_lines.append(f"File: {filename}")
+    raw_lines.append(f"Site: {site}")
+    raw_lines.append("")
+
+    # ----- METADATA -----
+    raw_lines.append("# ---- METADATA ----")
+    meta_dict = df_meta.to_dict("records")[0] if not df_meta.empty else {}
+    for k, v in meta_dict.items():
+        raw_lines.append(f"{k}: {v}")
+
+    raw_lines.append("")
+    raw_lines.append("# ---- DATA TABLE ----")
+    raw_lines.append("time,lat,lon,pressure,temp,RH,dewpoint,wind_speed,wind_dir")
+
+    # cari kolom
+    def find(col):
+        return next((c for c in df_levels.columns if col in c.lower()), None)
+
+    col_time = find("time")
+    col_lat = find("lat")
+    col_lon = find("lon")
+    col_p   = find("pres")
+    col_t   = find("temp")
+    col_rh  = find("hum") or find("rh")
+    col_td  = find("dew")
+    col_ws  = find("wind_speed")
+    col_wd  = find("wind_dir")
+
+    for _, r in df_levels.iterrows():
+        raw_lines.append(
+            f"{r.get(col_time,'')},"
+            f"{r.get(col_lat,'')},"
+            f"{r.get(col_lon,'')},"
+            f"{r.get(col_p,'')},"
+            f"{r.get(col_t,'')},"
+            f"{r.get(col_rh,'')},"
+            f"{r.get(col_td,'')},"
+            f"{r.get(col_ws,'')},"
+            f"{r.get(col_wd,'')}"
+        )
+
+    raw_text = "\n".join(raw_lines)
+
+    # ===============================
+    # 4) ZIP all 3 files
+    # ===============================
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(local_bufr, arcname=filename)
+        z.writestr(wmo_name,  wmo_text)
+        z.writestr(raw_name,  raw_text)
+
+    zip_buffer.seek(0)
+    zip_name = filename.replace(".bfr", "") + "_bundle.zip"
+
+    return send_file(
+        zip_buffer,
+        as_attachment=True,
+        download_name=zip_name,
+        mimetype="application/zip"
+    )

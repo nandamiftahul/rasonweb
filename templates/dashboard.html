@@ -483,6 +483,11 @@
       background: rgba(255,255,255,0.35);
       color: #fff;
     }
+.combined-burst { color: #ff4d4d !important; font-weight:600; }
+.combined-ascent { color: #ffdd55 !important; font-weight:600; }
+.combined-telemetry { color: #4da3ff !important; font-weight:600; }
+.combined-temp { color: #ffa366 !important; font-weight:600; }
+.combined-other { color: #d1d5db !important; font-weight:600; }
     
   </style>
 </head>
@@ -675,7 +680,7 @@
           <th>Distance<br><small>(km)</small></th>
           <th>Ascent<br><small>(m/s)</small></th>
         `;
-      html += `<th>BUFR</th><th>WMO</th><th>Graph</th></tr></thead><tbody>`;
+      html += `<th>ZIP</th><th>Graph</th></tr></thead><tbody>`;
 
       for (const [site, files] of Object.entries(sites)) {
         files.forEach(f => {
@@ -717,7 +722,13 @@
                 <td>${cleanLaunch}</td>
                 <td>${cleanEnd}</td>
                 <td class='${statusClass}'>${issues}</td>
-                <td>${f.reason_for_termination || "-"}</td>
+                <td class="combined-${f.combined_color}">
+                  ${f.reason_for_termination || "-"} 
+                  <br>
+                  <small style="opacity:0.9;font-weight:600;">
+                    ${f.combined_code || ""}
+                  </small>
+                </td>
                 <td>${f.radiosonde_serial_number || "-"}</td>
                 <td>${f.manufactured || "-"}</td>
                 <td>${f.end_pressure || "-"}</td>
@@ -726,8 +737,11 @@
                 <td>${f.avg_ascent_rate || "-"}</td>`;
             }
             html += `
-              <td><a href='/download/${f.site_code || '-'}/${f.name}' target='_blank'>⬇</a></td>
-              <td><a href='/download_wmo/${f.site_code || '-'}/${f.name}' target='_blank'>⬇</a></td>
+              <td>
+                <a href="/download_zip/${f.site_code}/${f.name}" 
+                   target="_blank"
+                   title="Download BUFR + WMO ZIP">🗜️</a>
+              </td>
               <td><a href='/raob/${f.site_code || '-'}/${f.name}' target='_blank'>📊</a></td>
             </tr>`;
         });

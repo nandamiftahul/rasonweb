@@ -114,6 +114,153 @@ REASON_MAP = {
     4:"Telemetry interrupted",5:"Manual termination",6:"Other",11:"Temperature KO",
 }
 
+COMBINED_REASON_MAP = {
+    "BUR-FRZ-100": {
+        "primary": "Balloon Burst",
+        "secondary": "RH Freeze-out",
+        "level": "<100 hPa",
+        "meaning": "Burst terjadi setelah sensor freeze-out, terjadi pada supercooled dry layer."
+    },
+    "BUR-CLD-100": {
+        "primary": "Balloon Burst",
+        "secondary": "Cloud/Rain Layer",
+        "level": "<100 hPa",
+        "meaning": "Balon pecah akibat turbulensi atau drag saat melewati lapisan awan/hujan."
+    },
+    "BUR-CNB-100": {
+        "primary": "Balloon Burst",
+        "secondary": "Deep Convection",
+        "level": "<100 hPa",
+        "meaning": "Balon pecah saat melewati cumulonimbus atau updraft kuat."
+    },
+    "BUR-SHR-100": {
+        "primary": "Balloon Burst",
+        "secondary": "Strong Shear",
+        "level": "<100 hPa",
+        "meaning": "Shear vertikal tinggi menyebabkan balon pecah sebelum mencapai puncak."
+    },
+    "BUR-DSH-100": {
+        "primary": "Balloon Burst",
+        "secondary": "Directional Shear",
+        "level": "<100 hPa",
+        "meaning": "Perubahan arah angin ekstrem memicu stress pada balon."
+    },
+    "BUR-PRS-UNK": {
+        "primary": "Balloon Burst",
+        "secondary": "Pressure Reversal",
+        "level": "Unknown",
+        "meaning": "Pecah terjadi setelah anomali tekanan, kemungkinan sensor error atau turbulensi."
+    },
+
+    "ASC-CLD-UNK": {
+        "primary": "Ascent Stop",
+        "secondary": "Cloud/Rain Layer",
+        "level": "N/A",
+        "meaning": "Balon tertahan hujan/drag sehingga berhenti naik."
+    },
+    "ASC-CNB-UNK": {
+        "primary": "Ascent Stop",
+        "secondary": "Deep Convection",
+        "level": "N/A",
+        "meaning": "Downburst atau turbulensi cumulonimbus menghentikan kenaikan balon."
+    },
+    "ASC-FRZ-UNK": {
+        "primary": "Ascent Stop",
+        "secondary": "RH Freeze-out",
+        "level": "N/A",
+        "meaning": "Freeze-out menyebabkan data stagnan lalu ascent stop."
+    },
+    "ASC-ASN-UNK": {
+        "primary": "Ascent Stop",
+        "secondary": "Slow Ascent",
+        "level": "N/A",
+        "meaning": "Laju naik melemah bertahap akibat densitas udara, cuaca, atau gas kurang."
+    },
+    "ASC-SHR-UNK": {
+        "primary": "Ascent Stop",
+        "secondary": "Strong Shear",
+        "level": "N/A",
+        "meaning": "Shear layer menghambat kenaikan sehingga balon berhenti."
+    },
+
+    "TEL-CLD-UNK": {
+        "primary": "Telemetry Interrupted",
+        "secondary": "Cloud/Rain Layer",
+        "level": "N/A",
+        "meaning": "Hujan menyebabkan sinyal lemah/terhalang."
+    },
+    "TEL-CNB-UNK": {
+        "primary": "Telemetry Interrupted",
+        "secondary": "Deep Convection",
+        "level": "N/A",
+        "meaning": "Sinyal hilang saat balon masuk cumulonimbus."
+    },
+    "TEL-GPS-UNK": {
+        "primary": "Telemetry Interrupted",
+        "secondary": "GPS Fail",
+        "level": "N/A",
+        "meaning": "GPS hilang dan sistem tracking gagal mengikuti balon."
+    },
+    "TEL-SHR-UNK": {
+        "primary": "Telemetry Interrupted",
+        "secondary": "Strong Shear",
+        "level": "N/A",
+        "meaning": "Shear tinggi membuat balon drift cepat keluar coverage antena."
+    },
+
+    "TMP-FRZ-UNK": {
+        "primary": "Temperature KO",
+        "secondary": "RH Freeze-out",
+        "level": "N/A",
+        "meaning": "Sensor T rusak akibat pembentukan es."
+    },
+    "TMP-SAT-UNK": {
+        "primary": "Temperature KO",
+        "secondary": "RH Saturation",
+        "level": "N/A",
+        "meaning": "Sensor T dan RH jenuh sehingga data KO."
+    },
+    "TMP-CPT-UNK": {
+        "primary": "Temperature KO",
+        "secondary": "Cold Point Tropopause",
+        "level": "N/A",
+        "meaning": "Sensor tidak mampu membaca temperatur ekstrem di tropopause."
+    },
+
+    "BAT-CPT-UNK": {
+        "primary": "Battery Exhausted",
+        "secondary": "Cold Point Tropopause",
+        "level": "N/A",
+        "meaning": "Tegangan drop karena suhu ekstrem di tropopause."
+    },
+    "BAT-FRZ-UNK": {
+        "primary": "Battery Exhausted",
+        "secondary": "RH Freeze-out",
+        "level": "N/A",
+        "meaning": "Es dan kondensasi mempercepat konsumsi power."
+    },
+
+    "OTH-CLD-UNK": {
+        "primary": "Other",
+        "secondary": "Cloud Layer",
+        "level": "N/A",
+        "meaning": "Gangguan operasi umum terkait lapisan awan."
+    },
+    "OTH-SHR-UNK": {
+        "primary": "Other",
+        "secondary": "Strong Shear",
+        "level": "N/A",
+        "meaning": "Shear ekstrem menyebabkan gangguan aerodinamis."
+    },
+    "UNK-SHR-UNK": {
+        "primary": "Not Specified",
+        "secondary": "Strong Shear",
+        "level": "N/A",
+        "meaning": "Kasus umum tanpa reason eksplisit, namun shear terdeteksi."
+    }
+}
+
+
 SENSOR_MAPS = {
     "pressure": {0:"Unknown",1:"Aneroid",2:"Capacitive",3:"Other"},
     "temperature": {0:"Unknown",1:"Thermistor",2:"Platinum",3:"Other"},
@@ -122,6 +269,36 @@ SENSOR_MAPS = {
     "balloon_gas": {0:"Unknown",1:"Hydrogen",2:"Helium"},
     "balloon_manufacturer": {0:"Unknown",1:"Totex",2:"Kaysam",3:"Other"},
 }
+
+# =============================
+# 🔧 PRIMARY & SECONDARY NORMALIZER
+# =============================
+
+def normalize_primary(reason_raw: str) -> str:
+    """Convert '1 – Balloon burst' → 'balloon burst' """
+    if not reason_raw:
+        return ""
+    return reason_raw.split("–")[-1].strip().lower()
+
+
+def infer_secondary_from_qc(issues_text: str) -> str:
+    """Infer secondary category only from QC flight_issues."""
+    issues = issues_text.lower()
+
+    if "ascent stop" in issues:
+        return "slow ascent"            # maps to ASC-ASN-UNK
+
+    if "not reaching 30" in issues or "not reaching 100" in issues:
+        return "strong shear"           # maps to *-SHR-* groups
+
+    if "gps fail" in issues:
+        return "gps fail"
+
+    if "temp ko" in issues:
+        return "rh freeze-out"
+
+    return ""
+
 
 def analyze_flight(df_meta, df_levels):
     issues = []

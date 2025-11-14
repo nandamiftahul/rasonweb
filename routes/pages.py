@@ -6,6 +6,7 @@ from datetime import datetime
 from core.auth import login_required, page_access_required, VALID_USERS, ACTIVE_USERS, USER_SESSION_TOKENS, get_global_session_version, get_user_store
 from core.auth import save_users  # if needed
 from core.ftp import fetch_all_sites
+from core.utils import COMBINED_REASON_MAP
 from config.settings import SECRET_KEY
 import secrets
 
@@ -222,3 +223,8 @@ def user_guide_page():
 @login_required
 def display_page():
     return render_template("display.html")
+
+@pages.route("/reason_explanation")
+@login_required
+def reason_explanation_page():
+    return render_template("reason_explanation.html", combined=COMBINED_REASON_MAP)
