@@ -907,13 +907,14 @@ async function loadSites() {
       const hourZ = tagRaw.replace(/[()]/g, "") || "00Z";
   
       const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_${hourZ}`];
-      if (!entry) return;
-  
+      
       const dateFmt = `${day}/${String(month).padStart(2,"0")} ${hourZ}`;
-      const launchHHMM = getLaunchHHMM(entry.launch_time);
-      const abUTC = addMinutesToLaunch(entry.launch_time, entry.AB);
-      const burstUTC = addMinutesToLaunch(entry.launch_time, entry.CD);
-  
+      
+      // ✅ kalau tidak ada entry, isi "-"
+      const launchHHMM = entry ? getLaunchHHMM(entry.launch_time) : "-";
+      const abUTC      = entry ? addMinutesToLaunch(entry.launch_time, entry.AB) : "-";
+      const burstUTC   = entry ? addMinutesToLaunch(entry.launch_time, entry.CD) : "-";
+      
       tbody.insertAdjacentHTML("beforeend", `
         <tr>
           <td>${dateFmt}</td>
@@ -921,7 +922,7 @@ async function loadSites() {
           <td>${abUTC}</td>
           <td>${burstUTC}</td>
         </tr>
-      `);
+      `);     
     });
   }
 

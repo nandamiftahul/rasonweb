@@ -509,9 +509,15 @@ def api_time_accuracy(site):
     Ambil data time accuracy (.bfr) untuk site tertentu berdasarkan bulan & tahun.
     🔹 Query param opsional: ?year=YYYY&month=MM
     🔹 Default: bulan berjalan
+    ✅ Selalu output semua tanggal (00Z & 12Z), jika tidak ada data → null/"-"
     """
     from datetime import datetime, timedelta, timezone
     import pandas as pd, re
+    import calendar  # ✅ TAMBAHAN (untuk full month template)
+
+    # ✅ TAMBAHAN: map untuk menampung record yang benar-benar ada
+    # key: (date_str, hour_label)
+    records_map = {}
 
     # ==========================================================
     # 🔹 Tangkap parameter dari query string (debug-friendly)
@@ -578,7 +584,23 @@ def api_time_accuracy(site):
         site_key = site.lower()
         if site_key not in site_keys:
             print(f"⚠️ Site {site} not found in FTP list")
-            return jsonify({"site": site, "data": [], "year": year, "month": month})
+
+            # ✅ TAMBAHAN: tetap balikin template full month (kosong semua)
+            end_day = calendar.monthrange(year, month)[1]
+            out = []
+            for day in range(1, end_day + 1):
+                dstr = f"{year}-{month:02d}-{day:02d}"
+                for hour_label in ["00Z", "12Z"]:
+                    out.append({
+                        "filename": "-",
+                        "date": dstr,
+                        "hour": hour_label,
+                        "launch_time": None,
+                        "AB": None,
+                        "CD": None,
+                        "note": "-"
+                    })
+            return jsonify({"site": site, "data": out, "year": year, "month": month})
 
         true_site = site_keys[site_key]
 
@@ -645,7 +667,7 @@ def api_time_accuracy(site):
                 # ======================================================
                 # Ambil waktu sampai tekanan tertentu
                 t100 = df_levels.loc[df_levels["pressure_hPa"] <= 100, "time_s"].min()
-                
+
                 # Jika tidak sampai 100 hPa, gunakan minimum pressure yang tercapai
                 if pd.isna(t100):
                     min_pres = df_levels["pressure_hPa"].min()
@@ -653,15 +675,15 @@ def api_time_accuracy(site):
                     note = f"(fallback {min_pres:.1f} hPa)"
                 else:
                     note = ""
-                
+
                 # Titik burst (atau akhir data)
                 t30 = df_levels.loc[df_levels["pressure_hPa"] <= 0, "time_s"].min()
                 if pd.isna(t30):
                     t30 = df_levels["time_s"].max()
-                
+
                 # Masukkan record walau tidak sampai 100 hPa
                 if pd.notna(t100):
-                    data.append({
+                    rec = {
                         "filename": fname,
                         "date": date_str,
                         "hour": hour_label,
@@ -669,8 +691,14 @@ def api_time_accuracy(site):
                         "AB": round(t100 / 60.0, 1),
                         "CD": round(t30 / 60.0, 1) if pd.notna(t30) else None,
                         "note": note
-                    })
-                
+                    }
+
+                    # ✅ tetap append seperti sebelumnya
+                    data.append(rec)
+
+                    # ✅ TAMBAHAN: simpan ke records_map untuk full-month output
+                    records_map[(date_str, hour_label)] = rec
+
             except Exception as e:
                 print(f"⚠️ Error parsing {fname}: {e}")
 
@@ -686,7 +714,29 @@ def api_time_accuracy(site):
     data = sorted(data, key=sort_key)
     print(f"✅ Found {len(data)} records for {site} ({year}-{month:02d})")
 
-    return jsonify({"site": site, "data": data, "year": year, "month": month})
+    # ==========================================================
+    # ✅ TAMBAHAN: OUTPUT FULL MONTH (selalu ada semua tanggal + 00Z/12Z)
+    # ==========================================================
+    end_day = calendar.monthrange(year, month)[1]
+    out = []
+    for day in range(1, end_day + 1):
+        dstr = f"{year}-{month:02d}-{day:02d}"
+        for hour_label in ["00Z", "12Z"]:
+            key = (dstr, hour_label)
+            if key in records_map:
+                out.append(records_map[key])
+            else:
+                out.append({
+                    "filename": "-",
+                    "date": dstr,
+                    "hour": hour_label,
+                    "launch_time": None,
+                    "AB": None,
+                    "CD": None,
+                    "note": "-"
+                })
+
+    return jsonify({"site": site, "data": out, "year": year, "month": month})
 
 @api.route("/api/height_reach/<site>")
 @login_required
@@ -697,9 +747,12 @@ def api_height_reach(site):
     🔹 Query param opsional: ?year=YYYY&month=MM
     🔹 Default: bulan berjalan (UTC)
     🔹 Data diambil dari SQLite cache (jika tidak ada, unduh & decode dari FTP)
+    ✅ Selalu output semua tanggal (00Z & 12Z), jika tidak ada data → null/"-"
+    ✅ Tambahan kolom: pressure_reason
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
     import pandas as pd, re
+    import calendar
 
     # ==========================================================
     # 🔹 Tangkap parameter dari query string
@@ -729,6 +782,7 @@ def api_height_reach(site):
         end_date = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     else:
         end_date = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
     print(f"📅 [HeightReach] Fetching {site} for {year}-{month:02d} ({start_date.date()} → {end_date.date()})")
 
     # ==========================================================
@@ -747,7 +801,12 @@ def api_height_reach(site):
                 continue
         return None
 
-    data = []
+    # ==========================================================
+    # ✅ records_map menampung hasil yang ADA saja
+    # key: (date_str, hour_label)
+    # ==========================================================
+    records_map = {}
+
     try:
         # ==========================================================
         # 🔹 Ambil daftar file .bfr dari cache/FTP
@@ -764,7 +823,22 @@ def api_height_reach(site):
         site_key = site.lower()
         if site_key not in site_keys:
             print(f"⚠️ Site {site} not found in FTP list")
-            return jsonify({"site": site, "data": [], "year": year, "month": month})
+            # tetap balikin template full month (kosong semua)
+            all_days = calendar.monthrange(year, month)[1]
+            out = []
+            for day in range(1, all_days + 1):
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                for hour_label in ["00Z", "12Z"]:
+                    out.append({
+                        "filename": "-",
+                        "date": date_str,
+                        "hour": hour_label,
+                        "max_height": None,
+                        "end_pressure": None,
+                        "pressure_reason": "-"
+                    })
+            return jsonify({"site": site, "data": out, "year": year, "month": month})
+
         true_site = site_keys[site_key]
 
         # ==========================================================
@@ -783,6 +857,7 @@ def api_height_reach(site):
 
                 date_str = file_dt.strftime("%Y-%m-%d")
                 hour_label = "00Z" if file_dt.hour < 6 else "12Z"
+                key = (date_str, hour_label)
 
                 # ======================================================
                 # 🔹 Ambil data dari cache DB atau decode baru
@@ -793,7 +868,7 @@ def api_height_reach(site):
 
                 cached = db_get(ftype, true_site, fname)
                 if cached:
-                    _, df_levels = cached
+                    df_meta, df_levels = cached
                     print(f"[DB] ✅ cache hit for {fname}")
                 else:
                     local_path = download_from_ftp(true_site, fname)
@@ -820,14 +895,52 @@ def api_height_reach(site):
                 max_height = df_levels["height_m"].max()
                 min_pres = df_levels["pressure_hPa"].min()
 
-                if pd.notna(max_height) and max_height > 0:
-                    data.append({
-                        "filename": fname,
-                        "date": date_str,
-                        "hour": hour_label,
-                        "max_height": round(float(max_height), 0),
-                        "end_pressure": round(float(min_pres), 1) if pd.notna(min_pres) else None
-                    })
+                if not (pd.notna(max_height) and float(max_height) > 0):
+                    continue
+
+                # ======================================================
+                # ✅ Pressure Reason (Burst reason / termination reason)
+                # ======================================================
+                pressure_reason = "-"
+                try:
+                    if df_meta is not None and (not df_meta.empty):
+                        raw_reason = df_meta.iloc[0].get("reason_for_termination", None)
+                
+                        if raw_reason is None or raw_reason == "":
+                            pressure_reason = "-"
+                        else:
+                            # pastikan integer native
+                            reason_code = int(raw_reason)
+                            pressure_reason = REASON_MAP.get(
+                                reason_code,
+                                f"Unknown ({reason_code})"
+                            )
+                except Exception:
+                    pressure_reason = "-"
+                
+
+                # ======================================================
+                # ✅ Cast ke native type (hindari numpy int64/float64)
+                # ======================================================
+                rec = {
+                    "filename": fname,
+                    "date": date_str,
+                    "hour": hour_label,
+                    "max_height": int(round(float(max_height), 0)),  # ✅ native int
+                    "end_pressure": float(round(float(min_pres), 1)) if pd.notna(min_pres) else None,  # ✅ native float
+                    "pressure_reason": pressure_reason
+                }
+
+                # kalau ada duplikat di hari/jam yang sama, ambil yang max_height lebih tinggi
+                if key in records_map:
+                    try:
+                        old_h = records_map[key].get("max_height")
+                        if old_h is None or (rec["max_height"] is not None and rec["max_height"] > old_h):
+                            records_map[key] = rec
+                    except Exception:
+                        records_map[key] = rec
+                else:
+                    records_map[key] = rec
 
             except Exception as e:
                 print(f"⚠️ Error parsing {fname}: {e}")
@@ -836,14 +949,28 @@ def api_height_reach(site):
         print(f"❌ Height reach fetch failed for {site}: {e}")
 
     # ==========================================================
-    # 🔹 Urutkan hasil: tanggal + jam (00Z dulu, 12Z setelahnya)
+    # ✅ OUTPUT FULL MONTH (selalu ada semua tanggal + 00Z/12Z)
     # ==========================================================
-    def sort_key(x):
-        return (x["date"], 0 if x["hour"] == "00Z" else 1)
-    data = sorted(data, key=sort_key)
+    end_day = calendar.monthrange(year, month)[1]
+    out = []
+    for day in range(1, end_day + 1):
+        dstr = f"{year}-{month:02d}-{day:02d}"
+        for hour_label in ["00Z", "12Z"]:
+            key = (dstr, hour_label)
+            if key in records_map:
+                out.append(records_map[key])
+            else:
+                out.append({
+                    "filename": "-",
+                    "date": dstr,
+                    "hour": hour_label,
+                    "max_height": None,        # ✅ numeric missing → null (frontend bisa tampil NaN / "-")
+                    "end_pressure": None,      # ✅ numeric missing → null
+                    "pressure_reason": "-"     # ✅ string missing → "-"
+                })
 
-    print(f"✅ Found {len(data)} records for {site} ({year}-{month:02d})")
-    return jsonify({"site": site, "data": data, "year": year, "month": month})
+    print(f"✅ Found {len(records_map)} real records; returning {len(out)} rows (full month template).")
+    return jsonify({"site": site, "data": out, "year": year, "month": month})
 
 @api.route("/api/users", methods=["GET", "POST", "PUT", "DELETE"])
 @login_required

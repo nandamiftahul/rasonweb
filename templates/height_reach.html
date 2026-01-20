@@ -596,7 +596,7 @@
         <table id="heightTable">
           <thead>
             <tr>
-              <th>Date</th><th>Height(m)</th><th>Pressure(hPa)</th>
+              <th>Date</th><th>Height</th><th>Pressure</th><th>Burst</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -792,12 +792,13 @@ async function loadSites() {
 
     const data00 = labels.map(day => {
       const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_00Z`];
-      return entry ? entry.max_height : null;
+      return entry ? entry.end_pressure : null;   // ✅ pressure
     });
     const data12 = labels.map(day => {
       const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_12Z`];
-      return entry ? entry.max_height : null;
+      return entry ? entry.end_pressure : null;   // ✅ pressure
     });
+
 
     loadingMsg.style.display = "none";
 
@@ -841,24 +842,28 @@ async function loadSites() {
             grid: { color: "rgba(255,255,255,0.1)" }
           },
           y: {
-            title: { display: true, text: "Maximum Height (m)", color: "#fff" },
+            title: { display: true, text: "End Pressure (hPa)", color: "#fff" },  // ✅
             ticks: { color: "#fff" },
             grid: { color: "rgba(255,255,255,0.1)" },
-            beginAtZero: true,
-            suggestedMax: 40000
+            beginAtZero: false,        // ✅ pressure nggak perlu start 0
+            suggestedMin: 0,           // optional
+            suggestedMax: 1050         // optional (biar enak lihat)
           }
         },
         plugins: {
           legend: { labels: { color: "#fff" } },
           title: {
             display: true,
-            text: `Height Reach - ${siteSelect.value} (${monthName(month)} ${year}, ${filterTime})`,
+            text: `End Pressure - ${siteSelect.value} (${monthName(month)} ${year}, ${filterTime})`,
             color: "#fff",
             font: { size: 18 }
           },
           tooltip: {
             callbacks: {
-              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y ?? "No data"} m`
+              label: ctx => {
+                const v = ctx.parsed.y;
+                return `${ctx.dataset.label}: ${v == null ? "No data" : v.toFixed(1)} hPa`;
+              }
             }
           }
         }
@@ -867,8 +872,8 @@ async function loadSites() {
 
     // Summary (average height)
     const allVals = [...data00, ...data12].filter(v => v != null && !isNaN(v));
-    const avg = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(0) : "-";
-    summaryDiv.textContent = `Average maximum height: ${avg} m`;
+    const avg = allVals.length ? (allVals.reduce((a,b)=>a+b,0)/allVals.length).toFixed(1) : "-";
+    summaryDiv.textContent = `Average end pressure: ${avg} hPa`;
 
     renderTable(year, month);
   }
@@ -889,22 +894,29 @@ async function loadSites() {
       if (timeSelect.value === "ALL" || timeSelect.value === "12Z") labels.push(`${day} (12Z)`);
     }
 
-    labels.forEach(lbl => {
-      const [dayRaw, tagRaw] = lbl.split(" ");
-      const day = dayRaw.padStart(2, "0");
-      const hourZ = tagRaw.replace(/[()]/g, "");
-      const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_${hourZ}`];
-      if (!entry) return;
-      const dateFmt = `${day}/${String(month).padStart(2,"0")} ${hourZ}`;
-      const pres = entry.end_pressure && entry.end_pressure > 0 ? entry.end_pressure.toFixed(1) : "-";
-      tbody.insertAdjacentHTML("beforeend", `
-        <tr>
-          <td>${dateFmt}</td>
-          <td>${entry.max_height}</td>
-          <td>${pres}</td>
-        </tr>
-      `);
-    });
+labels.forEach(lbl => {
+  const [dayRaw, tagRaw] = lbl.split(" ");
+  const day = dayRaw.padStart(2, "0");
+  const hourZ = tagRaw.replace(/[()]/g, "");
+  const entry = map[`${year}-${String(month).padStart(2,"0")}-${day}_${hourZ}`];
+
+  const dateFmt = `${day}/${String(month).padStart(2,"0")} ${hourZ}`;
+
+  // ✅ selalu tampilkan, walau entry null
+  const height = (entry && entry.max_height != null && isFinite(entry.max_height)) ? entry.max_height : "-";
+  const pres   = (entry && entry.end_pressure != null && isFinite(entry.end_pressure)) ? entry.end_pressure.toFixed(1) : "-";
+  const reason = (entry && entry.pressure_reason != null && String(entry.pressure_reason).trim() !== "") ? entry.pressure_reason : "-";
+
+  tbody.insertAdjacentHTML("beforeend", `
+    <tr>
+      <td>${dateFmt}</td>
+      <td>${height}</td>
+      <td>${pres}</td>
+      <td>${reason}</td>   <!-- ✅ kolom baru -->
+    </tr>
+  `);
+});
+
 
     // Summary bawah tabel
     const heights = allData.map(d => d.max_height).filter(v => v != null && !isNaN(v));
@@ -992,30 +1004,45 @@ async function showHeightRankingTable(year, month, siteList = window.siteList ||
       const alias = s.alias || s.name;
       const r = await fetch(`/api/height_reach/${site}?year=${year}&month=${month}`);
       const j = await r.json();
-      const heights = (j.data || []).map(e => e.max_height).filter(v => v && isFinite(v));
 
-      const avgH = heights.length ? heights.reduce((a, b) => a + b, 0) / heights.length : NaN;
-      results.push({ site, alias, avgH });
+      // ✅ ambil end_pressure (lebih kecil = lebih tinggi)
+      const pressures = (j.data || [])
+        .map(e => e.end_pressure)
+        .filter(v => v != null && isFinite(v) && v > 0);
+
+      const avgP = pressures.length
+        ? pressures.reduce((a, b) => a + b, 0) / pressures.length
+        : NaN;
+
+      results.push({ site, alias, avgP });
     }
 
-    results.sort((a, b) => (b.avgH || 0) - (a.avgH || 0));
+    // ✅ sort: avg pressure terkecil jadi rank 1
+    results.sort((a, b) => {
+      const A = isFinite(a.avgP) ? a.avgP : Infinity;
+      const B = isFinite(b.avgP) ? b.avgP : Infinity;
+      return A - B;
+    });
 
     rankingBox.innerHTML = `
-      <h3>🏆 Site Ranking by Average Max Balloon Height (${monthName(month)} ${year})</h3>
+      <h3>🏆 Site Ranking by Average End Pressure (${monthName(month)} ${year})</h3>
       <table>
         <thead>
-          <tr><th>Rank</th><th>Site</th><th>Avg Max Height (m)</th></tr>
+          <tr><th>Rank</th><th>Site</th><th>Avg End Pressure (hPa)</th></tr>
         </thead>
         <tbody>
           ${results.map((r, i) => `
             <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
               <td>${i + 1}</td>
-              <td>${r.alias} (${r.site})</td>  <!-- ✅ alias(name) -->
-              <td>${isFinite(r.avgH)?r.avgH.toFixed(0):'-'}</td>
+              <td>${r.alias} (${r.site})</td>
+              <td>${isFinite(r.avgP) ? r.avgP.toFixed(1) : '-'}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>
+      <p style="margin:8px 0 0; font-size:12px; color:#dbeafe; text-align:center;">
+        *Lower pressure means higher balloon reach
+      </p>
     `;
   } catch (err) {
     console.error(err);
@@ -1044,36 +1071,47 @@ async function showHeightDailyRanking(year, month, siteList = window.siteList ||
       const j = await r.json();
       const flights = (j.data || []).filter(e => e.date === selectedDate);
 
+      // kalau kosong, skip (seperti versi lama)
       if (flights.length === 0) continue;
 
-      const h00 = flights.find(f => f.hour === "00Z")?.max_height || null;
-      const h12 = flights.find(f => f.hour === "12Z")?.max_height || null;
-      const valid = [h00, h12].filter(v => v != null && isFinite(v));
+      // ✅ ambil end_pressure untuk 00Z & 12Z
+      const p00 = flights.find(f => f.hour === "00Z")?.end_pressure ?? null;
+      const p12 = flights.find(f => f.hour === "12Z")?.end_pressure ?? null;
+
+      const valid = [p00, p12].filter(v => v != null && isFinite(v) && v > 0);
       const avg = valid.length ? valid.reduce((a,b)=>a+b,0) / valid.length : NaN;
 
-      results.push({ site, alias, h00, h12, avg });
+      results.push({ site, alias, p00, p12, avg });
     }
 
-    results.sort((a,b)=>(b.avg||0)-(a.avg||0));
+    // ✅ sort: avg pressure terkecil jadi rank 1
+    results.sort((a, b) => {
+      const A = isFinite(a.avg) ? a.avg : Infinity;
+      const B = isFinite(b.avg) ? b.avg : Infinity;
+      return A - B;
+    });
 
     rankingBox.innerHTML = `
       <h3>📅 Daily Ranking (Global) – ${selectedLabel}</h3>
       <table>
         <thead>
-          <tr><th>Rank</th><th>Site</th><th>00Z (m)</th><th>12Z (m)</th><th>Avg (m)</th></tr>
+          <tr><th>Rank</th><th>Site</th><th>00Z (hPa)</th><th>12Z (hPa)</th><th>Avg (hPa)</th></tr>
         </thead>
         <tbody>
           ${results.map((r, i) => `
             <tr style="${i===0?'background:rgba(255,255,255,0.25);font-weight:600;':''}">
               <td>${i+1}</td>
-              <td>${r.alias} (${r.site})</td>   <!-- ✅ konsisten -->
-              <td>${r.h00 ? r.h00.toFixed(0) : '-'}</td>
-              <td>${r.h12 ? r.h12.toFixed(0) : '-'}</td>
-              <td>${isFinite(r.avg)?r.avg.toFixed(0):'-'}</td>
+              <td>${r.alias} (${r.site})</td>
+              <td>${(r.p00 != null && isFinite(r.p00) && r.p00 > 0) ? r.p00.toFixed(1) : '-'}</td>
+              <td>${(r.p12 != null && isFinite(r.p12) && r.p12 > 0) ? r.p12.toFixed(1) : '-'}</td>
+              <td>${isFinite(r.avg) ? r.avg.toFixed(1) : '-'}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>
+      <p style="margin:8px 0 0; font-size:12px; color:#dbeafe; text-align:center;">
+        *Lower pressure means higher balloon reach
+      </p>
     `;
   } catch (err) {
     console.error("❌ Error in showHeightDailyRanking:", err);
