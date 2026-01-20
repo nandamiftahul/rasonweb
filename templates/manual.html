@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Manual Operations | Rason Monitoring</title>
+  <link href="{{ url_for('static', filename='libs/fonts/inter/inter.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #0a2a6b, #004aad, #0078d7);
+      color: white;
+      overflow-x: hidden;
+    }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #0a2a6b 0%, #004aad 60%, #0078d7 100%);
+      padding: 35px 0 25px;
+      color: #fff;
+      text-align: left;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+    .header-inner {
+      width: 90%;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    header p {
+      margin: 6px 0 18px;
+      font-size: 15px;
+      opacity: 0.9;
+    }
+    .header-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #eaf6ff;
+      font-weight: 500;
+      backdrop-filter: blur(4px);
+    }
+
+    /* MAIN CONTENT */
+    main {
+      flex: 1;
+      width: 90%;
+      max-width: 1100px;
+      margin: 25px auto;
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.3);
+      overflow: hidden;
+      position: relative;
+    }
+
+    section.page {
+      display: none;
+      opacity: 0;
+      padding: 40px 50px 70px;
+      transition: opacity 0.6s ease;
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+    }
+    section.page.active {
+      display: block;
+      opacity: 1;
+      animation: fadeIn 0.6s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      color: #eaf6ff;
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      padding-bottom: 6px;
+      margin-bottom: 18px;
+    }
+
+    h3 { color: #dff1ff; margin-top: 18px; }
+    h4 { color: #d8eeff; margin-top: 14px; }
+
+    ul { line-height: 1.7; margin-left: 20px; }
+    li { margin-bottom: 8px; }
+
+    ol { line-height: 1.7; margin-left: 20px; }
+    ol li { margin-bottom: 8px; }
+
+    code {
+      background: rgba(255,255,255,0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #ffe;
+    }
+
+    img.icon {
+      height: 55px;
+      width: auto;
+      margin: 10px 0;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    /* CALLOUT BOX */
+    .callout {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 14px 0;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    }
+    .callout b { color: #ffffff; }
+    .callout .tag {
+      display: inline-block;
+      margin-right: 8px;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+
+    .steps {
+      margin: 12px 0 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.22);
+      background: rgba(255,255,255,0.06);
+    }
+    .steps ol { margin: 6px 0 0 18px; }
+    .steps li { margin-bottom: 10px; }
+    .steps li:last-child { margin-bottom: 0; }
+
+    /* NAVIGATION */
+    .global-nav-controls {
+      position: fixed;
+      bottom: 70px;  /* di atas footer */
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      z-index: 100;
+    }
+    .global-nav-controls button {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      font-weight: 500;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+      backdrop-filter: blur(6px);
+    }
+    .global-nav-controls button:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-2px);
+    }
+
+    /* FOOTER */
+    footer {
+      background: rgb(255, 255, 255);
+      text-align: center;
+      padding: 8px;
+      font-size: 11.5px;
+      color: #000000;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      font-weight: 500;
+    }
+
+    footer img {
+      height: 18px;
+      vertical-align: middle;
+      margin: 0 4px;
+      opacity: 1;
+      filter: brightness(1.1);
+    }
+
+    /* TOC POPUP */
+    .toc-popup {
+      display: none;
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      max-width: 600px;
+      background: rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 5px 25px rgba(0,0,0,0.4);
+      animation: fadeIn 0.4s ease;
+      z-index: 10;
+    }
+    .toc-popup h3 { margin-top: 0; color: #cfe8ff; }
+    .toc-popup a {
+      display: block;
+      color: #fff;
+      text-decoration: none;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      transition: color 0.2s;
+    }
+    .toc-popup a:hover { color: #00b4ff; }
+
+    .global-nav-controls {
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <h1>RASON Monitoring — Manual Operations v1.1.0</h1>
+      <p>Step-by-step Penggunaan Aplikasi (klik ini → klik itu) — sesuai alur operator</p>
+      <div class="header-badges">
+        <div class="badge">Version: v1.1.0</div>
+        <div class="badge">Mode: Operator Manual</div>
+        <div class="badge">Developed by: Terrindo</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main id="guide-container">
+
+    <!-- ✅ QUICK START -->
+    <section class="page active" id="page-quickstart" data-title="Quick Start">
+      <h2>✅ QUICK START — ALUR CEPAT (3 MENIT)</h2>
+
+      <p>Bagian ini dibuat untuk operator yang ingin langsung menggunakan aplikasi tanpa membaca seluruh detail modul.</p>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-lightning-charge"></i> Quick</span>
+        <b>Tujuan:</b> Login → pilih modul → filter data → lihat hasil → export (bila perlu).
+      </div>
+
+      <div class="steps">
+        <h3>🚀 Langkah Cepat</h3>
+        <ol>
+          <li><b>Login</b> → buka halaman login, isi <b>Username</b> & <b>Password</b>, lalu klik <b>Login</b>.</li>
+          <li><b>Masuk Main Page</b> → cek status site di peta (Online/Offline/Inflight/Preparing).</li>
+          <li><b>Pilih modul di sidebar</b> (contoh: <b>Data Resume</b>, <b>Map View</b>, <b>Time Accuracy</b>).</li>
+          <li><b>Set filter</b> → pilih <b>Site</b>, <b>Date/Month/Year</b>, <b>Hour</b>, dan <b>File Type</b> sesuai kebutuhan.</li>
+          <li><b>Klik tombol aksi</b> (misal <b>Apply</b>, <b>Load Data</b>, atau <b>List Files</b>) → tunggu data tampil.</li>
+          <li><b>Analisis & Export</b> → gunakan tabel/grafik; export CSV jika tersedia di modul.</li>
+        </ol>
+      </div>
+
+      <h3>🧭 Navigasi Dasar yang Selalu Sama</h3>
+      <ul>
+        <li><b>Sidebar</b> di kiri: daftar modul utama.</li>
+        <li><b>Toggle Sidebar (☰ / ❮)</b>: sembunyikan/tampilkan sidebar (tersimpan di <code>localStorage</code>).</li>
+        <li><b>Ikon User (👤)</b>: info akun + logout.</li>
+        <li><b>Header Box</b>: judul modul + jam UTC.</li>
+      </ul>
+
+      <div style="display:flex;justify-content:center;align-items:center;gap:20px;margin-top:30px;">
+        <img src="{{ url_for('static', filename='images/bmkg2.png') }}" alt="BMKG Logo" style="height:60px;">
+        <img src="{{ url_for('static', filename='images/meteomodem.png') }}"
+             alt="Meteomodem Logo"
+             style="height:60px;background:white;padding:6px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+      </div>
+
+      <p style="text-align:center;margin-top:15px;font-style:italic;opacity:0.85;">
+        "Klik modul → set filter → Apply → baca grafik & tabel"
+      </p>
+    </section>
+
+    <!-- 🔑 LOGIN -->
+    <section class="page" id="page-login" data-title="Login">
+      <h2>🔑 LOGIN — LANGKAH OPERASI</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/login_page.png') }}"
+           alt="Login Page Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step</h3>
+        <ol>
+          <li>Buka halaman login aplikasi.</li>
+          <li>Klik kolom <b>Username</b> → ketik username.</li>
+          <li>Klik kolom <b>Password</b> → ketik password.</li>
+          <li>Klik tombol <b>Login</b> <i class="bi bi-box-arrow-in-right"></i>.</li>
+          <li>Jika sukses, sistem otomatis pindah ke <b>Main Page</b> (<code>/main</code>).</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-exclamation-triangle"></i> Jika gagal</span>
+        <ul>
+          <li>Muncul pesan error (kredensial salah / akun expired).</li>
+          <li>Pastikan <b>caps lock</b> tidak aktif dan koneksi server normal.</li>
+        </ul>
+      </div>
+
+      <h3>✅ Output yang benar</h3>
+      <ul>
+        <li>Anda melihat peta Indonesia + sidebar menu utama.</li>
+        <li>Jam UTC di header berjalan (update per detik).</li>
+      </ul>
+    </section>
+
+    <!-- 🏠 MAIN -->
+    <section class="page" id="page-main" data-title="Main Page">
+      <h2>🏠 MAIN PAGE — OPERASI HARIAN</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/main_page.png') }}"
+           alt="Main Page Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <img src="{{ url_for('static', filename='images/guide/card-main.png') }}"
+           alt="Main Page Cards Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (cek status site)</h3>
+        <ol>
+          <li>Lihat peta Indonesia → perhatikan warna marker:
+            <ul>
+              <li>🟢 Online</li>
+              <li>🟠 Preparing</li>
+              <li>🔵 Inflight</li>
+              <li>🔴 Offline</li>
+            </ul>
+          </li>
+          <li>Arahkan mouse ke marker site → baca tooltip (nama site, status, last update).</li>
+          <li>Lihat <b>Status Grid</b> → cek ringkasan launch/end, end pressure, max height, termination.</li>
+          <li>Jika ingin analisis detail, klik menu modul di <b>sidebar</b>.</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-list"></i> Navigasi</span>
+        <ul>
+          <li>Klik <b>☰ / ❮</b> untuk hide/show sidebar.</li>
+          <li>Klik <b>👤</b> untuk info akun + logout cepat.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 📊 DATA RESUME / DASHBOARD -->
+    <section class="page" id="page-dashboard" data-title="Data Resume">
+      <h2>📊 DATA RESUME (DASHBOARD) — FILTER & EXPORT</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/dashboard.png') }}"
+           alt="Dashboard Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (ambil daftar file & metadata)</h3>
+        <ol>
+          <li>Klik menu <b>Data Resume</b> <i class="bi bi-bar-chart-fill"></i> di sidebar.</li>
+          <li>Di panel filter, pilih <b>File Type</b> (misal <code>.bfr</code> / <code>.bufr</code> / <code>.bfh</code> / <code>.bin</code>).</li>
+          <li>Pilih <b>Start Date</b> dan <b>End Date</b>.</li>
+          <li>Klik <b>Apply</b> → sistem memuat tabel daftar file.</li>
+          <li>Jika ingin metadata lengkap, klik <b>Show Metadata</b> (jika tombol tersedia).</li>
+          <li>Jika ingin export, klik <b>Generate CSV</b> → unduh hasil CSV.</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-info-circle"></i> Tips</span>
+        <ul>
+          <li>Gunakan rentang tanggal kecil dulu untuk loading cepat.</li>
+          <li>Status warna tabel: <b>OK</b> (hijau), <b>Warning</b> (oranye), <b>Issues</b> (merah).</li>
+        </ul>
+      </div>
+
+      <h3>✅ Output yang benar</h3>
+      <ul>
+        <li>Tabel terisi dengan file per site + metadata utama.</li>
+        <li>Ikon aksi (buka/unduh/analisis) tampil sesuai implementasi sistem Anda.</li>
+      </ul>
+    </section>
+
+    <!-- 🗺️ MAP VIEWER -->
+    <section class="page" id="page-map" data-title="Map Viewer">
+      <h2>🗺️ MAP VIEWER — PUTAR LINTASAN (PLAYBACK)</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/map_viewer.png') }}"
+           alt="Map Viewer Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (load data dari server)</h3>
+        <ol>
+          <li>Klik menu <b>Map View</b> <i class="bi bi-map"></i> di sidebar.</li>
+          <li>Pilih <b>Site</b>.</li>
+          <li>Pilih <b>Date</b> → lalu pilih <b>Hour</b> (00Z/12Z).</li>
+          <li>Pilih <b>Type</b> (BUFR/BFR/BFH/BIN).</li>
+          <li>Klik <b>Apply</b> → sistem mengambil file dari server dan menampilkan lintasan di peta.</li>
+          <li>Gunakan kontrol playback:
+            <ul>
+              <li><b>⏮</b> mundur frame</li>
+              <li><b>▶ / ⏸</b> play/pause</li>
+              <li><b>⏭</b> maju frame</li>
+              <li><b>Slider</b> untuk lompat ke frame tertentu</li>
+            </ul>
+          </li>
+          <li>(Opsional) Klik <b>Show Charts</b> untuk menampilkan grafik profil (angin/suhu/dewpoint) bila tersedia.</li>
+        </ol>
+      </div>
+
+      <div class="steps">
+        <h3>📤 Step-by-step (upload file lokal)</h3>
+        <ol>
+          <li>Di bagian uploader, klik <b>Choose File</b> / <b>Select File</b>.</li>
+          <li>Pilih file radiosonde dari komputer (BUFR/BFR/BFH/BIN).</li>
+          <li>Klik <b>Upload</b> (atau tombol upload yang tersedia).</li>
+          <li>Tunggu status: <b>Uploading → Decoding → Success</b>.</li>
+          <li>Jika sukses, lintasan tampil di peta + panel data terisi.</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-layers"></i> Layer</span>
+        <ul>
+          <li>Ganti basemap (Esri/OSM/Hybrid) via kontrol layer bila tersedia.</li>
+          <li>Overlay Himawari IR (GIBS WMS) tampil sesuai konfigurasi sistem.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 🌐 TRAJECTORY 3D -->
+    <section class="page" id="page-trajectory" data-title="Trajectory 3D">
+      <h2>🌐 TRAJECTORY 3D — VISUALISASI 3 DIMENSI</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/trajectory3d.png') }}"
+           alt="3D Trajectory Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (load data 3D)</h3>
+        <ol>
+          <li>Klik menu <b>Trajectory 3D</b> <i class="bi bi-globe2"></i> di sidebar.</li>
+          <li>Pilih <b>Site</b>, <b>Date</b>, <b>Hour</b>, dan <b>Type</b>.</li>
+          <li>Klik <b>Apply</b> → peta 3D memuat lintasan.</li>
+          <li>Gunakan <b>▶ / ⏸</b> di playback bar untuk memutar/menghentikan animasi.</li>
+          <li>Atur <b>Speed</b> untuk mempercepat/perlambat.</li>
+          <li>Geser <b>Progress Slider</b> untuk lompat ke waktu/ketinggian tertentu.</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-wind"></i> Analisis Layer</span>
+        <ul>
+          <li>Aktifkan <b>Wind Shear</b> (ikon angin) bila tersedia.</li>
+          <li>Aktifkan <b>Freezing Level</b> (ikon ❄️) bila tersedia.</li>
+          <li>Perhatikan panel level (kanan atas) untuk nilai numerik tiap lapisan.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ⏱️ TIME ACCURACY -->
+    <section class="page" id="page-time" data-title="Time Accuracy">
+      <h2>⏱️ TIME ACCURACY — OPERASI MONITORING WAKTU</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/time_accuracy.png') }}"
+           alt="Time Accuracy Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (tampilkan grafik & tabel)</h3>
+        <ol>
+          <li>Klik menu <b>Time Accuracy</b> <i class="bi bi-stopwatch"></i> di sidebar.</li>
+          <li>Pilih <b>Site</b>.</li>
+          <li>Pilih <b>Month</b> dan <b>Year</b>.</li>
+          <li>Pilih <b>Launch Time</b> (00Z / 12Z / All).</li>
+          <li>Halaman akan memuat grafik & tabel sesuai filter (secara otomatis atau via tombol load, tergantung implementasi).</li>
+          <li>Arahkan mouse ke bar chart → lihat tooltip durasi setiap fase (Prep→Launch, Launch→AB, AB→Burst).</li>
+          <li>Scroll ke tabel → cek kolom <b>Date</b>, <b>Launch</b>, <b>AB</b>, <b>Burst</b>.</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-bar-chart-steps"></i> Interpretasi cepat</span>
+        <ul>
+          <li>Bar makin tinggi = durasi makin lama.</li>
+          <li>Perbandingan 00Z vs 12Z memudahkan deteksi keterlambatan pola operasional.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 🎈 HEIGHT REACH -->
+    <section class="page" id="page-height" data-title="Height Reach">
+      <h2>🎈 HEIGHT REACH — OPERASI PEMANTAUAN KETINGGIAN</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/height_reach.png') }}"
+           alt="Height Reach Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (tampilkan grafik height & pressure)</h3>
+        <ol>
+          <li>Klik menu <b>Height Reach</b> <i class="bi bi-graph-up"></i> di sidebar.</li>
+          <li>Pilih <b>Site</b>.</li>
+          <li>Pilih <b>Month</b> dan <b>Year</b>.</li>
+          <li>Pilih <b>Launch Time</b> (00Z / 12Z / All).</li>
+          <li>Tunggu grafik muncul (line chart) + tabel bawah.</li>
+          <li>Arahkan mouse ke titik grafik → baca nilai <b>Height</b>.</li>
+          <li>Scroll ke tabel → cek kolom <b>Date</b>, <b>Height</b>, <b>Pressure</b>.</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-exclamation-triangle"></i> Indikasi anomali</span>
+        <ul>
+          <li>Height rendah mendadak di satu hari → potensi burst dini / masalah gas/balloon.</li>
+          <li>Pressure akhir tinggi (mis. &gt; 100 hPa) → indikator flight berhenti terlalu cepat.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 📅 DATA AVAILABILITY -->
+    <section class="page" id="page-availability" data-title="Data Availability">
+      <h2>📅 DATA AVAILABILITY — OPERASI CEK KELENGKAPAN DATA</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/data_availability.png') }}"
+           alt="Data Availability Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (load tabel kalender)</h3>
+        <ol>
+          <li>Klik menu <b>Data Availability</b> <i class="bi bi-calendar3"></i> di sidebar.</li>
+          <li>Pilih <b>Month</b> dan <b>Year</b>.</li>
+          <li>Pilih <b>Jam</b> (00Z / 12Z) bila ada selector jam.</li>
+          <li>Klik <b>Load Data</b> (atau auto-load sesuai implementasi).</li>
+          <li>Scroll horizontal untuk melihat tanggal 1–31.</li>
+          <li>Arahkan mouse ke simbol lingkaran → baca tooltip (complete/partial/no data).</li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-palette"></i> Arti warna umum</span>
+        <ul>
+          <li><b>Hijau</b> = data lengkap</li>
+          <li><b>Kuning</b> = data sebagian / tidak lengkap</li>
+          <li><b>Merah</b> = tidak ada data</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ⚠️ ERROR ANALYSIS -->
+    <section class="page" id="page-error" data-title="Error Analysis">
+      <h2>⚠️ ERROR ANALYSIS — OPERASI QC & DIAGNOSTIK</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/error_analysis.png') }}"
+           alt="Error Analysis Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="steps">
+        <h3>🧾 Step-by-step (analisis satu flight)</h3>
+        <ol>
+          <li>Klik menu <b>Error Analysis</b> <i class="bi bi-exclamation-triangle"></i> di sidebar.</li>
+          <li>Pilih <b>Site</b>.</li>
+          <li>Pilih <b>Date</b>.</li>
+          <li>Pilih <b>Hour</b> (00Z / 12Z).</li>
+          <li>Pilih <b>File Type</b> (BUFR / BFR / BFH / BIN).</li>
+          <li>Klik <b>📁 List Files</b> untuk memunculkan daftar file yang tersedia.</li>
+          <li>Pilih file yang ingin dianalisis.</li>
+          <li>Sistem menampilkan:
+            <ul>
+              <li>4 grafik (Temp, RH, Wind Speed, Wind Direction)</li>
+              <li>Tabel level data (Pressure/Height/Temp/Dewpoint/RH/Wind)</li>
+              <li>Hasil <b>Deep Physics</b> (issues + atmospheric features)</li>
+            </ul>
+          </li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-check2-circle"></i> Checklist operator</span>
+        <ul>
+          <li>Grafik tidak kosong (terutama RH & Dewpoint bila mapping benar).</li>
+          <li>Tabel level terisi (minimal pressure/height/temp/wind).</li>
+          <li>Bagian “Potential Operational Issues” memberi indikasi bila ada anomali.</li>
+        </ul>
+      </div>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-tools"></i> Jika grafik/tabel kosong</span>
+        <ul>
+          <li>Coba ganti <b>File Type</b> (mis. BFR vs BUFR) dan ulangi list files.</li>
+          <li>Pastikan mapping BUFR sesuai (cek di <b>Settings → BUFR Mapping</b>).</li>
+          <li>Pastikan file berhasil ter-decode (tidak error di backend).</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ⚙️ SETTINGS -->
+    <section class="page" id="page-settings" data-title="Settings">
+      <h2>⚙️ SETTINGS — OPERASI ADMIN (USER & CONFIG)</h2>
+
+      <img src="{{ url_for('static', filename='images/guide/settings.png') }}"
+           alt="Settings Preview"
+           style="width:100%;max-width:900px;border-radius:10px;margin:15px auto;display:block;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-shield-lock"></i> Admin Only</span>
+        <b>Catatan:</b> Menu ini umumnya hanya bisa diakses akun admin. User biasa biasanya hanya melihat tab tertentu (mis. Serial Lookup).
+      </div>
+
+      <div class="steps">
+        <h3>👥 Step-by-step — User Management</h3>
+        <ol>
+          <li>Klik menu <b>Settings</b> <i class="bi bi-gear"></i> di sidebar.</li>
+          <li>Buka tab <b>User Management</b>.</li>
+          <li>Untuk edit user:
+            <ul>
+              <li>Klik ikon <b>✏️</b> pada user → ubah field (password/expiry/pages) sesuai kebutuhan.</li>
+              <li>Klik <b>Save</b> / <b>Update</b> (sesuai tombol di UI).</li>
+            </ul>
+          </li>
+          <li>Untuk hapus user, klik <b>🗑️</b> lalu konfirmasi.</li>
+          <li>Untuk force logout user, gunakan tombol <b>Logout</b> / <b>Force logout</b> (jika tersedia).</li>
+        </ol>
+      </div>
+
+      <div class="steps">
+        <h3>🌐 Step-by-step — Site Configuration</h3>
+        <ol>
+          <li>Buka tab <b>Site Configuration</b>.</li>
+          <li>Untuk tambah site: klik <b>➕ Add Site</b> → isi nama, lat, lon, offset → <b>Save</b>.</li>
+          <li>Untuk edit site: klik <b>✏️</b> → ubah koordinat → <b>Save</b>.</li>
+          <li>Untuk hapus site: klik <b>🗑️</b> → konfirmasi.</li>
+        </ol>
+      </div>
+
+      <div class="steps">
+        <h3>🧩 Step-by-step — BUFR Mapping Configuration</h3>
+        <ol>
+          <li>Buka tab <b>BUFR Mapping</b>.</li>
+          <li>Pilih scope mapping (global/per-site) bila tersedia.</li>
+          <li>Tambah field: klik <b>➕</b> → isi descriptor/name/type → <b>Save</b>.</li>
+          <li>Edit field: klik <b>✏️</b> → ubah mapping → <b>Save</b>.</li>
+          <li>Export/Import JSON: gunakan tombol <b>Export</b> / <b>Import</b> untuk sinkronisasi antar environment.</li>
+        </ol>
+      </div>
+
+      <div class="steps">
+        <h3>🔍 Step-by-step — Serial Lookup</h3>
+        <ol>
+          <li>Buka tab <b>Serial Lookup</b>.</li>
+          <li>Ketik nomor seri (contoh: <code>230451</code>).</li>
+          <li>Klik <b>Search</b> → detail serial tampil.</li>
+        </ol>
+      </div>
+
+      <div class="steps">
+        <h3>🗂️ Step-by-step — FTP vs Database</h3>
+        <ol>
+          <li>Buka tab <b>FTP vs Database</b>.</li>
+          <li>Pilih <b>Site</b>, <b>File Type</b>, <b>Start</b>, <b>End</b>.</li>
+          <li>Klik <b>Refresh</b> untuk menampilkan daftar file FTP & DB.</li>
+          <li>Jika ingin sinkron:
+            <ul>
+              <li>Klik <b>Insert FTP → DB</b> (jika tersedia).</li>
+              <li>Atau <b>Re-download</b> untuk refresh file dari FTP.</li>
+            </ul>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 🧰 TROUBLESHOOT -->
+    <section class="page" id="page-troubleshoot" data-title="Troubleshoot">
+      <h2>🧰 TROUBLESHOOT — MASALAH UMUM & SOLUSI CEPAT</h2>
+
+      <div class="callout">
+        <span class="tag"><i class="bi bi-life-preserver"></i> Cepat</span>
+        Jika terjadi error, fokus ke 3 hal: <b>Filter</b> benar → <b>File tersedia</b> → <b>Decode sukses</b>.
+      </div>
+
+      <h3>1) Data tidak muncul setelah Apply/Load</h3>
+      <ul>
+        <li>Periksa pilihan <b>Site/Date/Hour/Type</b> (salah jam/tipe adalah kasus paling sering).</li>
+        <li>Klik <b>List Files</b> (jika ada) untuk memastikan file benar-benar tersedia.</li>
+        <li>Coba periode/tanggal lain untuk memastikan server ada data.</li>
+      </ul>
+
+      <h3>2) Grafik kosong tapi tabel ada (atau sebaliknya)</h3>
+      <ul>
+        <li>Indikasi mismatch mapping variable (cek <b>Settings → BUFR Mapping</b>).</li>
+        <li>Coba format file lain (BUFR vs BFR).</li>
+        <li>Refresh halaman (hard refresh) untuk cache JS yang nyangkut.</li>
+      </ul>
+
+      <h3>3) Halaman terasa lambat</h3>
+      <ul>
+        <li>Perkecil rentang tanggal.</li>
+        <li>Hindari membuka banyak tab browser sekaligus.</li>
+        <li>Pastikan koneksi ke server stabil.</li>
+      </ul>
+
+      <h3>4) Tidak bisa akses Settings</h3>
+      <ul>
+        <li>Akun Anda bukan role admin, atau halaman access belum diaktifkan.</li>
+        <li>Hubungi admin untuk menambahkan akses pada menu terkait.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <div class="global-nav-controls">
+    <button onclick="navigatePage(-1)"><i class="bi bi-arrow-left"></i> Previous</button>
+    <button onclick="toggleTOC()"><i class="bi bi-house-door"></i> Home</button>
+    <button onclick="navigatePage(1)">Next <i class="bi bi-arrow-right"></i></button>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    Powered by
+    <img src="{{ url_for('static', filename='images/meteomodem.png') }}" alt="Terrindo">
+    <span>PT. Terrindo Media Raya</span>
+  </footer>
+
+  <!-- 📖 Table of Contents -->
+  <div class="toc-popup" id="tocPopup">
+    <h3>📖 Table of Contents</h3>
+
+    <a href="#" data-goto="page-quickstart">✅ Quick Start</a>
+    <a href="#" data-goto="page-login">🔑 Login</a>
+    <a href="#" data-goto="page-main">🏠 Main Page</a>
+    <a href="#" data-goto="page-dashboard">📊 Data Resume</a>
+    <a href="#" data-goto="page-map">🗺️ Map Viewer</a>
+    <a href="#" data-goto="page-trajectory">🌐 Trajectory 3D</a>
+    <a href="#" data-goto="page-time">⏱️ Time Accuracy</a>
+    <a href="#" data-goto="page-height">🎈 Height Reach</a>
+    <a href="#" data-goto="page-availability">📅 Data Availability</a>
+    <a href="#" data-goto="page-error">⚠️ Error Analysis</a>
+    <a href="#" data-goto="page-settings">⚙️ Settings</a>
+    <a href="#" data-goto="page-troubleshoot">🧰 Troubleshoot</a>
+  </div>
+
+  <script>
+    const pages = document.querySelectorAll('.page');
+    let currentPage = 0;
+
+    function navigatePage(direction) {
+      pages[currentPage].classList.remove('active');
+      currentPage = (currentPage + direction + pages.length) % pages.length;
+      pages[currentPage].classList.add('active');
+    }
+
+    function toggleTOC() {
+      const toc = document.getElementById('tocPopup');
+      toc.style.display = toc.style.display === 'block' ? 'none' : 'block';
+    }
+
+    document.querySelectorAll('#tocPopup a').forEach(link => {
+      link.onclick = e => {
+        e.preventDefault();
+        const targetId = link.getAttribute('data-goto');
+        const idx = [...pages].findIndex(p => p.id === targetId);
+        if (idx >= 0) {
+          pages[currentPage].classList.remove('active');
+          currentPage = idx;
+          pages[currentPage].classList.add('active');
+        }
+        toggleTOC();
+      };
+    });
+
+    // === 🕒 Auto-hide Global Navigation Controls ===
+    const navControls = document.querySelector('.global-nav-controls');
+    let navTimeout;
+
+    function showNav() {
+      navControls.style.opacity = '1';
+      navControls.style.pointerEvents = 'auto';
+      clearTimeout(navTimeout);
+      navTimeout = setTimeout(() => {
+        navControls.style.opacity = '0';
+        navControls.style.pointerEvents = 'none';
+      }, 2500);
+    }
+
+    document.addEventListener('mousemove', showNav);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      navControls.style.transition = 'opacity 0.5s ease';
+      navControls.style.opacity = '0';
+      navControls.style.pointerEvents = 'none';
+    });
+  </script>
+</body>
+</html>

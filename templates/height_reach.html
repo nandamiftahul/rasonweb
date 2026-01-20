@@ -827,6 +827,26 @@ async function loadSites() {
         pointHoverRadius: 6
       });
     }
+// ✅ Reference lines for monitoring levels
+datasets.push({
+  label: "Ref 100 hPa",
+  data: labels.map(() => 100),
+  borderColor: "rgba(255,255,255,0.7)",
+  borderWidth: 1,
+  borderDash: [6, 6],
+  pointRadius: 0,
+  fill: false
+});
+
+datasets.push({
+  label: "Ref 30 hPa",
+  data: labels.map(() => 30),
+  borderColor: "rgba(255,255,255,0.7)",
+  borderWidth: 1,
+  borderDash: [2, 6],
+  pointRadius: 0,
+  fill: false
+});
 
     if (chart) chart.destroy();
     chart = new Chart(ctx, {
@@ -842,12 +862,21 @@ async function loadSites() {
             grid: { color: "rgba(255,255,255,0.1)" }
           },
           y: {
-            title: { display: true, text: "End Pressure (hPa)", color: "#fff" },  // ✅
-            ticks: { color: "#fff" },
+            type: "logarithmic",  // ✅ log scale
+            title: { display: true, text: "End Pressure (hPa) [log scale]", color: "#fff" },
+            ticks: {
+              color: "#fff",
+              // ✅ biar tick log enak dibaca (opsional tapi membantu)
+              callback: (value) => {
+                const v = Number(value);
+                // tampilkan tick utama saja (contoh: 30, 50, 100, 200, 500, 1000)
+                const keep = [10, 20, 30, 50, 100, 200, 300, 500, 700, 1000, 1100];
+                return keep.includes(v) ? v : "";
+              }
+            },
             grid: { color: "rgba(255,255,255,0.1)" },
-            beginAtZero: false,        // ✅ pressure nggak perlu start 0
-            suggestedMin: 0,           // optional
-            suggestedMax: 1050         // optional (biar enak lihat)
+            min: 0,     // ✅ supaya area 30–100 kelihatan
+            max: 1100    // ✅ pressure awal ~1100
           }
         },
         plugins: {

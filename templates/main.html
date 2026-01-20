@@ -430,6 +430,42 @@
 .footer {
   z-index: 10; /* footer selalu di atas map */
 }
+/* === 📘 Docs links under status grid (Main Page) === */
+.docs-under-grid{
+  margin-top: 6px;                  /* jarak dari card grid */
+  display: flex;
+  justify-content: flex-end;        /* rata kanan */
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255,255,255,0.22);
+}
+
+.doc-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #93c5fd;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.22);
+}
+
+.doc-chip i{
+  font-size: 15px;
+}
+
+.doc-chip:hover{
+  background: rgba(255,255,255,0.22);
+  color: #e0f2fe;
+  transform: translateY(-1px);
+}
 
   </style>
 </head>
@@ -485,11 +521,32 @@
     <!-- Map -->
     <div id="indoMap"></div>
 
-    <!-- Dynamic Site Status -->
-    <div id="statusGrid" class="card-grid">
-      <p>Loading latest site status...</p>
-    </div>
-  </div>
+<!-- Dynamic Site Status -->
+<div id="statusGrid" class="card-grid">
+  <p>Loading latest site status...</p>
+</div>
+
+<!-- 📘 Docs link: tepat di bawah card resume site -->
+<div class="docs-under-grid">
+  <a class="doc-chip"
+     href="{{ url_for('pages.manual_page') }}"
+     target="_blank"
+     title="Open Manual in new tab">
+    <i class="bi bi-book"></i>
+    Manual
+  </a>
+
+  <a class="doc-chip"
+     href="{{ url_for('pages.user_guide_page') }}"
+     target="_blank"
+     title="Open User Guide in new tab">
+    <i class="bi bi-journal-text"></i>
+    User Guide
+  </a>
+</div>
+
+</div>
+
     <!-- Footer -->
   <div class="footer">
     <span>Powered by</span>

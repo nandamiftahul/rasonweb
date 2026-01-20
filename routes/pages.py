@@ -224,6 +224,11 @@ def user_guide_page():
 def display_page():
     return render_template("display.html")
 
+@pages.route("/manual")
+@login_required
+def manual_page():
+    return render_template("manual.html")
+
 @pages.route("/reason_explanation")
 @login_required
 def reason_explanation_page():

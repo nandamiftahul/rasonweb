@@ -488,7 +488,42 @@
 .combined-telemetry { color: #4da3ff !important; font-weight:600; }
 .combined-temp { color: #ffa366 !important; font-weight:600; }
 .combined-other { color: #d1d5db !important; font-weight:600; }
-    
+
+/* === 🔹 Reason explanation footer under table === */
+.reason-footer {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255,255,255,0.25);
+}
+
+.reason-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(6px);
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.25s ease;
+}
+
+.reason-link i {
+  font-size: 16px;
+}
+
+.reason-link:hover {
+  background: rgba(255,255,255,0.25);
+  color: #e0f2fe;
+  transform: translateY(-1px);
+}
+
+
   </style>
 </head>
 
@@ -563,10 +598,24 @@
       </form>
     </div>
 
-    <div class="card">
-      <h2>Files</h2>
-      <div id="content"></div>
-    </div>
+<div class="card">
+  <h2>Files</h2>
+
+  <div id="content"></div>
+
+  <!-- 🔹 Explanation link BELOW table -->
+  <div class="reason-footer">
+    <a href="{{ url_for('pages.reason_explanation_page') }}"
+       target="_blank"
+       title="Explanation of Termination & Combined Codes"
+       class="reason-link">
+      <i class="bi bi-info-circle-fill"></i>
+      <span>Explanation of Termination & Combined Codes</span>
+    </a>
+  </div>
+</div>
+
+
   </div>
   <div class="footer">
     <span>Powered by</span>
