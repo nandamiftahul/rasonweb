@@ -63,6 +63,7 @@ def login():
     # GET method
     return render_template("login.html")
 
+
 @pages.route("/logout")
 @login_required
 def logout():
