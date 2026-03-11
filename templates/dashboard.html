@@ -630,6 +630,39 @@
 
   <script>
 
+// === COMBINED_REASON_MAP (meaning only) for CSV "Note" column ===
+const COMBINED_REASON_NOTE = {
+  "BUR-FRZ-100": "Burst terjadi setelah sensor freeze-out, terjadi pada supercooled dry layer.",
+  "BUR-CLD-100": "Balon pecah akibat turbulensi atau drag saat melewati lapisan awan/hujan.",
+  "BUR-CNB-100": "Balon pecah saat melewati cumulonimbus atau updraft kuat.",
+  "BUR-SHR-100": "Shear vertikal tinggi menyebabkan balon pecah sebelum mencapai puncak.",
+  "BUR-DSH-100": "Perubahan arah angin ekstrem memicu stress pada balon.",
+  "BUR-PRS-UNK": "Pecah terjadi setelah anomali tekanan, kemungkinan sensor error atau turbulensi.",
+
+  "ASC-CLD-UNK": "Balon tertahan hujan/drag sehingga berhenti naik.",
+  "ASC-CNB-UNK": "Downburst atau turbulensi cumulonimbus menghentikan kenaikan balon.",
+  "ASC-FRZ-UNK": "Freeze-out menyebabkan data stagnan lalu ascent stop.",
+  "ASC-ASN-UNK": "Laju naik melemah bertahap akibat densitas udara, cuaca, atau gas kurang.",
+  "ASC-SHR-UNK": "Shear layer menghambat kenaikan sehingga balon berhenti.",
+
+  "TEL-CLD-UNK": "Hujan menyebabkan sinyal lemah/terhalang.",
+  "TEL-CNB-UNK": "Sinyal hilang saat balon masuk cumulonimbus.",
+  "TEL-GPS-UNK": "GPS hilang dan sistem tracking gagal mengikuti balon.",
+  "TEL-SHR-UNK": "Shear tinggi membuat balon drift cepat keluar coverage antena.",
+
+  "TMP-FRZ-UNK": "Sensor T rusak akibat pembentukan es.",
+  "TMP-SAT-UNK": "Sensor T dan RH jenuh sehingga data KO.",
+  "TMP-CPT-UNK": "Sensor tidak mampu membaca temperatur ekstrem di tropopause.",
+
+  "BAT-CPT-UNK": "Tegangan drop karena suhu ekstrem di tropopause.",
+  "BAT-FRZ-UNK": "Es dan kondensasi mempercepat konsumsi power.",
+
+  "OTH-CLD-UNK": "Gangguan operasi umum terkait lapisan awan.",
+  "OTH-SHR-UNK": "Shear ekstrem menyebabkan gangguan aerodinamis.",
+  "UNK-SHR-UNK": "Kasus umum tanpa reason eksplisit, namun shear terdeteksi."
+};
+
+
   // === Apply saved sidebar state when page loads ===
   window.addEventListener("DOMContentLoaded", () => {
     const sidebar = document.getElementById("sidebar");
@@ -713,104 +746,105 @@
       }
     }
 
-    function renderTable(sites, withMeta) {
-      let html = `<table id='dataTable' class='display nowrap' style='width:100%'><thead><tr>
-      <th>Site</th><th>File</th><th>Data Date<br><small>(UTC)</small></th>`;
-      if (withMeta)
-        html += `
-          <th>Launch<br><small>(UTC)</small></th>
-          <th>End<br><small>(UTC)</small></th>
-          <th>Status</th>
-          <th>Reason</th>
-          <th>Serial</th>
-          <th>Manufactured</th>
-          <th>Pressure<br><small>(hPa)</small></th>
-          <th>Height<br><small>(m)</small></th>
-          <th>Distance<br><small>(km)</small></th>
-          <th>Ascent<br><small>(m/s)</small></th>
-        `;
-      html += `<th>ZIP</th><th>Graph</th></tr></thead><tbody>`;
+function renderTable(sites, withMeta) {
+  let html = `<table id='dataTable' class='display nowrap' style='width:100%'><thead><tr>
+  <th>Site</th><th>File</th><th>Data Date<br><small>(UTC)</small></th>`;
+  if (withMeta)
+    html += `
+      <th>Launch<br><small>(UTC)</small></th>
+      <th>End<br><small>(UTC)</small></th>
+      <th>Status</th>
+      <th>Reason</th>
+      <th>Serial</th>
+      <th>Manufactured</th>
+      <th>Pressure<br><small>(hPa)</small></th>
+      <th>Height<br><small>(m)</small></th>
+      <th>Distance<br><small>(km)</small></th>
+      <th>Ascent<br><small>(m/s)</small></th>
+    `;
+  html += `<th>ZIP</th><th>Graph</th></tr></thead><tbody>`;
 
-      for (const [site, files] of Object.entries(sites)) {
-        files.forEach(f => {
-          let issues = Array.isArray(f.flight_issues) ? f.flight_issues.join(", ") : (f.flight_issues || "-");
-          let statusClass = "status-ok";
-          
-          // pastikan string
-          if (typeof issues === "string" && issues !== "-") {
-            // 🔴 prioritas tertinggi: Not reaching 100
-            if (issues.includes("Not reaching 100 hPa")) {
-              statusClass = "status-issues";
-              // hilangkan "Not reaching 30 hPa" agar tidak muncul dobel
-              issues = issues.replace("Not reaching 30 hPa", "").trim();
-              issues = issues.replace(",", "").trim();
-            }
-            // 🟠 Not reaching 30 tanpa 100
-            else if (issues.includes("Not reaching 30 hPa")) {
-              statusClass = "status-warn";
-            }
-            // 🟠 Ascent Stop
-            else if (issues.includes("Ascent Stop")) {
-              statusClass = "status-warn";
-            }
-            // 🔴 error lain
-            else if (issues !== "OK") {
-              statusClass = "status-issues";
-            }
-          }
-          const dataDate = (f.file_date || "-").replace(/\s*UTC\s*$/, "");
-          html += `<tr>
-            <td>${site} <br><small style="opacity:0.8;">(${f.site_code || '-'})</small></td>
-            <td><a href='/load_from_ftp/${f.site_code || '-'}/${f.name}' target='_blank'>📄</a></td>
-            <td>${dataDate}</td>`;
-            if (withMeta) {
-              const cleanLaunch = (f.launch_time || "-").replace(/\s*UTC\s*$/, "");
-              const cleanEnd = (f.end_time || "-").replace(/\s*UTC\s*$/, "");
-            
-              html += `
-                <td>${cleanLaunch}</td>
-                <td>${cleanEnd}</td>
-                <td class='${statusClass}'>${issues}</td>
-                <td class="combined-${f.combined_color}">
-                  ${f.reason_for_termination || "-"} 
-                  <br>
-                  <small style="opacity:0.9;font-weight:600;">
-                    ${f.combined_code || ""}
-                  </small>
-                </td>
-                <td>${f.radiosonde_serial_number || "-"}</td>
-                <td>${f.manufactured || "-"}</td>
-                <td>${f.end_pressure || "-"}</td>
-                <td>${f.max_height || "-"}</td>
-                <td>${f.end_distance || "-"}</td>
-                <td>${f.avg_ascent_rate || "-"}</td>`;
-            }
-            html += `
-              <td>
-                <a href="/download_zip/${f.site_code}/${f.name}" 
-                   target="_blank"
-                   title="Download BUFR + WMO ZIP">🗜️</a>
-              </td>
-              <td><a href='/raob/${f.site_code || '-'}/${f.name}' target='_blank'>📊</a></td>
-            </tr>`;
-        });
+  // ✅ helper: keep status like old version (short only)
+  function legacyStatus(issueList) {
+    const arr = Array.isArray(issueList) ? issueList : [];
+    if (arr.includes("Not reaching 100 hPa")) return "Not reaching 100 hPa";
+    if (arr.includes("Not reaching 30 hPa")) return "Not reaching 30 hPa";
+    if (arr.some(x => typeof x === "string" && x.includes("Ascent Stop"))) return "Ascent Stop";
+    if (arr.length === 0) return "OK";
+    if (arr.includes("OK")) return "OK";
+    // fallback (old behavior feel): if there are issues but none of the legacy keys, still show OK
+    return "OK";
+  }
+
+  function legacyStatusClass(statusText) {
+    // keep your old color logic
+    if (statusText.includes("Not reaching 100 hPa")) return "status-issues";
+    if (statusText.includes("Not reaching 30 hPa") || statusText.includes("Ascent Stop")) return "status-warn";
+    return "status-ok";
+  }
+
+  for (const [site, files] of Object.entries(sites)) {
+    files.forEach(f => {
+      const statusText = legacyStatus(f.flight_issues);
+      const statusClass = legacyStatusClass(statusText);
+
+      const dataDate = (f.file_date || "-").replace(/\s*UTC\s*$/, "");
+
+      html += `<tr>
+        <td>${site} <br><small style="opacity:0.8;">(${f.site_code || '-'})</small></td>
+        <td><a href='/load_from_ftp/${f.site_code || '-'}/${f.name}' target='_blank'>📄</a></td>
+        <td>${dataDate}</td>`;
+
+      if (withMeta) {
+        const cleanLaunch = (f.launch_time || "-").replace(/\s*UTC\s*$/, "");
+        const cleanEnd = (f.end_time || "-").replace(/\s*UTC\s*$/, "");
+
+        html += `
+          <td>${cleanLaunch}</td>
+          <td>${cleanEnd}</td>
+          <td class='${statusClass}'>${statusText}</td>
+          <td class="combined-${f.combined_color}">
+            ${f.reason_for_termination || "-"} 
+            <br>
+            <small style="opacity:0.9;font-weight:600;">
+              ${f.combined_code || ""}
+            </small>
+          </td>
+          <td>${f.radiosonde_serial_number || "-"}</td>
+          <td>${f.manufactured || "-"}</td>
+          <td>${f.end_pressure || "-"}</td>
+          <td>${f.max_height || "-"}</td>
+          <td>${f.end_distance || "-"}</td>
+          <td>${f.avg_ascent_rate || "-"}</td>`;
       }
 
-      html += "</tbody></table>";
-      document.getElementById("content").innerHTML = html;
+      html += `
+        <td>
+          <a href="/download_zip/${f.site_code}/${f.name}" 
+             target="_blank"
+             title="Download BUFR + WMO ZIP">🗜️</a>
+        </td>
+        <td><a href='/raob/${f.site_code || '-'}/${f.name}' target='_blank'>📊</a></td>
+      </tr>`;
+    });
+  }
 
-      if ($.fn.DataTable.isDataTable('#dataTable')) $('#dataTable').DataTable().destroy();
-      $('#dataTable').DataTable({
-        scrollX: true,
-        autoWidth: true,
-        responsive: true,
-        order: [[2, "desc"]],
-        initComplete: () => $('.dataTables_scrollHead, .dataTables_scrollBody').css('width', '100%')
-      });
-      // Enable/disable tombol CSV: hanya aktif setelah "Show Metadata"
-      const btnCsv = document.getElementById('btnCsv');
-      btnCsv.disabled = !withMeta;
-    }
+  html += "</tbody></table>";
+  document.getElementById("content").innerHTML = html;
+
+  if ($.fn.DataTable.isDataTable('#dataTable')) $('#dataTable').DataTable().destroy();
+  $('#dataTable').DataTable({
+    scrollX: true,
+    autoWidth: true,
+    responsive: true,
+    order: [[2, "desc"]],
+    initComplete: () => $('.dataTables_scrollHead, .dataTables_scrollBody').css('width', '100%')
+  });
+
+  // Enable/disable tombol CSV: hanya aktif setelah "Show Metadata"
+  const btnCsv = document.getElementById('btnCsv');
+  btnCsv.disabled = !withMeta;
+}
 
     document.getElementById("filterForm").addEventListener("submit", async e => {
       e.preventDefault();
@@ -848,8 +882,21 @@ function generateCSV() {
   const headersAll = Array.from(document.querySelectorAll('#dataTable thead th'))
     .map(th => th.innerText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim());
 
-  // 🔹 Hapus kolom File (index ke-1) dan 3 terakhir (.bfr, WMO, Analysis)
-  const headers = headersAll.filter((_, i) => i !== 1 && i < headersAll.length - 3);
+  // ✅ Kita hanya buang:
+  // - kolom File (index 1)
+  // - 2 kolom terakhir: ZIP dan Graph
+  const last2Start = headersAll.length - 2;
+
+  let headers = headersAll.filter((_, i) => i !== 1 && i < last2Start);
+
+  // ✅ Sisipkan kolom "Note" setelah "Reason"
+  const reasonIdx = headers.findIndex(h => /^Reason\b/i.test(h));
+  if (reasonIdx !== -1) {
+    headers.splice(reasonIdx + 1, 0, "Note");
+  } else {
+    // fallback kalau header "Reason" tidak ada (harusnya ada saat metadata)
+    headers.push("Note");
+  }
 
   // 🔹 Tambahkan kolom Nomor di paling kiri
   headers.unshift("No");
@@ -862,6 +909,14 @@ function generateCSV() {
     return val;
   };
 
+  // Helper: ambil combined_code dari cell Reason (di UI: ada reason + small combined_code)
+  const extractCombinedCode = (reasonCellText) => {
+    if (!reasonCellText) return "";
+    // cocokkan format seperti BUR-FRZ-100, TEL-GPS-UNK, dll.
+    const m = String(reasonCellText).match(/\b[A-Z]{3}-[A-Z]{3}-[A-Z0-9]{3}\b/);
+    return m ? m[0] : "";
+  };
+
   // === Ambil baris aktif dari DataTable ===
   const nodes = dt.rows({ search: 'applied' }).nodes().toArray();
   const lines = [];
@@ -869,12 +924,31 @@ function generateCSV() {
 
   nodes.forEach((tr, idx) => {
     const tds = Array.from(tr.querySelectorAll('td'));
-    const validCells = tds.filter((_, i) => i !== 1 && i < tds.length - 3);
 
-    const row = validCells.map(td => {
-      const text = td.textContent.trim();
-      return csvEscape(text);
-    });
+    // ✅ Ambil cells yang sama dengan header filtering di atas:
+    // - buang File (index 1)
+    // - buang 2 terakhir (ZIP, Graph)
+    const validCells = tds.filter((_, i) => i !== 1 && i < tds.length - 2);
+
+    // Ambil text semua cell dulu
+    const rowTexts = validCells.map(td => td.textContent.trim());
+
+    // ✅ Siapkan note dari combined_code (berdasarkan text di kolom Reason)
+    let noteText = "";
+    if (reasonIdx !== -1) {
+      // Karena kita sudah buang File, indeks "Reason" pada validCells = reasonIdx (headers tanpa No)
+      const reasonText = rowTexts[reasonIdx] || "";
+      const code = extractCombinedCode(reasonText);
+      noteText = COMBINED_REASON_NOTE[code] || "";
+      // Sisipkan note tepat setelah reason
+      rowTexts.splice(reasonIdx + 1, 0, noteText);
+    } else {
+      // fallback
+      rowTexts.push(noteText);
+    }
+
+    // Escape CSV
+    const row = rowTexts.map(csvEscape);
 
     // 🔹 Tambah nomor urut di kolom paling kiri
     row.unshift(idx + 1);
@@ -900,7 +974,9 @@ function generateCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-    // === Load user info from backend ===
+
+
+// === Load user info from backend ===
     async function loadUserInfo() {
       try {
         const res = await fetch("/api/my_info");

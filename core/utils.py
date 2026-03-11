@@ -15,9 +15,11 @@ def _derive_fernet_key(secret: str) -> bytes:
     h = _hashlib.sha256(secret.encode("utf-8")).digest()
     return _base64.urlsafe_b64encode(h)
 
+
 def _get_fernet():
     """Return global Fernet instance derived from config SECRET_KEY."""
     return Fernet(_derive_fernet_key(SECRET_KEY))
+
 
 def encrypt_value(val):
     """Encrypt any serializable object to a Fernet token."""
@@ -28,6 +30,7 @@ def encrypt_value(val):
     except Exception as e:
         print(f"encrypt_value failed: {e}")
         return val
+
 
 def decrypt_value(token_str):
     """Decrypt token back to original JSON value."""
@@ -48,6 +51,7 @@ def decrypt_value(token_str):
         print(f"decrypt_value failed: {e}")
         return token_str
 
+
 def extract_date_from_filename(fname: str):
     # Match 14-digit date string like 20250905000000
     m = re.search(r"(\d{14})", fname)
@@ -59,6 +63,7 @@ def extract_date_from_filename(fname: str):
         except Exception:
             return "-"
     return "-"
+
 
 def excel_date_to_str(val):
     """Konversi nilai Excel float (misal 45680.0) menjadi YYYY-MM-DD."""
@@ -72,11 +77,14 @@ def excel_date_to_str(val):
         pass
     return "-"
 
+
 def safe_float(val):
+    """(Deduped) Convert to float, else np.nan."""
     try:
         return float(val)
     except (TypeError, ValueError):
         return np.nan
+
 
 # Ambil tanggal dari nama file (atau fallback ke waktu modifikasi)
 def parse_log_date(filename):
@@ -94,6 +102,7 @@ def parse_log_date(filename):
     except Exception:
         return datetime.min
 
+
 # --- helper: ambil angka saja, aman untuk "12345", "12345.0", "SN-12345", dll.
 def parse_serial_to_int(val):
     if val is None:
@@ -108,6 +117,7 @@ def parse_serial_to_int(val):
     # jika format campur huruf, ambil digitnya
     digits = re.sub(r"\D", "", s)
     return int(digits) if digits.isdigit() else None
+
 
 REASON_MAP = {
     0:"Not specified",1:"Balloon burst",2:"Battery exhausted",3:"Ascent Stop",
@@ -260,7 +270,6 @@ COMBINED_REASON_MAP = {
     }
 }
 
-
 SENSOR_MAPS = {
     "pressure": {0:"Unknown",1:"Aneroid",2:"Capacitive",3:"Other"},
     "temperature": {0:"Unknown",1:"Thermistor",2:"Platinum",3:"Other"},
@@ -282,20 +291,46 @@ def normalize_primary(reason_raw: str) -> str:
 
 
 def infer_secondary_from_qc(issues_text: str) -> str:
-    """Infer secondary category only from QC flight_issues."""
-    issues = issues_text.lower()
+    """
+    Infer secondary cause from analyze_flight() issue strings.
+    Backward-compatible: original priority preserved.
+    """
+    issues = (issues_text or "").lower()
 
+    # =========================
+    # ✅ ORIGINAL RULES (same priority)
+    # =========================
     if "ascent stop" in issues:
-        return "slow ascent"            # maps to ASC-ASN-UNK
+        return "slow ascent"          # -> ASN
 
     if "not reaching 30" in issues or "not reaching 100" in issues:
-        return "strong shear"           # maps to *-SHR-* groups
+        return "strong shear"         # -> SHR
 
     if "gps fail" in issues:
-        return "gps fail"
+        return "gps fail"             # -> GPS
 
     if "temp ko" in issues:
-        return "rh freeze-out"
+        return "rh freeze-out"        # -> FRZ
+
+    # =========================
+    # ➕ NEW RULES (from new analyze_flight strings)
+    # =========================
+
+    # Directional shear
+    if "directional shear" in issues or "ddir/dz" in issues:
+        return "directional shear"    # -> DSH
+
+    # Pressure anomaly / reversal
+    if "pressure anomaly" in issues or "pressure increases with height" in issues:
+        return "pressure reversal"    # -> PRS
+
+    # Deep convection proxy (stronger condition)
+    if ("unstable layer" in issues or "lapse>7" in issues) and ("cloud layer" in issues or "rh>90%" in issues):
+        return "deep convection"      # -> CNB
+
+    # Cloud / rain layer
+    if "cloud layer" in issues or "rh>90%" in issues:
+        return "cloud / rain"         # -> CLD
 
     return ""
 
@@ -303,65 +338,142 @@ def infer_secondary_from_qc(issues_text: str) -> str:
 def analyze_flight(df_meta, df_levels):
     issues = []
 
+    # =========================
+    # ✅ EXISTING CHECKS (KEEP EXACT BEHAVIOR)
+    # =========================
+
     # --- Temperature check ---
-    if df_levels["temp_C"].isna().sum() > len(df_levels) * 0.3:
-        issues.append("Bad Temp: too many missing values")
-    if (df_levels["temp_C"] > 60).any():
-        issues.append("Temp KO: unrealistic values > ±60 °C")
+    if "temp_C" in df_levels:
+        if df_levels["temp_C"].isna().sum() > len(df_levels) * 0.3:
+            issues.append("Bad Temp: too many missing values")
+        if (df_levels["temp_C"] > 60).any():
+            issues.append("Temp KO: unrealistic values > ±60 °C")
 
     # --- Ascent stop ---
     if "ascent_rate_mps" in df_levels:
-        if (df_levels["ascent_rate_mps"] <= 0).rolling(5, min_periods=1).sum().max() >= 5:
-            issues.append("Ascent Stop: balloon stopped rising")
+        try:
+            if (df_levels["ascent_rate_mps"] <= 0).rolling(5, min_periods=1).sum().max() >= 5:
+                issues.append("Ascent Stop: balloon stopped rising")
+        except Exception:
+            pass
 
     # --- Max height check ---
     if "pressure_hPa" in df_levels:
-        min_p = df_levels["pressure_hPa"].min()
-        if min_p > 100:
-            issues.append("Not reaching 100 hPa")
-        if min_p > 30:
-            issues.append("Not reaching 30 hPa")
+        try:
+            min_p = df_levels["pressure_hPa"].min()
+            if min_p > 100:
+                issues.append("Not reaching 100 hPa")
+            if min_p > 30:
+                issues.append("Not reaching 30 hPa")
+        except Exception:
+            pass
 
     # --- GPS check ---
-    if "latitude" in df_levels and df_levels["latitude"].isna().sum() > len(df_levels) * 0.2:
-        issues.append("GPS Fail: too many missing positions")
+    if "latitude" in df_levels:
+        try:
+            if df_levels["latitude"].isna().sum() > len(df_levels) * 0.2:
+                issues.append("GPS Fail: too many missing positions")
+        except Exception:
+            pass
+
+    # =========================
+    # ➕ NEW “WEATHER-STYLE” SIGNALS (ADDITIVE ONLY)
+    # =========================
+
+    has_height = "height_m" in df_levels
+
+    # --- Cloud layer proxy (RH > 90%) ---
+    if has_height and "rh_percent" in df_levels:
+        try:
+            rh = df_levels["rh_percent"]
+            z  = df_levels["height_m"]
+            clouds = df_levels[(rh > 90) & rh.notna() & z.notna()]
+            if not clouds.empty:
+                zmin = float(clouds["height_m"].min())
+                zmax = float(clouds["height_m"].max())
+                thickness_km = (zmax - zmin) / 1000.0
+                if thickness_km >= 0.3:
+                    issues.append(f"Cloud Layer: RH>90% between {zmin/1000:.1f}–{zmax/1000:.1f} km")
+        except Exception:
+            pass
+
+    # --- Unstable lapse rate ---
+    if has_height and {"temp_C", "height_m"} <= set(df_levels.columns):
+        try:
+            tmp = df_levels["temp_C"].astype(float)
+            z   = df_levels["height_m"].astype(float)
+            dz_km = z.diff() / 1000.0
+            lapse_rate = -(tmp.diff() / dz_km)  # °C/km
+            lapse_rate = lapse_rate.replace([np.inf, -np.inf], np.nan)
+
+            unstable = df_levels[(lapse_rate > 7) & lapse_rate.notna()]
+            if not unstable.empty:
+                zmin = float(unstable["height_m"].min())
+                zmax = float(unstable["height_m"].max())
+                issues.append(f"Unstable Layer: lapse>7°C/km at {zmin/1000:.1f}–{zmax/1000:.1f} km")
+        except Exception:
+            pass
+
+    # --- Strong speed shear (uses wind_speed_mps from bufr_parser) ---
+    if has_height and {"wind_speed_mps", "height_m"} <= set(df_levels.columns):
+        try:
+            spd = df_levels["wind_speed_mps"].astype(float)
+            z   = df_levels["height_m"].astype(float)
+            dz_km = z.diff() / 1000.0
+            shear = spd.diff() / dz_km  # (m/s)/km
+            shear = shear.replace([np.inf, -np.inf], np.nan)
+
+            strong = df_levels[(shear.abs() > 10) & shear.notna()]
+            if not strong.empty:
+                zmin = float(strong["height_m"].min())
+                zmax = float(strong["height_m"].max())
+                issues.append(f"Strong Shear: |dV/dz|>10 m/s per km at {zmin/1000:.1f}–{zmax/1000:.1f} km")
+        except Exception:
+            pass
+
+    # --- Directional shear (uses wind_dir_deg from bufr_parser) ---
+    if has_height and {"wind_dir_deg", "height_m"} <= set(df_levels.columns):
+        try:
+            wd = df_levels["wind_dir_deg"].astype(float)
+            z  = df_levels["height_m"].astype(float)
+
+            d = wd.diff()
+            d = ((d + 180) % 360) - 180  # wrap to -180..180
+
+            dz_km = z.diff() / 1000.0
+            dsh = d.abs() / dz_km  # deg/km
+            dsh = dsh.replace([np.inf, -np.inf], np.nan)
+
+            strong_dsh = df_levels[(dsh > 60) & dsh.notna()]
+            if not strong_dsh.empty:
+                zmin = float(strong_dsh["height_m"].min())
+                zmax = float(strong_dsh["height_m"].max())
+                issues.append(f"Directional Shear: dDir/dz>60°/km at {zmin/1000:.1f}–{zmax/1000:.1f} km")
+        except Exception:
+            pass
+
+    # --- Pressure anomaly (pressure increasing with height) ---
+    if has_height and {"pressure_hPa", "height_m"} <= set(df_levels.columns):
+        try:
+            p = df_levels["pressure_hPa"].astype(float)
+            z = df_levels["height_m"].astype(float)
+
+            dz = z.diff()
+            dp = p.diff()
+
+            bad = df_levels[(dz > 0) & (dp > 0)]
+            if len(bad) >= 3:
+                issues.append("Pressure Anomaly: pressure increases with height (sensor/processing issue)")
+        except Exception:
+            pass
 
     return issues or ["OK"]
 
-def generate_weather_analysis(df):
-    text = []
-    # --- Cloud layers ---
-    clouds = df[df['rh_percent'] > 90]
-    if not clouds.empty:
-        base = clouds['height_m'].min()/1000
-        top = clouds['height_m'].max()/1000
-        text.append(f"Cloud layer detected between {base:.1f}–{top:.1f} km (RH > 90%).")
-
-    # --- Freezing level ---
-    df['temp_shift'] = df['temperature_C'].shift()
-    zero_cross = df[(df['temperature_C'] * df['temp_shift']) < 0]
-    if not zero_cross.empty:
-        zf = zero_cross['height_m'].iloc[0]/1000
-        text.append(f"Freezing level around {zf:.1f} km.")
-
-    # --- Instability zones ---
-    df['lapse_rate'] = -df['temperature_C'].diff() / (df['height_m'].diff()/1000)
-    unstable = df[df['lapse_rate'] > 7]
-    if not unstable.empty:
-        minz, maxz = unstable['height_m'].min()/1000, unstable['height_m'].max()/1000
-        text.append(f"Unstable layer (lapse rate > 7°C/km) from {minz:.1f}–{maxz:.1f} km.")
-
-    # --- Wind shear ---
-    df['wind_speed_diff'] = df['wind_speed_mps'].diff()
-    df['shear_rate'] = df['wind_speed_diff'] / (df['height_m'].diff()/1000)
-    strong_shear = df[df['shear_rate'] > 10]
-    if not strong_shear.empty:
-        minz, maxz = strong_shear['height_m'].min()/1000, strong_shear['height_m'].max()/1000
-        text.append(f"Strong wind shear zone ({minz:.1f}–{maxz:.1f} km). Turbulence risk.")
-
-    return "<br>".join(text) if text else "Atmospheric profile indicates generally stable conditions."
 
 def generate_weather_analysis(df):
+    """
+    (Deduped) Keep EXACT behavior of the *last* definition in your original file.
+    """
     text = []
 
     if "rh_percent" in df:
@@ -398,8 +510,10 @@ def generate_weather_analysis(df):
 
     return "<br>".join(text)
 
+
 SITE_LIST = []
-# core/utils.py
+
+
 def load_sites():
     """Return list of sites from sites.json (support alias)."""
     try:
@@ -430,6 +544,7 @@ def load_sites():
         print(f"[WARN] load_sites() failed: {e}")
         return []
 
+
 def save_sites(sites):
     """Write list of sites into sites.json ({'sites':[...]})"""
     try:
@@ -439,16 +554,10 @@ def save_sites(sites):
     except Exception as e:
         print(f"[WARN] save_sites() failed: {e}")
 
-def safe_float(val):
-    try:
-        return float(val)
-    except (TypeError, ValueError):
-        return np.nan
 
 def load_modem_lookup(json_path="list_data_modem.json"):
     """Convert modem list JSON to dict {serial_int: manufactured_str}."""
     from config.settings import BASE_DIR
-    import os
     path = os.path.join(BASE_DIR, json_path)
     if not os.path.exists(path):
         print(f"[WARN] Modem list not found: {path}")
@@ -464,5 +573,6 @@ def load_modem_lookup(json_path="list_data_modem.json"):
         if sn_int:
             lookup[sn_int] = manufactured_str
     return lookup
+
 
 MODEM_LOOKUP = load_modem_lookup("list_data_modem.json")

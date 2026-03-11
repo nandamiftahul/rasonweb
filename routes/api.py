@@ -178,27 +178,102 @@ def api_sites_with_meta():
 
             f["site_code"] = site_name
             # =============================
-            # 🔵 COMBINED REASON MATCHING (Solution A)
+            # 🔵 COMBINED REASON MATCHING (Solution A + safe fallback)
             # =============================
-            
+            import re
+
+            # --- helper: parse termination reason code from "13 – Unknown" / "1" / 1 ---
+            def _parse_reason_code(val):
+                if val is None:
+                    return None
+                if isinstance(val, (int, float, np.integer, np.floating)):
+                    try:
+                        return int(val)
+                    except Exception:
+                        return None
+                m = re.search(r"\d+", str(val))
+                return int(m.group()) if m else None
+
+            # --- helper: get level tag (30/100/UNK) ---
+            def _infer_level_tag(file_obj, issues_text_lower):
+                # Prefer real end_pressure if available
+                ep = file_obj.get("end_pressure")
+                try:
+                    # end_pressure might be "69.5" or "69.5 hPa"
+                    if ep is not None:
+                        if isinstance(ep, str):
+                            m = re.search(r"(\d+(\.\d+)?)", ep)
+                            ep_val = float(m.group(1)) if m else None
+                        else:
+                            ep_val = float(ep)
+
+                        if ep_val is not None:
+                            if ep_val <= 30:
+                                return "30"
+                            if ep_val <= 100:
+                                return "100"
+                except Exception:
+                    pass
+
+                # Fallback from issues text
+                if "not reaching 30" in issues_text_lower:
+                    return "30"
+                if "not reaching 100" in issues_text_lower:
+                    return "100"
+                return "UNK"
+
+            # --- mapping text -> code (same table you wrote) ---
+            SECONDARY_TEXT_TO_CODE = {
+                "rh freeze-out": "FRZ",
+                "cloud / rain": "CLD",
+                "deep convection": "CNB",
+                "strong shear": "SHR",
+                "directional shear": "DSH",
+                "gps fail": "GPS",
+                "slow ascent": "ASN",
+                "pressure reversal": "PRS",
+            }
+
+            # --- primary label -> code ---
+            PRIMARY_LABEL_TO_CODE = {
+                "balloon burst": "BUR",
+                "ascent stop": "ASN",
+                "telemetry interrupted": "TEL",
+                "temperature ko": "TMP",
+                "unknown": "UNK",
+            }
+
             primary_raw = f.get("reason_for_termination", "")
-            primary_clean = normalize_primary(primary_raw)
-            
+
+            # ✅ IMPORTANT: if we can parse numeric reason, map it via REASON_MAP first
+            reason_code = _parse_reason_code(primary_raw)
+            if reason_code is not None:
+                # This makes primary normalization stable even if API already stored "13 – Unknown"
+                primary_for_norm = f"{reason_code} – {REASON_MAP.get(reason_code, 'Unknown')}"
+            else:
+                primary_for_norm = primary_raw
+
+            primary_clean = normalize_primary(primary_for_norm)  # your existing normalizer
+
             issues_text = ", ".join(f.get("flight_issues", []) or [])
-            secondary_clean = infer_secondary_from_qc(issues_text)
-            
+            issues_lower = issues_text.lower()
+
+            secondary_text = infer_secondary_from_qc(issues_text) or ""
+            secondary_text_lower = secondary_text.lower().strip()
+
+            # =============================
+            # 1) Try your existing COMBINED_REASON_MAP match (old behavior)
+            # =============================
             combined_code = "-"
             combined_color = ""
             combined_meaning = ""
-            
+
             for code, info in COMBINED_REASON_MAP.items():
-                # primary MUST match 100%
                 if info["primary"].lower() == primary_clean:
-                    # secondary is best-effort: startswith()
-                    if secondary_clean and info["secondary"].lower().startswith(secondary_clean):
+                    if secondary_text_lower and info["secondary"].lower().startswith(secondary_text_lower):
                         combined_code = code
                         combined_meaning = info["meaning"]
-            
+
                         if info["primary"] == "Balloon Burst":
                             combined_color = "burst"
                         elif info["primary"] == "Ascent Stop":
@@ -210,7 +285,35 @@ def api_sites_with_meta():
                         else:
                             combined_color = "other"
                         break
-            
+
+            # =============================
+            # 2) Fallback: ALWAYS produce a combined code even if not in map
+            # =============================
+            if combined_code == "-" or not combined_code:
+                primary_code = PRIMARY_LABEL_TO_CODE.get(primary_clean, "UNK")
+
+                # secondary_text is like "directional shear" etc
+                secondary_code = SECONDARY_TEXT_TO_CODE.get(secondary_text_lower, "UNK")
+
+                level_tag = _infer_level_tag(f, issues_lower)
+
+                combined_code = f"{primary_code}-{secondary_code}-{level_tag}"
+
+                # Meaning fallback (optional, keeps UI useful even if map missing)
+                combined_meaning = combined_meaning or ""
+
+                # Color fallback based on primary_code
+                if primary_code == "BUR":
+                    combined_color = "burst"
+                elif primary_code == "ASN":
+                    combined_color = "ascent"
+                elif primary_code == "TEL":
+                    combined_color = "telemetry"
+                elif primary_code == "TMP":
+                    combined_color = "temp"
+                else:
+                    combined_color = "other"
+
             # inject ke response
             f["combined_code"] = combined_code
             f["combined_color"] = combined_color
